@@ -1,14 +1,18 @@
 <div align="center">
-  <img src="assets/logo.png" width="400" alt="KnowFlow 企业知识库">
+  <img src="assets/logo.png" width="54" height="62" alt="KnowFlow 企业知识库">
 </div>
 
 ## 项目介绍
 
-KnowFlow 是一个基于 Ragflow 的开源项目，能持续兼容 RAGFlow 官方能力，并在此基础上提供一些新的功能，以解决实际应用中的一些痛点。
+KnowFlow 是一个基于 RAGFlow 的开源项目，持续兼容 RAGFlow 官方版本，同时会将社区里做的比较好的最佳实践整合进来。
+并在此基础上提供一些新的功能，以解决实际应用中的一些痛点。
+KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的最后一公里服务。
 
 ## 新增功能介绍
 
 ### 一. 用户后台管理系统 [done]
+
+参考 [ragflow-plus](https://github.com/zstar1003/ragflow-plus/)
 
 移除原登陆页用户注册的通道，搭建用户后台管理系统，可对用户进行管理，包括用户管理、团队管理、用户模型配置管理等功能。
 
