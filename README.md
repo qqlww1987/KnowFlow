@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/ragflow-plus.png" width="400" alt="KnowFlow 企业知识库">
+  <img src="assets/logo.png" width="400" alt="KnowFlow 企业知识库">
 </div>
 
 ## 项目介绍
@@ -76,7 +76,7 @@ pnpm dev
 浏览器访问启动后的地址，即可进入系统。
 
 <div align="center">
-  <img src="assets/management.png"  alt="用户后台管理系统">
+  <img src="assets/user-setting.png"  alt="用户后台管理系统">
 </div>
 
 
