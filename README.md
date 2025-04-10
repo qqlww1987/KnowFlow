@@ -84,31 +84,6 @@ pnpm dev
 </div>
 
 
-#### 3. 前端文件替换(可选)
-
-ragflow-plus 还对原有的前端文件进行了若干优化，包含新增加的文档撰写功能，如需体验，可通过以下步骤替换原文件：
-
-1. 克隆项目
-```bash
-git clone https://github.com/zstar1003/ragflow-plus.git
-```
-
-2. 打包web文件
-```bash
-cd web
-pnpm run build
-```
-
-3. 进入到容器，删除容器中已有的/ragflow/web/dist文件
-```bash
-docker exec -it ragflow-server /bin/sh
-rm -rf /ragflow/web/dist
-```
-
-4. 将打包好的web文件拷贝到容器中
-```bash
-docker cp dist ragflow-server:/ragflow/web/
-```
 
 
 ## 交流群
