@@ -53,6 +53,12 @@ graph LR
 
 ```bash
 # 创建虚拟环境，注意 python < 3.13
+# 如果本地 python 版本不一致，可以用如下方式进行安装
+# brew install pyenv
+# pyenv install 3.10
+# python3.10 -m venv venv
+# python3.10 process_pdf.py demo.pdf
+
 python -m venv venv
 
 # 激活虚拟环境
