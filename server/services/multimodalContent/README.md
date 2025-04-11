@@ -57,8 +57,6 @@ graph LR
 # brew install pyenv
 # pyenv install 3.10
 # python3.10 -m venv venv
-# python3.10 process_pdf.py demo.pdf
-
 python -m venv venv
 
 # 激活虚拟环境
@@ -79,6 +77,7 @@ pip install -r requirements.txt
 ```
 RAGFLOW_API_KEY=您的RAGFlow API密钥
 RAGFLOW_SERVER_IP=您的服务器IP地址
+DOC_ENGINE=PyMuPDF 或 MinerU
 ```
 
 查询您的IP地址方法：
