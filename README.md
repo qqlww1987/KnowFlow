@@ -86,7 +86,7 @@ pnpm dev
 
 ### 二. 支持回答结果图文混排 
 
-参照 /services/multimodalContent/README.md 文档进行配置。
+参照 `/services/multimodalContent/README.md` 文档进行配置。
 
 
 ## TODO
