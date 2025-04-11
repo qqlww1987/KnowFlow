@@ -1,14 +1,14 @@
 # RAGFlow图片服务方案 🖼️
 
 <div align="center">
-  <img src="images/ragflow_logo.png" alt="RAGFlow Logo" width="200">
+  <img src="images/logo.png" alt="KnowFlow Logo" width="200">
   <br>
   <p><strong>增强文档问答体验的图片服务解决方案</strong></p>
 </div>
 
 ## 📋 项目背景
 
-在使用RAGFlow框架进行文档问答时，原始文档中通常包含大量图片。为了在问答结果中正确显示这些图片，我们需要一种机制来提供图片的网络访问。本项目通过独立的图片服务器容器解决这个问题，使RAGFlow容器能够通过Docker网络访问图片资源。
+在使用 RAGFlow 框架进行文档问答时，原始文档中通常包含大量图片。为了在问答结果中正确显示这些图片，我们需要一种机制来提供图片的网络访问。本项目通过独立的图片服务器容器解决这个问题，使 RAGFlow 容器能够通过 Docker 网络访问图片资源。
 
 ## 🏗️ 系统架构
 
@@ -178,7 +178,7 @@ sequenceDiagram
 2. 找到新创建的聊天助手（名称与PDF文件名相关）
 3. 开始测试问答，验证回答中的图片是否正确显示
 
-![RAGFlow问答截图](images/ragflow_chat_demo.png)
+![RAGFlow问答截图](images/mulcontent.png)
 
 ## 🖼️ 图片URL格式说明
 
@@ -192,11 +192,6 @@ sequenceDiagram
 
 **注意**: 不要使用`localhost`或`127.0.0.1`作为图片URL中的主机地址，否则在RAGFlow容器中将无法正确解析。
 
-### 效果对比:
-
-| 使用IP地址的图片 | 使用localhost的图片 |
-|------------------|---------------------|
-| ![正确显示](images/correct_image_display.png) | ![不显示](images/incorrect_image_display.png) |
 
 ## 📊 代码运行流程说明
 
