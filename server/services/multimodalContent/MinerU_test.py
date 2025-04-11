@@ -15,20 +15,20 @@ def process_pdf_with_minerU(pdf_file_path, server_base="http://172.21.4.35:8000/
     local_image_dir, local_md_dir = "output/images", "output"
     os.makedirs(local_image_dir, exist_ok=True)
     
-    # # 处理PDF核心逻辑
-    # image_writer, md_writer = FileBasedDataWriter(local_image_dir), FileBasedDataWriter(local_md_dir)
-    # reader = FileBasedDataReader("")
-    # pdf_bytes = reader.read(pdf_file_path)
+    # 处理PDF核心逻辑
+    image_writer, md_writer = FileBasedDataWriter(local_image_dir), FileBasedDataWriter(local_md_dir)
+    reader = FileBasedDataReader("")
+    pdf_bytes = reader.read(pdf_file_path)
     
-    # ds = PymuDocDataset(pdf_bytes)
-    # if ds.classify() == SupportedPdfParseMethod.OCR:
-    #     pipe_result = ds.apply(doc_analyze, ocr=True).pipe_ocr_mode(image_writer)
-    # else:
-    #     pipe_result = ds.apply(doc_analyze, ocr=False).pipe_txt_mode(image_writer)
+    ds = PymuDocDataset(pdf_bytes)
+    if ds.classify() == SupportedPdfParseMethod.OCR:
+        pipe_result = ds.apply(doc_analyze, ocr=True).pipe_ocr_mode(image_writer)
+    else:
+        pipe_result = ds.apply(doc_analyze, ocr=False).pipe_txt_mode(image_writer)
     
     # 生成Markdown文件
     md_file_path = os.path.join(local_md_dir, f"{name_without_suff}.md")
-    # pipe_result.dump_md(md_writer, f"{name_without_suff}.md", "images")
+    pipe_result.dump_md(md_writer, f"{name_without_suff}.md", "images")
     
     # 处理图片和URL
     copy_images_to_server(local_image_dir, "./images")
