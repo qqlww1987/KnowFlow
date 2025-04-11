@@ -5,7 +5,7 @@ import argparse
 import os
 import json
 from dotenv import load_dotenv
-from PyMuPDF_test import extract_images_from_pdf, copy_images_to_server
+
 
 def main():
     # 加载.env文件中的环境变量
@@ -18,6 +18,7 @@ def main():
     parser.add_argument('--mount_dir', default='/app/images', help='图片服务器容器内的挂载目录，默认为/app/images')
     parser.add_argument('--skip_ragflow', action='store_true', help='跳过创建RAGFlow知识库，只处理图片')
     parser.add_argument('--server_ip', help='图片服务器IP地址（可选，默认从环境变量RAGFLOW_SERVER_IP获取）')
+    parser.add_argument('--doc_engine', help='文档解析器')
     
     args = parser.parse_args()
     
@@ -29,6 +30,10 @@ def main():
     
     # 获取服务器IP地址，优先使用命令行参数，其次使用环境变量
     server_ip = args.server_ip or os.getenv('RAGFLOW_SERVER_IP')
+
+    # 文档引擎
+    doc_engine = args.doc_engine or os.getenv('DOC_ENGINE')
+
     if not server_ip:
         raise ValueError("错误：未提供图片服务器IP地址。请在.env文件中设置RAGFLOW_SERVER_IP或使用--server_ip参数指定。")
     
@@ -36,13 +41,19 @@ def main():
     
     try:
         # 提取图片和增强文本
-        print(f"第1步：处理PDF并提取图片...")
-        enhanced_text, extracted_images = extract_images_from_pdf(args.pdf_path, server_ip=server_ip)
-        
-        # 复制图片到图片服务器目录
-        print(f"第2步：复制图片到服务器目录...")
-        copy_images_to_server(extracted_images, args.image_dir)
-        
+        print(f"第1步：处理PDF并提取内容以及图片...")
+
+        if doc_engine == 'PyMuPDF':
+            print(f"第1步：使用PyMuPDF处理PDF...")
+            # 导入PyMuPDF处理函数
+            from PyMuPDF_test import process_pdf_with_PyMuPDF
+            enhanced_text = process_pdf_with_PyMuPDF(args.pdf_path, f"http://{server_ip}:8000/")
+        elif doc_engine == 'MinerU':
+            print(f"第1步：使用MinerU处理PDF...")
+            # 导入MinerU处理函数
+            from MinerU_test import process_pdf_with_minerU
+            enhanced_text = process_pdf_with_minerU(args.pdf_path, f"http://{server_ip}:8000/")
+
         # 将增强文本保存到本地文件
         text_filename = os.path.splitext(os.path.basename(args.pdf_path))[0] + "_enhanced.txt"
         with open(text_filename, "w", encoding="utf-8") as f:

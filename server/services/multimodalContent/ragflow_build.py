@@ -4,7 +4,7 @@ import os
 import time
 import sys
 
-def create_ragflow_resources(enhanced_text, pdf_filename, api_key, base_url="http://localhost:9222", server_ip=None):
+def create_ragflow_resources(enhanced_text, pdf_filename, api_key, base_url="http://localhost", server_ip=None):
 
     """
     使用增强文本创建RAGFlow知识库和聊天助手
@@ -27,9 +27,6 @@ def create_ragflow_resources(enhanced_text, pdf_filename, api_key, base_url="htt
     try:
         # 初始化RAGFlow客户端
         rag_object = RAGFlow(api_key=api_key, base_url=base_url)
-        
-        # 检测是否为工程机械维修案例文档
-        is_maintenance_doc = "设备名称" in enhanced_text and "工时" in enhanced_text
         
         # 创建数据集名称
         dataset_name = f"{os.path.splitext(os.path.basename(pdf_filename))[0]}_知识库"
@@ -101,13 +98,9 @@ def create_ragflow_resources(enhanced_text, pdf_filename, api_key, base_url="htt
         
         # 如果需要更新助手的提示词，可以在创建后更新
         prompt_template = f"""
-        请参考以下内容回答用户问题。
-        
-        检索到的文档是工程机械维修案例合集，包含设备信息、维修过程和相关图片。
-
-        回答中默认需要展示知识库中和回答最相关的一张图片URL。注意，这个html格式的URL是来自知识库本身，
-        示例如下：<img src="http://{server_ip}:8000/images/filename.png" alt="维修图片" width="300">。
-        
+        请参考 {knowledge} 内容回答用户问题。
+        需要展示知识库中和回答最相关的一张图片URL。注意这个 html 格式的 URL 是来自知识库本身，URL 不能做任何改动。
+        示例如下：<img src="http://172.21.4.35:8000/images/filename.png" alt="维修图片" width="300">。
         请确保回答简洁、专业，将图片自然地融入回答内容中。
         """
         

@@ -6,6 +6,32 @@ import sys
 from PIL import Image
 import io
 
+
+def process_pdf_with_PyMuPDF(pdf_file_path, server_base="http://172.21.4.35:8000/"):
+    """
+    使用PyMuPDF处理PDF文件的主方法
+    参数:
+    - pdf_file_path: PDF文件路径
+    - server_base: 服务器基础URL
+    返回:
+    - 增强文本的Markdown文件路径
+    """
+    # 从server_base中提取server_ip
+    server_ip = server_base.split("//")[1].split(":")[0]
+    
+    # 调用原有方法处理PDF
+    enhanced_text, extracted_images = extract_images_from_pdf(
+        pdf_file_path, 
+        image_server_dir="./images",
+        server_ip=server_ip
+    )
+    
+    # 复制图片到服务器目录
+    copy_images_to_server(extracted_images, "./images")
+
+    return enhanced_text
+
+
 def extract_images_from_pdf(pdf_path, image_server_dir="./images", image_server_url=None, server_ip=None):
     """
     提取PDF中的图片和文本，返回带有图片位置标记的增强文本
