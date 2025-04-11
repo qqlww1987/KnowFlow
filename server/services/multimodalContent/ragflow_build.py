@@ -98,7 +98,7 @@ def create_ragflow_resources(enhanced_text, pdf_filename, api_key, base_url="htt
         
         # 如果需要更新助手的提示词，可以在创建后更新
         prompt_template = f"""
-        请参考 {knowledge} 内容回答用户问题。
+        请参考知识库内容回答用户问题。
         需要展示知识库中和回答最相关的一张图片URL。注意这个 html 格式的 URL 是来自知识库本身，URL 不能做任何改动。
         示例如下：<img src="http://172.21.4.35:8000/images/filename.png" alt="维修图片" width="300">。
         请确保回答简洁、专业，将图片自然地融入回答内容中。
