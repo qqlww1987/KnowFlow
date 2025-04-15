@@ -114,7 +114,7 @@ function createRequest(instance: AxiosInstance) {
       // 请求体
       data: {},
       // 请求超时
-      timeout: 5000,
+      timeout: 500000,
       // 跨域请求时是否携带 Cookies
       withCredentials: false
     }
