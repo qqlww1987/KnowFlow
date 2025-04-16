@@ -14,22 +14,13 @@ def main():
     parser = argparse.ArgumentParser(description='处理PDF文件，提取图片并创建RAGFlow知识库')
     parser.add_argument('--pdf_path', help='PDF文件路径')
     parser.add_argument('--api_key', help='RAGFlow API密钥（可选，默认从环境变量获取）')
-    parser.add_argument('--image_dir', default='./images', help='本地图片存储目录，默认为./images')
-    parser.add_argument('--mount_dir', default='/app/images', help='图片服务器容器内的挂载目录，默认为/app/images')
     parser.add_argument('--skip_ragflow', action='store_true', help='跳过创建RAGFlow知识库，只处理图片')
-    parser.add_argument('--server_ip', help='图片服务器IP地址（可选，默认从环境变量RAGFLOW_SERVER_IP获取）')
-    parser.add_argument('--doc_engine', help='文档解析器')
+
     
     args = parser.parse_args()
-    
-    # 确保本地图片目录存在
-    os.makedirs(args.image_dir, exist_ok=True)
-    
-    # 优先使用命令行参数的API密钥，其次使用环境变量
-    api_key = args.api_key or os.getenv('RAGFLOW_API_KEY')
-    
-    # 获取服务器IP地址，优先使用命令行参数，其次使用环境变量
-    server_ip = args.server_ip or os.getenv('RAGFLOW_SERVER_IP')
+
+    api_key =  os.getenv('RAGFLOW_API_KEY')
+    server_ip = os.getenv('RAGFLOW_SERVER_IP')
 
     # 文件路径
     pdf_path = args.pdf_path
@@ -38,24 +29,21 @@ def main():
     image_dir = 'output/images'
 
     if not server_ip:
-        raise ValueError("错误：未提供图片服务器IP地址。请在.env文件中设置RAGFLOW_SERVER_IP或使用--server_ip参数指定。")
+        raise ValueError("错误：请在.env文件中设置RAGFLOW_SERVER_IP或使用--server_ip参数指定。")
     
     print(f"使用图片服务器IP地址: {server_ip}")
     
     try:
        
         print(f"第1步：通过 MinerU 识别文本")
-        from MinerU_test import process_pdf_with_minerU
-        md_file_path = process_pdf_with_minerU(pdf_path, f"http://{server_ip}:8000/")
+        from mineru_test import process_pdf_with_minerU
+        md_file_path = process_pdf_with_minerU(pdf_path)
 
         # 如果设置了--skip_ragflow参数，跳过创建RAGFlow知识库
         if args.skip_ragflow:
             print("已跳过创建RAGFlow知识库")
             print("\n处理完成！")
             print(f"- 图片已保存到: {args.image_dir}")
-            print("\n请确保您已完成以下步骤：")
-            print(f"1. 构建并运行图片服务器容器：docker build -t image-server . && docker run -d -p 8000:8000 -v {os.path.abspath(args.image_dir)}:{args.mount_dir} --name image-server image-server")
-            print(f"2. 将图片服务器连接到RAGFlow网络：docker network connect rag-network ragflow-server && docker network connect rag-network image-server")
             return
         
         # 检查API密钥
@@ -65,7 +53,7 @@ def main():
         
         # 使用纯文本方式创建RAGFlow知识库和助手
         from ragflow_build import create_ragflow_resources
-        create_ragflow_resources(md_file_path, pdf_path, image_dir,api_key, server_ip=server_ip)
+        create_ragflow_resources(md_file_path, pdf_path, image_dir,api_key, server_ip)
         
         print(f"\n处理完成！")
     

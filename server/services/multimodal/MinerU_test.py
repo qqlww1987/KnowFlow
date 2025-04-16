@@ -9,12 +9,11 @@ from magic_pdf.config.enums import SupportedPdfParseMethod
 
 
 
-def process_pdf_with_minerU(pdf_file_path, server_base="http://172.21.4.35:8000/"):
+def process_pdf_with_minerU(pdf_file_path):
     """
     使用minerU处理PDF文件的主方法
     """
     print(f"=== 开始处理PDF文件: {pdf_file_path} ===")
-    print(f"服务器基础URL: {server_base}")
     
     # 初始化参数和目录
     name_without_suff = os.path.splitext(os.path.basename(pdf_file_path))[0]
@@ -22,7 +21,7 @@ def process_pdf_with_minerU(pdf_file_path, server_base="http://172.21.4.35:8000/
     print(f"创建输出目录: 图片目录={local_image_dir}, Markdown目录={local_md_dir}")
     os.makedirs(local_image_dir, exist_ok=True)
     
-    # 处理PDF核心逻辑
+    #处理PDF核心逻辑
     print("初始化文件读写器...")
     image_writer, md_writer = FileBasedDataWriter(local_image_dir), FileBasedDataWriter(local_md_dir)
     reader = FileBasedDataReader("")
@@ -43,7 +42,6 @@ def process_pdf_with_minerU(pdf_file_path, server_base="http://172.21.4.35:8000/
         pipe_result = ds.apply(doc_analyze, ocr=False).pipe_txt_mode(image_writer)
     
     # 生成Markdown文件
-
     md_file_path = os.path.join(local_md_dir, f"{name_without_suff}.md")
     print(f"生成Markdown文件: {md_file_path}")
     pipe_result.dump_md(md_writer, f"{name_without_suff}.md", "images")
@@ -69,12 +67,12 @@ def update_markdown_image_urls(md_file_path, kb_id):
         pattern = r'!\[\]\((.*?)\)'
         def replace_img(match):
             img_url = match.group(1)
-            # 去掉 images/ 前缀
+            # 去掉 images/ 前缀 
             img_url = os.path.basename(img_url)
             from minio_server import get_image_url
             if not img_url.startswith(('http://', 'https://')):
                  img_url = get_image_url(kb_id, img_url)
-            return f'<img src="{img_url}" width="300" alt="产品图片">'
+            return f'<img src="{img_url}" width="300" alt="图片">'
             
         updated_content = re.sub(pattern, replace_img, content)
         

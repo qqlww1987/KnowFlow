@@ -151,19 +151,8 @@ def get_image_url(kb_id, image_key):
         图片的公共访问URL
     """
     try:
-        # minio_client = get_minio_client()
-        
-        # # 检查桶和对象是否存在
-        # if not minio_client.bucket_exists(kb_id):
-        #     print(f"[ERROR] 存储桶不存在: {kb_id}")
-        #     return None
-                
-        # try:
-        #     minio_client.stat_object(kb_id, image_key)
-        # except Exception as e:
-        #     print(f"[ERROR] 对象不存在: {kb_id}/{image_key}, 错误: {str(e)}")
-        #     return None
-                
+
+
         # 获取MinIO服务器配置
         minio_endpoint = MINIO_CONFIG["endpoint"].split(':')[0] 
         # use_ssl = MINIO_CONFIG["secure"]

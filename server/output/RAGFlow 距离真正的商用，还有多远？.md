@@ -95,12 +95,12 @@ QAnything 企业版本功能：
 
 # 产品原型设计重构  
 
-<img src="https://www.knowflowchat.cn/minio/2d0d59401a8411f0badc5225ee02e7da/3ae2a7e2bd0a84445f1f04a51341d2fdf333e25b79cebda3a19b72e6fb40cfa7.jpg" width="300" alt="产品图片">  
+<img src="https://www.knowflowchat.cn/minio/5a5978f01aa411f0b2e35225ee02e7da/3ae2a7e2bd0a84445f1f04a51341d2fdf333e25b79cebda3a19b72e6fb40cfa7.jpg" width="300" alt="图片">  
 欢迎回来，tom今天我们要使用哪个知识库？  
 
 了解 RAGFlow 的同学可能也知道，目前 RAGFlow 的产品体验比较简陋，无论是核心的聊天主页面还是知识库页面都比较难以下咽。在 RAGFlow 交流社区内提过不少想换一个 UI 界面的需求，有的想接入三方 Open UI 或者 Dify ，我们的结论是重构整个 UI 设计：基于 RAGFlow API 能力，我们在现有服务基础上，改写所有页面设计。  
 
-<img src="https://www.knowflowchat.cn/minio/2d0d59401a8411f0badc5225ee02e7da/c6d56a017bcda7f3f37318278c41bde9daaa1c640ae128fb78728981b77a2a76.jpg" width="300" alt="产品图片">  
+<img src="https://www.knowflowchat.cn/minio/5a5978f01aa411f0b2e35225ee02e7da/c6d56a017bcda7f3f37318278c41bde9daaa1c640ae128fb78728981b77a2a76.jpg" width="300" alt="图片">  
 
 同时增强结构化输出能力，如回答中支持图文混排、代码、表格等格式。  
 
