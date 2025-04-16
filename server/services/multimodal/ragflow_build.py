@@ -4,19 +4,18 @@ import os
 import time
 import sys
 
-def create_ragflow_resources(enhanced_text, pdf_filename, api_key, base_url="https://www.knowflowchat.cn", server_ip=None):
+def create_ragflow_resources(md_file_path, pdf_filename,image_dir, api_key, base_url="https://www.knowflowchat.cn", server_ip=None):
 
     """
     使用增强文本创建RAGFlow知识库和聊天助手
     
     参数:
-    - enhanced_text: 包含图片URL的增强文本
+    - md_file_path: md 文件路径
     - pdf_filename: PDF文件名
     - api_key: RAGFlow API密钥
     - base_url: RAGFlow基础URL，默认为http://localhost
     - server_ip: 图片服务器IP地址（必须提供）
     """
-    print(f"创建RAGFlow资源，使用文本长度: {len(enhanced_text)} 字符")
     
     # 检查是否提供了server_ip
     if server_ip is None:
@@ -31,7 +30,9 @@ def create_ragflow_resources(enhanced_text, pdf_filename, api_key, base_url="htt
         # 创建数据集名称
         dataset_name = f"{os.path.splitext(os.path.basename(pdf_filename))[0]}_知识库"
         
-        print(f"使用默认分块方法创建数据集: {dataset_name}")
+     
+
+        print(f"第2步：创建RAGFlow知识库和助手...")
         # 使用默认的naive分块方法
         dataset = rag_object.create_dataset(
             name=dataset_name,
@@ -39,14 +40,15 @@ def create_ragflow_resources(enhanced_text, pdf_filename, api_key, base_url="htt
             embedding_model="BAAI/bge-m3",
             chunk_method="naive"  # 使用默认分块方法
         )
-        
+
+
+        print(f"第4步：上传增强文本到知识库中")
+        from MinerU_test import update_markdown_image_urls
+        enhanced_text = update_markdown_image_urls(md_file_path,dataset.id)
         # 准备文档显示名称和文本内容
         doc_name = os.path.basename(pdf_filename)
         if not doc_name.endswith(".txt"):
             doc_name = os.path.splitext(doc_name)[0] + ".txt"
-        
-        # 直接将文本内容上传（无需再处理PDF）
-        print(f"上传增强文本作为纯文本文档: {doc_name}")
         encoded_text = enhanced_text.encode('utf-8')
         
         # 上传增强文档
@@ -54,6 +56,11 @@ def create_ragflow_resources(enhanced_text, pdf_filename, api_key, base_url="htt
             "display_name": doc_name,
             "blob": encoded_text
         }])
+
+        print(f"第3步：将本地图片上传到 minio 中")
+        # 将本地图片上传到 minio 中
+        from minio_server import upload_directory_to_minio
+        upload_directory_to_minio(dataset.id, image_dir)
         
         # 解析文档
         docs = dataset.list_documents()
@@ -61,7 +68,7 @@ def create_ragflow_resources(enhanced_text, pdf_filename, api_key, base_url="htt
         print(f"开始解析文档，ID: {doc_ids}")
         dataset.async_parse_documents(doc_ids)
         
-        print(f"文档上传成功，正在解析...")
+        print(f"第5步: 文档上传成功，正在解析...")
         
         # 等待文档解析完成
         all_done = False

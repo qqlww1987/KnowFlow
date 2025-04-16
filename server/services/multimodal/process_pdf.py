@@ -31,10 +31,11 @@ def main():
     # 获取服务器IP地址，优先使用命令行参数，其次使用环境变量
     server_ip = args.server_ip or os.getenv('RAGFLOW_SERVER_IP')
 
-    # 文档引擎
-    doc_engine = args.doc_engine or os.getenv('DOC_ENGINE')
-
+    # 文件路径
     pdf_path = args.pdf_path
+
+    # 图片目录
+    image_dir = 'output/images'
 
     if not server_ip:
         raise ValueError("错误：未提供图片服务器IP地址。请在.env文件中设置RAGFLOW_SERVER_IP或使用--server_ip参数指定。")
@@ -42,33 +43,16 @@ def main():
     print(f"使用图片服务器IP地址: {server_ip}")
     
     try:
-        # 提取图片和增强文本
-        print(f"第1步：处理PDF并提取内容以及图片...")
+       
+        print(f"第1步：通过 MinerU 识别文本")
+        from MinerU_test import process_pdf_with_minerU
+        md_file_path = process_pdf_with_minerU(pdf_path, f"http://{server_ip}:8000/")
 
-        if doc_engine == 'PyMuPDF':
-            print(f"第1步：使用PyMuPDF处理PDF...")
-            # 导入PyMuPDF处理函数
-            from PyMuPDF_test import process_pdf_with_PyMuPDF
-            enhanced_text = process_pdf_with_PyMuPDF(pdf_path, f"http://{server_ip}:8000/")
-        elif doc_engine == 'MinerU':
-            print(f"第1步：使用MinerU处理PDF...")
-            # 导入MinerU处理函数
-            from MinerU_test import process_pdf_with_minerU
-            enhanced_text = process_pdf_with_minerU(pdf_path, f"http://{server_ip}:8000/")
-
-        # 将增强文本保存到本地文件
-        text_filename = os.path.splitext(os.path.basename(pdf_path))[0] + "_enhanced.txt"
-        with open(text_filename, "w", encoding="utf-8") as f:
-            f.write(enhanced_text)
-        
-        print(f"第2步：增强文本已保存到 {text_filename}")
-        
         # 如果设置了--skip_ragflow参数，跳过创建RAGFlow知识库
         if args.skip_ragflow:
             print("已跳过创建RAGFlow知识库")
             print("\n处理完成！")
             print(f"- 图片已保存到: {args.image_dir}")
-            print(f"- 增强文本已保存到: {text_filename}")
             print("\n请确保您已完成以下步骤：")
             print(f"1. 构建并运行图片服务器容器：docker build -t image-server . && docker run -d -p 8000:8000 -v {os.path.abspath(args.image_dir)}:{args.mount_dir} --name image-server image-server")
             print(f"2. 将图片服务器连接到RAGFlow网络：docker network connect rag-network ragflow-server && docker network connect rag-network image-server")
@@ -79,30 +63,17 @@ def main():
             print("错误：未提供RAGFlow API密钥，请通过--api_key参数或在.env文件中设置RAGFLOW_API_KEY")
             return
         
-        print(f"第3步：创建RAGFlow知识库和助手...")
-        
         # 使用纯文本方式创建RAGFlow知识库和助手
         from ragflow_build import create_ragflow_resources
-        dataset, assistant = create_ragflow_resources(enhanced_text, pdf_path, api_key, server_ip=server_ip)
+        create_ragflow_resources(md_file_path, pdf_path, image_dir,api_key, server_ip=server_ip)
         
         print(f"\n处理完成！")
-        print(f"- 图片已保存到: {args.image_dir}")
-        print(f"- 增强文本已保存到: {text_filename}")
-        print(f"- 知识库ID: {dataset.id}")
-        print(f"- 聊天助手ID: {assistant.id}")
-        print("\n请确保您已完成以下步骤：")
-        print(f"1. 构建并运行图片服务器容器：docker build -t image-server . && docker run -d -p 8000:8000 -v {os.path.abspath(args.image_dir)}:{args.mount_dir} --name image-server image-server")
-        print(f"2. 将图片服务器连接到RAGFlow网络：docker network connect rag-network ragflow-server && docker network connect rag-network image-server")
+    
+       
     except Exception as e:
         print(f"处理过程中出现错误：{str(e)}")
         # 保存已提取的图片和文本，即使处理过程中出错
-        if 'extracted_images' in locals() and extracted_images:
-            print(f"已提取{len(extracted_images)}张图片并保存到{args.image_dir}")
-        if 'enhanced_text' in locals() and enhanced_text:
-            text_filename = os.path.splitext(os.path.basename(pdf_path))[0] + "_enhanced.txt"
-            with open(text_filename, "w", encoding="utf-8") as f:
-                f.write(enhanced_text)
-            print(f"增强文本已保存到{text_filename}")
+
 
 if __name__ == "__main__":
     main() 
