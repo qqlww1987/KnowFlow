@@ -26,30 +26,34 @@ def process_pdf():
         python_executable = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'venv', 'bin', 'python3.10')    
         # 调用处理脚本
         result = subprocess.run(
-            [python_executable, 'services/multimodal/process_pdf.py', '--pdf_path',tmp_path],
+            [python_executable, 'services/multimodal/process_pdf.py', '--pdf_path', tmp_path],
             text=True,
             stdout=sys.stdout,  # 直接输出到控制台
-            stderr=sys.stderr,  # 直接输出错误到控制台
-            # capture_output=True,  # 捕获输出而不是直接打印
-            # check=True  # 如果返回非零状态码则抛出异常
+            stderr=sys.stderr  # 直接输出错误到控制台
+            # capture_output=True,  # 捕获输出
+            # check=False  # 不自动抛出异常，让我们手动处理返回码
         )
 
-        # 打印脚本的标准输出和错误输出
-        print("=== 脚本标准输出 ===")
-        print(result.stdout)
-        print("=== 脚本错误输出 ===")
-        print(result.stderr)
-
-        
         # 清理临时文件
         shutil.rmtree(temp_dir)
         
-        if "ERROR" in result.stdout or "Error" in result.stdout:
-                return jsonify({
-                    'code': 500,
-                    'message': '处理失败',
-                    'error': result.stdout
-                }), 500
+        # 检查返回码
+        if result.returncode != 0:
+            return jsonify({
+                'code': 500,
+                'message': '处理失败',
+                'error': result.stderr or result.stdout,  # stderr优先，如果没有则使用stdout
+                'returncode': result.returncode
+            }), 500
+            
+        # 即使返回码为0，也检查输出中是否包含错误信息
+        if result.stderr or "ERROR" in result.stdout or "Error" in result.stdout:
+            return jsonify({
+                'code': 500,
+                'message': '处理过程中出现错误',
+                'error': result.stderr or result.stdout,
+                'returncode': result.returncode
+            }), 500
             
         return jsonify({
             "code": 0,
