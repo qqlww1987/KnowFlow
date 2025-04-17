@@ -29,7 +29,7 @@ def _process_pdf(pdf_path, api_key, server_ip, skip_ragflow=False):
     """处理PDF文件的主要逻辑"""
     image_dir = 'output/images'
     
-    print(f"第1步：通过 MinerU 识别文本")
+   
     from mineru_test import process_pdf_with_minerU
     md_file_path = process_pdf_with_minerU(pdf_path)
 
@@ -42,11 +42,10 @@ def _process_pdf(pdf_path, api_key, server_ip, skip_ragflow=False):
     if not api_key:
         raise ValueError("错误：未提供RAGFlow API密钥，请通过--api_key参数或在.env文件中设置RAGFLOW_API_KEY")
 
-    print("第2步：创建RAGFlow知识库和助手")
     from ragflow_build import create_ragflow_resources
     create_ragflow_resources(md_file_path, pdf_path, image_dir, api_key, server_ip)
     
-    print(f"\n处理完成！")
+    print(f"\n全部任务处理完成！")
 
 def main():
     # 加载环境变量

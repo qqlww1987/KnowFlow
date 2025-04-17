@@ -44,6 +44,7 @@ def process_pdf_with_minerU(pdf_file_path):
     Returns:
         str: 生成的Markdown文件路径
     """
+    print(f"第1步：通过 MinerU 识别文本")
     print(f"=== 开始处理PDF文件: {pdf_file_path} ===")
     
     # 初始化目录

@@ -8,42 +8,37 @@
 
 ## 📋 项目背景
 
-在使用 RAGFlow 框架进行文档问答时，原始文档中通常包含大量图片。为了在问答结果中正确显示这些图片，我们需要一种机制来提供图片的网络访问。本项目通过独立的图片服务器容器解决这个问题，使 RAGFlow 容器能够通过 Docker 网络访问图片资源。
+在使用 RAGFlow 框架进行文档问答时，原始文档中通常包含大量图片。为了在问答结果中正确显示这些图片，我们需要一种机制来提供图片的网络访问。本项目通过 MinerU 库提取PDF中的图片，并将其保存到 RAGFlow 的 MinIO 容器内。
 
 ## 🏗️ 系统架构
 
 系统包含两个主要容器：
-1. **RAGFlow容器**：处理文档和提供问答功能
-2. **图片服务器容器**：提供图片资源的HTTP访问
+1. **RAGFlow 容器**：处理文档和提供问答功能
+2. **RAGFlow MinerU 存储**：提供图片资源的HTTP访问
 
-两个容器通过Docker自定义网络(`rag-network`)相互连接，使RAGFlow可以通过服务器IP地址引用图片：`http://192.168.x.x:8000/images/example.jpg`
+RAGFlow可以通过服务器IP地址引用图片：`http://localhost/kb_id/file.jpg`
 
 ```mermaid
 graph LR
     User[用户] --> |1. 上传PDF| RAG[RAGFlow容器]
     RAG --> |2. 提取图片| Images[图片文件]
     RAG --> |3. 创建知识库| KB[知识库]
-    Images --> |4. 存储| ImgServer[图片服务器容器]
+    Images --> |4. 存储| MinIO[图片服务器容器]
     User --> |5. 提问| RAG
     RAG --> |6. 检索知识库| KB
     RAG --> |7. 生成回答| User
     RAG --> |8. 引用图片URL| ImgServer
-    ImgServer --> |9. 提供图片访问| User
+    MinIO --> |9. 提供图片访问| User
     
-    subgraph Docker网络
-        RAG
-        ImgServer
-    end
 ```
 
 ## 📁 项目文件说明
 
-1. `image_server.py`: 图片服务器的主程序
-2. `PyMuPDF_test.py`: PDF文档处理和图片提取的核心功能
-3. `ragflow_build.py`: RAGFlow知识库和聊天助手创建的核心功能
-4. `process_pdf.py`: 整合所有功能的启动脚本
-5. `Dockerfile`: 图片服务器的容器配置文件
-6. `requirements.txt`: Python依赖包列表
+
+1. `ragflow_build.py`: RAGFlow知识库和聊天助手创建的核心功能
+2. `process_pdf.py`: 整合所有功能的启动脚本
+3. `Dockerfile`: 图片服务器的容器配置文件
+
 
 ## 🛠️ 环境准备
 

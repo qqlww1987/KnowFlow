@@ -1,17 +1,25 @@
 import { request } from "@/http/axios"
+import type * as mul from "./type"
 
-// PDF处理接口
-export function processPdfApi(file: File) {
+// PDF处理接口``
+export function processPdfApi(raw: File) {
   const formData = new FormData()
-  formData.append('file', file)
+  formData.append('file', raw)
   
-  return request({
+  return request<mul.ProcessPdfResponse>({
     url: 'api/v1/multimodal/process_pdf',
     method: 'post',
     data: formData,
     headers: {
       'Content-Type': 'multipart/form-data'
     }
+  })
+}
+
+export function getProcessStatus(taskId: string) {
+  return request<mul.ProcessPdfResponse>({
+    url: `api/v1/multimodal/process_status/${taskId}`,
+    method: "get"
   })
 }
 

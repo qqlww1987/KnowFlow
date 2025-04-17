@@ -109,7 +109,7 @@ export const constantRoutes: RouteRecordRaw[] = [
         component: () => import("@/pages/process-pdf/index.vue"),
         name: "ProcessPdf",
         meta: {
-          title: "PDF处理",
+          title: "PDF 图文混排",
           svgIcon: "keyboard-up",
           affix: false,
           keepAlive: true

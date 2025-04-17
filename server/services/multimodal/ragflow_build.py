@@ -14,7 +14,6 @@ def _create_dataset(rag_object, dataset_name):
     Returns:
         dataset: 创建的知识库对象
     """
-    print(f"第2步：创建RAGFlow知识库...")
     return rag_object.create_dataset(
         name=dataset_name,
         description="包含图片的PDF增强文档",
@@ -69,6 +68,7 @@ def create_ragflow_resources(md_file_path, pdf_filename, image_dir, api_key, bas
         rag_object = RAGFlow(api_key=api_key, base_url=base_url)
         
         # 创建知识库
+        print(f"第2步：创建RAGFlow知识库")
         dataset_name = f"{os.path.splitext(os.path.basename(pdf_filename))[0]}_知识库"
         dataset = _create_dataset(rag_object, dataset_name)
 
