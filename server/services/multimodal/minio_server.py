@@ -8,9 +8,20 @@ import json
 # 加载环境变量
 load_dotenv(".env")
 
+# 检测是否在Docker容器中运行
+def is_running_in_docker():
+    # 检查是否存在/.dockerenv文件
+    docker_env = os.path.exists('/.dockerenv')
+    # 或者检查cgroup中是否包含docker字符串
+    try:
+        with open('/proc/self/cgroup', 'r') as f:
+            return docker_env or 'docker' in f.read()
+    except:
+        return docker_env
+
 # MinIO配置常量
 MINIO_HOST = 'host.docker.internal' if is_running_in_docker() else 'localhost'
-# MINIO_HOST = 'www.knowflowchat.cn'
+
 
 SUPPORTED_IMAGE_TYPES = ('.png', '.jpg', '.jpeg')
 MINIO_CONFIG = {

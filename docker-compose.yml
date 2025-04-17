@@ -1,6 +1,6 @@
 services:
   frontend:
-    image: zstar1003/ragflowplus-management-web:v0.1.2
+    image: zxwei/knowflow-web:v0.1.0
     build:
       context: .
       dockerfile: Dockerfile
@@ -15,7 +15,7 @@ services:
       - management_network
 
   backend:
-    image: zstar1003/ragflowplus-management-server:v0.1.2
+    image: zxwei/knowflow-server:v0.1.0
     build:
       context: .
       dockerfile: Dockerfile

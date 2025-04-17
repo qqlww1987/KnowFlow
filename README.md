@@ -86,6 +86,16 @@ pnpm dev
 
 ### 二. 支持回答结果图文混排 
 
+> [!注意]  
+> 1. 需要提前安装好 MinerU 以及下载模型  https://github.com/opendatalab/mineru?tab=readme-ov-file#1-install-magic-pdf
+> 2. server/services/multimodal 目录下新建 .env文件，添加如下内容
+> ```bash
+> # 图片服务器地址
+> RAGFLOW_API_KEY=  从 RAGFlow 后台获取
+> RAGFLOW_SERVER_IP= 从 RAGFlow 后台获取
+> ```
+
+
 1. 在前端上传 PDF 文档，点击解析，等待解析完成。
 
 <div align="center">
