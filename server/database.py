@@ -16,6 +16,7 @@ def is_running_in_docker():
 
 # 根据运行环境选择合适的主机地址
 DB_HOST = 'host.docker.internal' if is_running_in_docker() else 'localhost'
+# DB_HOST = 'www.knowflowchat.cn'
 
 # 数据库连接配置
 db_config = {

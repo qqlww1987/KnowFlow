@@ -14,7 +14,7 @@ task_status = {}
 
 def process_pdf_task(task_id, tmp_path):
     try:
-        python_executable = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'venv', 'bin', 'python3.10')
+        python_executable = sys.executable 
 
         # 调用处理脚本
         process = subprocess.Popen(
