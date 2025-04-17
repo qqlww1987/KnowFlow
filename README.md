@@ -86,12 +86,25 @@ pnpm dev
 
 ### 二. 支持回答结果图文混排 
 
-参照 `/services/multimodalContent/README.md` 文档进行配置。
+1. 在前端上传 PDF 文档，点击解析，等待解析完成。
+
+<div align="center">
+  <img src="assets/pdf_helper.png"  alt="文档解析">
+</div>
+
+2. 解析完成后，在 RAGFlow 聊天会自动创建聊天助手（以文件名命名）
+
+3. 点击聊天助手，进入聊天界面。
+
+<div align="center">
+  <img src="assets/pdf_chat.png"  alt="聊天">
+</div>
+
 
 
 ## TODO
 - [ ] 支持更多格式的混排，如表格、图标等，同时支持可视化界面上传文档
-- [ ] 文档预处理：虽然 DeepDoc 很出色，但经过实践经验，文档经过预处理之后，对识别准确率有很大提升，我们将会持续支持文档预处理能力。
+- [ ] 当前版本是将纯文本直接上传到 RAGFlow 中，解析快不包含向量信息，检索只能通过关键词检索
 - [ ] RAGFlow UI 重构：重构 RAGFlow UI，提供更友好的交互体验。
 
 
