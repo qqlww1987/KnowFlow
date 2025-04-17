@@ -9,8 +9,8 @@ import json
 load_dotenv(".env")
 
 # MinIO配置常量
-# MINIO_HOST = 'host.docker.internal' if is_running_in_docker() else 'localhost'
-MINIO_HOST = 'www.knowflowchat.cn'
+MINIO_HOST = 'host.docker.internal' if is_running_in_docker() else 'localhost'
+
 SUPPORTED_IMAGE_TYPES = ('.png', '.jpg', '.jpeg')
 MINIO_CONFIG = {
     "endpoint": f"{MINIO_HOST}:{os.getenv('MINIO_PORT', '9000')}",

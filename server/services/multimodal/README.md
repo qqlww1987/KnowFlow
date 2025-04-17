@@ -13,8 +13,8 @@
 ## 🏗️ 系统架构
 
 系统包含两个主要容器：
-1. **RAGFlow 容器**：处理文档和提供问答功能
-2. **RAGFlow MinerU 存储**：提供图片资源的HTTP访问
+1. **MinerU **：用于提取PDF中的图片
+2. **MinIO 存储**：提供图片资源的HTTP访问
 
 RAGFlow可以通过服务器IP地址引用图片：`http://localhost/kb_id/file.jpg`
 
@@ -33,7 +33,6 @@ graph LR
 ```
 
 ## 📁 项目文件说明
-
 
 1. `ragflow_build.py`: RAGFlow知识库和聊天助手创建的核心功能
 2. `process_pdf.py`: 整合所有功能的启动脚本
@@ -70,61 +69,17 @@ pip install -r requirements.txt
 ### 环境变量配置
 **重要**: 创建`.env`文件并配置必要参数：
 ```
-RAGFLOW_API_KEY=您的RAGFlow API密钥
-RAGFLOW_SERVER_IP=您的服务器IP地址
-DOC_ENGINE=PyMuPDF 或 MinerU
+RAGFLOW_API_KEY=您的RAGFlow API密钥 (从 RAGFlow API 处获取)
+RAGFLOW_SERVER_IP=您的服务器IP地址 (从 RAGFlow API 处获取)
 ```
 
-查询您的IP地址方法：
-- Windows: 在命令提示符中运行 `ipconfig`
-- Mac/Linux: 在终端中运行 `ifconfig` 或 `ip addr`
-
-**注意**: 请使用您机器在局域网中的实际 IPv4 地址，不要使用`localhost`或`127.0.0.1`
 
 ## 🚀 实现步骤
 
-### 1. 构建并启动图片服务器
+### 1. 在前端选择 PDF 文档 上传等到解析
 
-```bash
-# 构建图片服务器镜像
-docker build -t image-server .
 
-# 创建本地图片存储目录
-mkdir images
 
-# 运行图片服务器容器（Windows PowerShell）
-docker run -d -p 8000:8000 -v ${PWD}\/images:/app/images --name image-server image-server
-
-# 如果使用CMD，请使用以下命令
-# docker run -d -p 8000:8000 -v %cd%\/images:/app/images --name image-server image-server
-```
-
-### 2. 配置Docker网络
-
-```bash
-# 如果你是重新配置Docker服务，下述命令的前两行可以跳过
-
-# 创建共享网络
-docker network create rag-network
-
-# 连接容器到网络
-docker network connect rag-network ragflow-server
-docker network connect rag-network image-server
-
-# 验证网络连接
-docker network inspect rag-network
-```
-
-### 3. 验证服务器状态
-
-```bash
-# 检查image-server是否正常运行
-docker logs image-server
-
-# 测试图片服务器访问
-curl http://localhost:8000
-# 或在浏览器访问 http://localhost:8000
-```
 
 ### 4. 处理PDF文档
 
