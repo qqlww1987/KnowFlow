@@ -31,6 +31,15 @@ KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的�
 </div>
 
 
+### 三. 支持对接企业微信应用 [done]
+
+支持企业微信应用，可将企业微信应用作为聊天机器人，使用企业微信应用进行聊天。具体使用方式参照  **server/services/knowflow/README.md** 中的说明。
+
+<div align="center">
+  <img src="assets/wecom.jpg"  alt="企业微信应用">
+</div>
+
+
 ## 使用方式
 
 ### 用户后台管理系统
@@ -90,9 +99,9 @@ pnpm dev
 > 1. 需要提前安装好 MinerU 以及下载模型  https://github.com/opendatalab/mineru?tab=readme-ov-file#1-install-magic-pdf
 > 2. server/services/multimodal 目录下新建 .env文件，添加如下内容
 > ```bash
-> # 图片服务器地址
 > RAGFLOW_API_KEY=  从 RAGFlow 后台获取
 > RAGFLOW_SERVER_IP= 从 RAGFlow 后台获取
+
 > ```
 
 
