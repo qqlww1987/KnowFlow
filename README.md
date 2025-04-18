@@ -36,7 +36,7 @@ KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的�
 支持企业微信应用，可将企业微信应用作为聊天机器人，使用企业微信应用进行聊天。具体使用方式参照  **server/services/knowflow/README.md** 中的说明。
 
 <div align="center">
-  <img src="assets/wecom.jpg" style="height: 200px;" alt="企业微信应用">
+  <img src="assets/wecom.jpg" style="height: 400px;" alt="企业微信应用">
 </div>
 
 
