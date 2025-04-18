@@ -83,7 +83,7 @@ def update_markdown_image_urls(md_file_path, kb_id):
         from minio_server import get_image_url
         if not img_url.startswith(('http://', 'https://')):
             img_url = get_image_url(kb_id, img_url)
-        return f'<img src="{img_url}" width="300" alt="图片">'
+        return f'<img src="{img_url}" style="max-width: 300px;" alt="图片">'
 
     with open(md_file_path, 'r+', encoding='utf-8') as f:
         content = f.read()

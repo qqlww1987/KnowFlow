@@ -69,7 +69,7 @@ def create_ragflow_resources(md_file_path, pdf_filename, image_dir, api_key, bas
         
         # 创建知识库
         print(f"第2步：创建RAGFlow知识库")
-        dataset_name = f"{os.path.splitext(os.path.basename(pdf_filename))[0]}_知识库"
+        dataset_name = f"{os.path.splitext(os.path.basename(pdf_filename))[0][:4]}_知识库"
         dataset = _create_dataset(rag_object, dataset_name)
 
         # 处理和上传文档
@@ -77,7 +77,7 @@ def create_ragflow_resources(md_file_path, pdf_filename, image_dir, api_key, bas
         from mineru_test import update_markdown_image_urls
         enhanced_text = update_markdown_image_urls(md_file_path, dataset.id)
         
-        doc_name = os.path.splitext(os.path.basename(pdf_filename))[0] + ".txt"
+        doc_name = os.path.splitext(os.path.basename(pdf_filename))[0] + ".md"
         dataset.upload_documents([{
             "display_name": doc_name,
             "blob": enhanced_text.encode('utf-8')
@@ -102,7 +102,7 @@ def create_ragflow_resources(md_file_path, pdf_filename, image_dir, api_key, bas
         
         # 创建助手
         print(f"第6步：创建聊天助手...")
-        assistant_name = f"{os.path.splitext(os.path.basename(pdf_filename))[0]}_助手"
+        assistant_name = f"{os.path.splitext(os.path.basename(pdf_filename))[0][:4]}_助手"
         assistant = rag_object.create_chat(
             name=assistant_name,
             dataset_ids=[dataset.id]

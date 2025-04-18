@@ -20,8 +20,7 @@ def is_running_in_docker():
         return docker_env
 
 # MinIO配置常量
-MINIO_HOST = 'host.docker.internal' if is_running_in_docker() else 'localhost'
-
+MINIO_HOST = os.getenv('MINIO_HOST', 'host.docker.internal' if is_running_in_docker() else 'localhost')
 
 SUPPORTED_IMAGE_TYPES = ('.png', '.jpg', '.jpeg')
 MINIO_CONFIG = {
