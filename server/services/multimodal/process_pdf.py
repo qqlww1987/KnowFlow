@@ -17,6 +17,7 @@ def _setup_argparser():
 
 def _validate_environment():
     """验证环境变量配置"""
+    load_dotenv("../../.env")
     api_key = os.getenv('RAGFLOW_API_KEY')
     server_ip = os.getenv('RAGFLOW_SERVER_IP')
     

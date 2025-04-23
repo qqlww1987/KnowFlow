@@ -140,7 +140,7 @@ const pollStatus = async (taskId: string, file: any) => {
       ElMessage.error('状态查询失败')
       console.error('Error fetching status:', error)
     }
-  }, 3000)
+  }, 10000)
 
   file.statusTimer = timer
 }

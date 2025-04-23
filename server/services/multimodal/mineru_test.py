@@ -62,8 +62,21 @@ def process_pdf_with_minerU(pdf_file_path):
     md_writer = FileBasedDataWriter(output_dir)
     md_file_path = os.path.join(output_dir, f"{name_without_suff}.md")
     print(f"生成Markdown文件: {md_file_path}")
-    pipe_result.dump_md(md_writer, f"{name_without_suff}.md", "images")
-    
+    pipe_result.dump_md(md_writer, f"{name_without_suff}.md", image_dir)
+
+    ### get content list content
+    content_list_content = pipe_result.get_content_list(image_dir)
+
+    ### dump content list
+    pipe_result.dump_content_list(md_writer, f"{name_without_suff}_content_list.json", image_dir)
+
+    ### get middle json
+    middle_json_content = pipe_result.get_middle_json()
+
+    ### dump middle json
+    pipe_result.dump_middle_json(md_writer, f'{name_without_suff}_middle.json')
+
+
     print("=== PDF处理完成 ===")
     return md_file_path
 

@@ -1,43 +1,12 @@
-import os
 import sys
-from minio import Minio
-from dotenv import load_dotenv
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from io import BytesIO
 import json
-
-# 加载环境变量
-load_dotenv(".env")
-
-# 检测是否在Docker容器中运行
-def is_running_in_docker():
-    # 检查是否存在/.dockerenv文件
-    docker_env = os.path.exists('/.dockerenv')
-    # 或者检查cgroup中是否包含docker字符串
-    try:
-        with open('/proc/self/cgroup', 'r') as f:
-            return docker_env or 'docker' in f.read()
-    except:
-        return docker_env
-
-# MinIO配置常量
-MINIO_HOST = os.getenv('MINIO_HOST', 'host.docker.internal' if is_running_in_docker() else 'localhost')
+from database import get_minio_client,MINIO_CONFIG
 
 SUPPORTED_IMAGE_TYPES = ('.png', '.jpg', '.jpeg')
-MINIO_CONFIG = {
-    "endpoint": f"{MINIO_HOST}:{os.getenv('MINIO_PORT', '9000')}",
-    "access_key": os.getenv("MINIO_USER", "rag_flow"),
-    "secret_key": os.getenv("MINIO_PASSWORD", "infini_rag_flow"),
-    "secure": False
-}
 
-def _get_minio_client():
-    """创建MinIO客户端（内部方法）"""
-    return Minio(
-        endpoint=MINIO_CONFIG["endpoint"],
-        access_key=MINIO_CONFIG["access_key"],
-        secret_key=MINIO_CONFIG["secret_key"],
-        secure=MINIO_CONFIG["secure"]
-    )
 
 def _set_bucket_policy(minio_client, kb_id):
     """设置存储桶的访问策略（内部方法）"""
@@ -59,7 +28,8 @@ def upload_file_to_minio(kb_id, file_path):
         kb_id: 知识库ID
         file_path: 文件路径
     """
-    minio_client = _get_minio_client()
+
+    minio_client = get_minio_client()
 
     if not minio_client.bucket_exists(kb_id):
         print(f"[ERROR] Bucket {kb_id} 不存在")
@@ -136,8 +106,12 @@ def get_image_url(kb_id, image_key):
         str: 图片的公共访问URL
     """
     try:
-        minio_endpoint = MINIO_CONFIG["endpoint"].split(':')[0]
-        url = f"https://{minio_endpoint}/minio/{kb_id}/{image_key}"
+        # 获取MinIO服务器配置
+        minio_endpoint = MINIO_CONFIG["endpoint"]
+        use_ssl = MINIO_CONFIG["secure"]
+        # 构建URL
+        protocol = "https" if use_ssl else "http"
+        url = f"{protocol}://{minio_endpoint}/{kb_id}/{image_key}"
         print(f"[DEBUG] 图片URL: {url}")
         return url
     except Exception as e:
