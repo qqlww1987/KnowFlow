@@ -5,7 +5,6 @@
 ## 项目介绍
 
 KnowFlow 是一个基于 RAGFlow 的开源项目，持续兼容 RAGFlow 官方版本，同时会将社区里做的比较好的最佳实践整合进来。
-并在此基础上提供一些新的功能，以解决实际应用中的一些痛点。
 KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的最后一公里服务。
 
 ## 功能介绍
@@ -24,7 +23,9 @@ KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的�
 
 ### 二. 支持回答结果图文混排 [done]
 
-能够回答结果图文混排，可将回答结果中的图片和文本进行混排，以增强回答的可读性。后续将持续支持表格、图标等格式，增强其结构化输出能力。
+1. 能够回答结果图文混排，可将回答结果中的图片和文本进行混排，以增强回答的可读性。后续将持续支持表格、图标等格式，增强其结构化输出能力。
+2. 支持自定义 chunk 以及分块坐标溯源
+3. 支持 RAGFlow 添加的文档在 KnowFlow 进行一键解析
 
 <div align="center">
   <img src="assets/mulcontent.png"  alt="图文混排">
@@ -33,7 +34,7 @@ KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的�
 
 ### 三. 支持对接企业微信应用 [done]
 
-支持企业微信应用，可将企业微信应用作为聊天机器人，使用企业微信应用进行聊天。具体使用方式参照  **server/services/knowflow/README.md** 中的说明。
+支持企业微信应用，可将企业微信应用作为聊天机器人，使用企业微信应用进行聊天。具体使用方式参照  `server/services/knowflow/README.md` 中的说明。
 
 <div align="center">
   <img src="assets/wecom.jpg" style="height: 400px;" alt="企业微信应用">
@@ -97,12 +98,12 @@ pnpm dev
 
 > [!注意]  
 > 1. 需要提前安装好 MinerU 以及下载模型  https://github.com/opendatalab/mineru?tab=readme-ov-file#1-install-magic-pdf
-> 2. server/services/multimodal 目录下新建 .env文件，添加如下内容
+> 2. 项目根目录下新建 `.env` 文件，添加如下内容
 > ```bash
 > RAGFLOW_API_KEY=  从 RAGFlow 后台获取
 > RAGFLOW_SERVER_IP= 从 RAGFlow 后台获取
-
 > ```
+> 3. 如 MySQL、MINIO、ELASTIC 需要配置，也统一在上述  `.env` 进行配置
 
 
 1. 在前端上传 PDF 文档，点击解析，等待解析完成。
@@ -111,9 +112,15 @@ pnpm dev
   <img src="assets/pdf_helper.png"  alt="文档解析">
 </div>
 
-2. 解析完成后，在 RAGFlow 聊天会自动创建聊天助手（以文件名命名）
+2. 解析完成后，在 RAGFlow 知识库页面检查文档解析状态
 
-3. 点击聊天助手，进入聊天界面。
+3. 新建聊天助手，引用知识库，添加提示词，注意提示词很重要，配置不正确会无法显示图片。模板如下
+
+>   请参考{knowledge}内容回答用户问题。
+>   如果知识库内容包含图片，请在回答中包含图片URL。
+>   注意这个 html 格式的 URL 是来自知识库本身，URL 不能做任何改动。
+>   示例如下：<img src="http://172.21.4.35:8000/images/filename.png" alt="图片" width="300">。
+>   请确保回答简洁、专业，将图片自然地融入回答内容中。
 
 <div align="center">
   <img src="assets/pdf_chat.png"  alt="聊天">
