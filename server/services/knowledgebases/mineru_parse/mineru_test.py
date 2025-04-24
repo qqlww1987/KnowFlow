@@ -1,5 +1,6 @@
 import os
 import re
+from .minio_server import get_image_url
 from magic_pdf.data.data_reader_writer import FileBasedDataWriter, FileBasedDataReader
 from magic_pdf.data.dataset import PymuDocDataset
 from magic_pdf.model.doc_analyze_by_custom_model import doc_analyze
@@ -35,7 +36,7 @@ def _process_pdf_content(pdf_bytes):
         print("使用文本模式处理PDF...")
         return ds.apply(doc_analyze, ocr=False).pipe_txt_mode(image_writer)
 
-def process_pdf_with_minerU(pdf_file_path):
+def process_pdf_with_minerU(pdf_file_path,update_progress):
     """使用minerU处理PDF文件
     
     Args:
@@ -44,8 +45,7 @@ def process_pdf_with_minerU(pdf_file_path):
     Returns:
         str: 生成的Markdown文件路径
     """
-    print(f"第1步：通过 MinerU 识别文本")
-    print(f"=== 开始处理PDF文件: {pdf_file_path} ===")
+    update_progress(0.3, f"=== 开始处理PDF文件 ===")
     
     # 初始化目录
     image_dir, output_dir = _setup_directories()
@@ -75,9 +75,10 @@ def process_pdf_with_minerU(pdf_file_path):
 
     ### dump middle json
     pipe_result.dump_middle_json(md_writer, f'{name_without_suff}_middle.json')
+    
+    update_progress(0.5, f"=== PDF 文件处理完成 ===")
 
 
-    print("=== PDF处理完成 ===")
     return md_file_path
 
 def update_markdown_image_urls(md_file_path, kb_id):
@@ -93,7 +94,6 @@ def update_markdown_image_urls(md_file_path, kb_id):
     def _replace_img(match):
         """替换图片URL的内部函数"""
         img_url = os.path.basename(match.group(1))
-        from minio_server import get_image_url
         if not img_url.startswith(('http://', 'https://')):
             img_url = get_image_url(kb_id, img_url)
         return f'<img src="{img_url}" style="max-width: 300px;" alt="图片">'
@@ -107,7 +107,5 @@ def update_markdown_image_urls(md_file_path, kb_id):
 
     return updated_content
 
-if __name__ == "__main__":
-    test_pdf = "demo2.pdf"
-    process_pdf_with_minerU(test_pdf)
+
 

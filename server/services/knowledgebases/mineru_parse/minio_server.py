@@ -33,7 +33,9 @@ def upload_file_to_minio(kb_id, file_path):
 
     if not minio_client.bucket_exists(kb_id):
         print(f"[ERROR] Bucket {kb_id} 不存在")
-        return False
+        minio_client.make_bucket(kb_id)
+        print(f"[Parser-INFO] 创建MinIO桶: {kb_id}")
+
 
     print(f"[INFO] 处理图像: {file_path}")
     try:

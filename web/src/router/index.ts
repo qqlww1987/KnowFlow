@@ -135,10 +135,42 @@ export const constantRoutes: RouteRecordRaw[] = [
       }
     ]
   },
-
-
-
-
+  {
+    path: "/file",
+    component: Layouts,
+    redirect: "/file/index",
+    children: [
+      {
+        path: "index",
+        component: () => import("@/pages/file/index.vue"),
+        name: "File",
+        meta: {
+          title: "文件管理",
+          svgIcon: "file",
+          affix: false,
+          keepAlive: true
+        }
+      }
+    ]
+  },
+  {
+    path: "/knowledgebase",
+    component: Layouts,
+    redirect: "/knowledgebase/index",
+    children: [
+      {
+        path: "index",
+        component: () => import("@/pages/knowledgebase/index.vue"),
+        name: "KnowledgeBase",
+        meta: {
+          title: "知识库管理",
+          svgIcon: "kb",
+          affix: false,
+          keepAlive: true
+        }
+      }
+    ]
+  },
   {
     path: "/config",
     component: Layouts,
