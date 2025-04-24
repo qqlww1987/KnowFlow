@@ -26,7 +26,5 @@ def get_doc_content(dataset_id, doc_id):
     if not docs:
         raise Exception(f"未找到指定 doc_id: {doc_id}")
     doc = docs[0]
-    file_content = doc.download()
-    print(f"下载文档成功: {file_content}")
-    return file_content
+    return doc.download()
   

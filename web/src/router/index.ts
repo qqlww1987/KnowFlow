@@ -100,24 +100,6 @@ export const constantRoutes: RouteRecordRaw[] = [
     ]
   },
   {
-    path: "/process-pdf",
-    component: Layouts,
-    redirect: "/process-pdf/index",
-    children: [
-      {
-        path: "index",
-        component: () => import("@/pages/process-pdf/index.vue"),
-        name: "ProcessPdf",
-        meta: {
-          title: "PDF 图文混排",
-          svgIcon: "keyboard-up",
-          affix: false,
-          keepAlive: true
-        }
-      }
-    ]
-  },
-  {
     path: "/team",
     component: Layouts,
     redirect: "/team/index",
