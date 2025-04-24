@@ -1,20 +1,18 @@
-RAGFlow Chat Plugin for ChatGPT-on-WeChat
-=========================================
+# RAGFlow Chat 插件用于 ChatGPT-on-WeChat
+本文件夹包含 ragflow_chat 插件的源代码，该插件扩展了 RAGFlow API 的核心功能，支持基于检索增强生成（RAG）的对话交互。该插件可无缝集成到 ChatGPT-on-WeChat 项目中，使微信及其他平台能够在聊天交互中利用 RAGFlow 提供的知识检索能力。
 
-This folder contains the source code for the `ragflow_chat` plugin, which extends the core functionality of the RAGFlow API to support conversational interactions using Retrieval-Augmented Generation (RAG). This plugin integrates seamlessly with the [ChatGPT-on-WeChat](https://github.com/zhayujie/chatgpt-on-wechat) project, enabling WeChat and other platforms to leverage the knowledge retrieval capabilities provided by RAGFlow in chat interactions.
+### 功能特性
+- 对话交互 ：将微信的对话界面与强大的 RAG（检索增强生成）能力结合。
+- 基于知识的回复 ：通过检索外部知识源中的相关数据并将其融入聊天回复，丰富对话内容。
+- 多平台支持 ：可在微信、企业微信以及 ChatGPT-on-WeChat 框架支持的多种平台上运行。
 
-### Features
-* **Conversational Interactions**: Combine WeChat's conversational interface with powerful RAG (Retrieval-Augmented Generation) capabilities.
-* **Knowledge-Based Responses**: Enrich conversations by retrieving relevant data from external knowledge sources and incorporating them into chat responses.
-* **Multi-Platform Support**: Works across WeChat, WeCom, and various other platforms supported by the ChatGPT-on-WeChat framework.
+### 插件与 ChatGPT-on-WeChat 配置说明
+注意 ：本集成涉及两个不同的配置文件——一个用于 ChatGPT-on-WeChat 核心项目，另一个专用于 ragflow_chat 插件。请务必正确配置两者，以确保顺利集成。
+ ChatGPT-on-WeChat 根配置（ config.json ）
+该文件位于 ChatGPT-on-WeChat 项目的根目录，用于定义通信渠道和整体行为。例如，它负责配置微信、企业微信以及飞书、钉钉等服务。
 
-### Plugin vs. ChatGPT-on-WeChat Configurations
-**Note**: There are two distinct configuration files used in this setup—one for the ChatGPT-on-WeChat core project and another specific to the `ragflow_chat` plugin. It is important to configure both correctly to ensure smooth integration.
+微信渠道的 config.json 示例：
 
-#### ChatGPT-on-WeChat Root Configuration (`config.json`)
-This file is located in the root directory of the [ChatGPT-on-WeChat](https://github.com/zhayujie/chatgpt-on-wechat) project and is responsible for defining the communication channels and overall behavior. For example, it handles the configuration for WeChat, WeCom, and other services like Feishu and DingTalk.
-
-Example `config.json` (for WeChat channel):
 ```json
 {
   "channel_type": "wechatmp",
@@ -24,21 +22,21 @@ Example `config.json` (for WeChat channel):
   "wechatmp_port": 80,
   ...
 }
-```
+ ```
 
-This file can also be modified to support other communication platforms, such as:
-- **Personal WeChat** (`channel_type: wx`)
-- **WeChat Public Account** (`wechatmp` or `wechatmp_service`)
-- **WeChat Work (WeCom)** (`wechatcom_app`)
-- **Feishu** (`feishu`)
-- **DingTalk** (`dingtalk`)
+该文件也可修改以支持其他通信平台，例如：
 
-For detailed configuration options, see the official [LinkAI documentation](https://docs.link-ai.tech/cow/multi-platform/wechat-mp).
+- 个人微信 （ channel_type: wx ）
+- 微信公众号 （ wechatmp 或 wechatmp_service ）
+- 企业微信 （ wechatcom_app ）
+- 飞书 （ feishu ）
+- 钉钉 （ dingtalk ）
+详细配置选项请参见官方 LinkAI 文档 。
+ RAGFlow Chat 插件配置（ plugins/ragflow_chat/config.json ）
+该配置文件专用于 ragflow_chat 插件，用于设置与 RAGFlow 服务器的通信。请确保你的 RAGFlow 服务器已启动，并将插件的 config.json 文件更新为你的服务器信息：
 
-#### RAGFlow Chat Plugin Configuration (`plugins/ragflow_chat/config.json`)
-This configuration is specific to the `ragflow_chat` plugin and is used to set up communication with the RAGFlow server. Ensure that your RAGFlow server is running, and update the plugin's `config.json` file with your server details:
+ragflow_chat 的 config.json 示例：
 
-Example `config.json` (for `ragflow_chat`):
 ```json
 {
     "api_key": "ragflow-xxxx",
@@ -46,14 +44,16 @@ Example `config.json` (for `ragflow_chat`):
     "dialog_id": "助理 ID",
     "conversation_id":"会话 ID"
 }
-```
+ ```
 
-This file must be configured to point to your RAGFlow instance, with the `ragflow_api_key` and `ragflow_host` fields set appropriately. The `ragflow_host` is typically your server's address and port number, and the `ragflow_api_key` is obtained from your RAGFlow API setup.
+该文件必须正确指向你的 RAGFlow 实例，`api_key` 和 `host_address` 字段需正确设置。 `dialog_id`， `ragflow_api_key` 可在 RAGFlow 前端页面 url 或者调试模式中获取。
 
-### Requirements
-Before you can use this plugin, ensure the following are in place:
+### 使用要求
+在使用本插件前，请确保：
 
-1. You have installed and configured [ChatGPT-on-WeChat](https://github.com/zhayujie/chatgpt-on-wechat).
-2. You have deployed and are running the [RAGFlow](https://github.com/infiniflow/ragflow) server.
-   
-Make sure both `config.json` files (ChatGPT-on-WeChat and RAGFlow Chat Plugin) are correctly set up as per the examples above.
+1. 你已安装并配置好 `ChatGPT-on-WeChat`。
+2. 将 knowflow 文件夹放到 `chatgpt-on-wechat/plugins/` 目录下
+3. 在 knowflow 目录下运行 `pip instal -r requirement.txt`
+4. 重启 ChatGPT-on-WeChat 服务
+5. 你已部署并运行 RAGFlow 服务器
+请确保上述两个 config.json 文件（ChatGPT-on-WeChat 和 RAGFlow Chat 插件）均已按示例正确配置。

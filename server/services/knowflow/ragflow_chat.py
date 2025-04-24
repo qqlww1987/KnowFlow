@@ -38,9 +38,6 @@ class RAGFlowChat(Plugin):
     def send_messages(self, user_input, channel, context):
         """发送多条消息，包括文本和图片"""
         try:
-            # 稍微延迟，确保第一条消息先发出
-            time.sleep(1)
-            
             # 获取实际回复
             reply_text = self.get_ragflow_reply(user_input)
             
@@ -66,19 +63,14 @@ class RAGFlowChat(Plugin):
                 reply.content = reply_text
                 channel.send(reply, context)
                 
-                # 如果有图片，稍微延迟后发送
-                if img_urls:
-                    time.sleep(0.5)
-            
+               
             # 发送图片
             for url in img_urls:
                 img_reply = Reply()
                 img_reply.type = ReplyType.IMAGE_URL
                 img_reply.content = url
                 channel.send(img_reply, context)
-                # 多张图片之间稍微间隔一下
-                if len(img_urls) > 1:
-                    time.sleep(0.5)
+                
                 
         except Exception as e:
             logging.exception("[RAGFlowChat] Error in async processing")

@@ -100,24 +100,6 @@ export const constantRoutes: RouteRecordRaw[] = [
     ]
   },
   {
-    path: "/process-pdf",
-    component: Layouts,
-    redirect: "/process-pdf/index",
-    children: [
-      {
-        path: "index",
-        component: () => import("@/pages/process-pdf/index.vue"),
-        name: "ProcessPdf",
-        meta: {
-          title: "PDF 图文混排",
-          svgIcon: "keyboard-up",
-          affix: false,
-          keepAlive: true
-        }
-      }
-    ]
-  },
-  {
     path: "/team",
     component: Layouts,
     redirect: "/team/index",
@@ -135,10 +117,42 @@ export const constantRoutes: RouteRecordRaw[] = [
       }
     ]
   },
-
-
-
-
+  {
+    path: "/file",
+    component: Layouts,
+    redirect: "/file/index",
+    children: [
+      {
+        path: "index",
+        component: () => import("@/pages/file/index.vue"),
+        name: "File",
+        meta: {
+          title: "文件管理",
+          svgIcon: "file",
+          affix: false,
+          keepAlive: true
+        }
+      }
+    ]
+  },
+  {
+    path: "/knowledgebase",
+    component: Layouts,
+    redirect: "/knowledgebase/index",
+    children: [
+      {
+        path: "index",
+        component: () => import("@/pages/knowledgebase/index.vue"),
+        name: "KnowledgeBase",
+        meta: {
+          title: "知识库管理",
+          svgIcon: "kb",
+          affix: false,
+          keepAlive: true
+        }
+      }
+    ]
+  },
   {
     path: "/config",
     component: Layouts,
