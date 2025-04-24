@@ -120,7 +120,7 @@ def perform_parse(doc_id, doc_info, file_info, embedding_config):
                 file_content = response.read()
                 response.close()
         except Exception as e:
-            print(f"[Parser-WARNING] MinIO 下载异常: {e}，尝试从本地/其他方式获取文件")
+            print(f"[Parser-WARNING] MinIO 下载异常: {e}，尝试从 RAGFlow API获取文件")
             from .utils import get_doc_content     
             file_content = get_doc_content(kb_id, doc_id)
 
