@@ -37,3 +37,6 @@ services:
 networks:
   management_network:
     driver: bridge
+
+
+  

@@ -1,9 +1,9 @@
 import json
-import shutil
 import os
+import shutil
 
 import requests
-from modelscope import snapshot_download
+from huggingface_hub import snapshot_download
 
 
 def download_json(url):
@@ -32,6 +32,7 @@ def download_and_modify_json(url, local_filename, modifications):
 
 
 if __name__ == '__main__':
+
     mineru_patterns = [
         # "models/Layout/LayoutLMv3/*",
         "models/Layout/YOLO/*",
@@ -42,7 +43,13 @@ if __name__ == '__main__':
         # "models/TabRec/StructEqTable/*",
     ]
     model_dir = snapshot_download('opendatalab/PDF-Extract-Kit-1.0', allow_patterns=mineru_patterns)
-    layoutreader_model_dir = snapshot_download('ppaanngggg/layoutreader')
+
+    layoutreader_pattern = [
+        "*.json",
+        "*.safetensors",
+    ]
+    layoutreader_model_dir = snapshot_download('hantian/layoutreader', allow_patterns=layoutreader_pattern)
+
     model_dir = model_dir + '/models'
     print(f'model_dir is: {model_dir}')
     print(f'layoutreader_model_dir is: {layoutreader_model_dir}')
@@ -53,7 +60,7 @@ if __name__ == '__main__':
     #     shutil.rmtree(user_paddleocr_dir)
     # shutil.copytree(paddleocr_model_dir, user_paddleocr_dir)
 
-    json_url = 'https://gcore.jsdelivr.net/gh/opendatalab/MinerU@master/magic-pdf.template.json'
+    json_url = 'https://github.com/opendatalab/MinerU/raw/master/magic-pdf.template.json'
     config_file_name = 'magic-pdf.json'
     home_dir = os.path.expanduser('~')
     config_file = os.path.join(home_dir, config_file_name)

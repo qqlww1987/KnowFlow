@@ -8,11 +8,11 @@ def _validate_environment():
     """验证环境变量配置"""
     load_dotenv()
     api_key = os.getenv('RAGFLOW_API_KEY')
-    base_url = os.getenv('RAGFLOW_SERVER_IP')
+    base_url = os.getenv('RAGFLOW_BASE_URL')
     if not api_key:
         raise ValueError("错误：请在.env文件中设置RAGFLOW_API_KEY或使用--api_key参数指定。")
     if not base_url:
-        raise ValueError("错误：请在.env文件中设置RAGFLOW_SERVER_IP或使用--server_ip参数指定。")
+        raise ValueError("错误：请在.env文件中设置RAGFLOW_BASE_URL或使用--server_ip参数指定。")
     return api_key, base_url
 
 def get_doc_content(dataset_id, doc_id):

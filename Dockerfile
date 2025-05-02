@@ -38,7 +38,7 @@ RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua
 COPY server /app
 
 # /root/.cache/huggingface/hub/models--opendatalab--PDF-Extract-Kit-1.0/snapshots/95817b4b2321769155f05c8d7e2f5a6b6da9e662/models
-RUN python3.10 services/multimodal/download_models_hf.py 
+RUN python3.10 server/download_models_hf.py 
 
 # 暴露后端端口
 EXPOSE 5000

@@ -927,12 +927,6 @@ function shouldShowProgressCount(status: string) {
               批量删除
             </el-button>
           </div>
-
-          <div>
-            <el-button type="primary" :icon="Setting" @click="showConfigModal">
-              嵌入模型配置
-            </el-button>
-          </div>
         </div>
 
         <div class="table-wrapper">
@@ -1252,7 +1246,7 @@ function shouldShowProgressCount(status: string) {
       </el-dialog>
 
       <!-- 系统 Embedding 配置模态框 -->
-      <el-dialog
+      <!-- <el-dialog
         v-model="configModalVisible"
         title="嵌入模型配置"
         width="500px"
@@ -1299,7 +1293,7 @@ function shouldShowProgressCount(status: string) {
             </el-button>
           </span>
         </template>
-      </el-dialog>
+      </el-dialog> -->
     </div>
     <DocumentParseProgress
       :document-id="currentDocId"

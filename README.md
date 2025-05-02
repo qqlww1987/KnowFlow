@@ -101,7 +101,7 @@ pnpm dev
 > 2. 项目根目录下新建 `.env` 文件，添加如下内容
 > ```bash
 > RAGFLOW_API_KEY=  从 RAGFlow 后台获取
-> RAGFLOW_SERVER_IP= 从 RAGFlow 后台获取
+> RAGFLOW_BASE_URL= 从 RAGFlow 后台获取
 > ```
 > 3. 如 MySQL、MINIO、ELASTIC 需要配置，也统一在上述  `.env` 进行配置
 
