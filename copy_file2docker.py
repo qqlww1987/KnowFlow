@@ -1,3 +1,6 @@
+# 本项目 mineru 并未打包到镜像内，而是挂载到本地已下载的资源
+# 通过本脚本可以将 magic-pdf.json 文件复制到 docker 镜像内并实现自动挂载
+
 import os
 import json
 

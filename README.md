@@ -9,7 +9,20 @@ KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的�
 
 ## 功能介绍
 
-### 一. 用户后台管理系统 
+### 适配 RAGFlow 全新 UI 
+
+基于 RAGFlow v0.18.0 二次开发全新 UI 页面。
+
+<div align="center">
+  <img src="assets/ui_1.png" width="108" height="124" alt="KnowFlow 企业知识库">
+</div>
+
+<div align="center">
+  <img src="assets/ui_2.png" width="108" height="124" alt="KnowFlow 企业知识库">
+</div>
+
+
+### 用户后台管理系统 
 
 参考 [ragflow-plus](https://github.com/zstar1003/ragflow-plus/)
 
@@ -21,7 +34,7 @@ KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的�
 
 特点：新建用户时，新用户会自动加入创建时间最早用户的团队，并默认采取和最早用户相同的模型配置。
 
-### 二. 支持回答结果图文混排 
+### 图文混排输出 
 
 1. 能够回答结果图文混排，可将回答结果中的图片和文本进行混排，以增强回答的可读性。后续将持续支持表格、图标等格式，增强其结构化输出能力。
 2. 支持自定义 chunk 以及分块坐标溯源
@@ -32,7 +45,7 @@ KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的�
 </div>
 
 
-### 三. 支持对接企业微信应用 
+### 支持企业微信应用 
 
 支持企业微信应用，可将企业微信应用作为聊天机器人，使用企业微信应用进行聊天。具体使用方式参照  `server/services/knowflow/README.md` 中的说明。
 
@@ -43,21 +56,34 @@ KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的�
 
 ## 使用方式
 
-### 用户后台管理系统
+### 1. 使用Docker Compose运行
 
-#### 1. 使用Docker Compose运行
-
-和运行 ragflow 原始项目一样，项目根目录下执行
-
+1. 在项目根目录下新建 `.env` 文件，添加如下内容
 ```bash
-docker compose -f docker/docker-compose.yml up -d
+RAGFLOW_API_KEY=  从 RAGFlow 后台获取 (必须)
+RAGFLOW_BASE_URL= 从 RAGFlow 后台获取 (必须)
+DB_HOST='xxxx' (选填)
+MINIO_HOST='xxxx'(选填)
+ES_HOST='xxxxx'(选填)
+ES_PORT='xxxx'(选填)
 ```
-访问地址：`服务器ip:80`，进入到ragflow原始界面
+2. 在宿主机器上下载 MinerU 模型文件
+```bash
+python3 server/download_models_hf.py
+```
+3. 在项目根目录下执行预处理脚本，用于复制宿主 `magic-pdf.json` 到 docker 容器
+```bash
+python3 copy_file2docker.py
+```
 
+4. 启动容器，开始愉快之旅
+```bash
+docker compose up -d
+```
 访问地址：`服务器ip:8888`，进入到管理界面
 
 
-#### 2. 源码运行
+### 2. 源码运行
 
 也可以通过下面的方式单独运行管理系统
 
@@ -74,7 +100,7 @@ pip install -r requirements.txt
 2.启动后端
 
 ```bash
-python app.py
+python3 app.py
 ```
 
 启动前端：
@@ -91,63 +117,36 @@ pnpm dev
 
 浏览器访问启动后的地址，即可进入系统。
 
+> 💡 **提示：** **图文混排功能**，聊天助手的提示词很重要，配置不正确会无法显示图片。模板如下：<br>
+> 请参考{knowledge}内容回答用户问题。<br>
+> 如果知识库内容包含图片，请在回答中包含图片URL。<br>
+> 注意这个 html 格式的 URL 是来自知识库本身，URL 不能做任何改动。<br>
+> 请确保回答简洁、专业，将图片自然地融入回答内容中。
+
 
 ---
 
-### 二. 支持回答结果图文混排 
+### RAGFlow UI 
 
-> [!注意]  
-> 1. 需要提前安装好 MinerU 以及下载模型  https://github.com/opendatalab/mineru?tab=readme-ov-file#1-install-magic-pdf
-> 2. 项目根目录下新建 `.env` 文件，添加如下内容
-> ```bash
-> RAGFLOW_API_KEY=  从 RAGFlow 后台获取
-> RAGFLOW_BASE_URL= 从 RAGFlow 后台获取
-> ```
-> 3. 如 MySQL、MINIO、ELASTIC 需要配置，也统一在上述  `.env` 进行配置
-
-
-1. 在前端上传 PDF 文档，点击解析，等待解析完成。
-
-<div align="center">
-  <img src="assets/pdf_helper.png"  alt="文档解析">
-</div>
-
-2. 解析完成后，在 RAGFlow 知识库页面检查文档解析状态
-
-3. 新建聊天助手，引用知识库，添加提示词，注意提示词很重要，配置不正确会无法显示图片。模板如下
-
->   请参考{knowledge}内容回答用户问题。
->   如果知识库内容包含图片，请在回答中包含图片URL。
->   注意这个 html 格式的 URL 是来自知识库本身，URL 不能做任何改动。
->   示例如下：<img src="http://172.21.4.35:8000/images/filename.png" alt="图片" width="300">。
->   请确保回答简洁、专业，将图片自然地融入回答内容中。
-
-<div align="center">
-  <img src="assets/pdf_chat.png"  alt="聊天">
-</div>
+将开源的 `dist` 目录复制到 docker 内的 /ragflow/web/dist 目录下，覆盖原有的 dist 即可
+```bash
+docker cp -r dist {ragflow_container_name}:/ragflow/web/
+```
 
 
 ## 编译 Docker
 
-> ```bash
-docker buildx build --platform linux/arm64 \
-  -f Dockerfile.web \
-  -t zxwei/knowflow-web:v0.3.0 \
-  --load .
+```bash
+docker buildx build --platform linux/amd64 --target backend -t zxwei/knowflow-server:v0.3.0 --push .
 
+docker buildx build --platform linux/amd64 --target frontend -t zxwei/knowflow-web:v0.3.0 --push .
 
-docker buildx build --platform linux/arm64 \
-  -f Dockerfile.server \
-  -t zxwei/knowflow-server:v0.3.0 \
-  --load .
-
-
-> ```
+```
 
 
 ## TODO
-- [ ] 支持更多格式的混排，如表格、图标等，同时支持可视化界面上传文档 [doing]
-- [ ] RAGFlow UI 重构：重构 RAGFlow UI，提供更友好的交互体验。[done]
+- [ ] 支持更多文档格式的 MinerU 解析
+- [ ] 前端 UI 源码 API 化
 
 
 ## 交流群
@@ -169,4 +168,3 @@ docker buildx build --platform linux/arm64 \
 ## 更新信息获取
 
 目前该项目仍在持续更新中，更新日志会在我的微信公众号[KnowFlow 企业知识库]上发布，欢迎关注。
-
