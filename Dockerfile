@@ -18,11 +18,11 @@ EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
 
 # 后端构建阶段
-FROM python:3.10.16 AS backend
+FROM python:3.10.16-slim AS backend
 WORKDIR /app
 
 # 安装系统依赖
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1-mesa-glx \
     libglib2.0-0 \
     libsm6 \
@@ -38,7 +38,7 @@ RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua
 COPY server /app
 
 # /root/.cache/huggingface/hub/models--opendatalab--PDF-Extract-Kit-1.0/snapshots/95817b4b2321769155f05c8d7e2f5a6b6da9e662/models
-RUN python3.10 server/download_models_hf.py 
+COPY server/magic-pdf.json /root/magic-pdf.json
 
 # 暴露后端端口
 EXPOSE 5000

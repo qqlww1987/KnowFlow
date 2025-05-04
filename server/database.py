@@ -20,14 +20,9 @@ def is_running_in_docker():
         return docker_env
 
 # 根据运行环境选择合适的主机地址
-#DB_HOST = 'host.docker.internal' if is_running_in_docker() else 'localhost'
-#MINIO_HOST = 'host.docker.internal' if is_running_in_docker() else 'localhost'
-#ES_HOST = 'es01' if is_running_in_docker() else 'localhost'
-
-
-DB_HOST = 'knowflowchat.cn'
-MINIO_HOST = 'knowflowchat.cn'
-ES_HOST = 'knowflowchat.cn'
+DB_HOST = os.getenv('DB_HOST', 'host.docker.internal' if is_running_in_docker() else 'localhost')
+MINIO_HOST =  os.getenv('MINIO_HOST', 'host.docker.internal' if is_running_in_docker() else 'localhost')
+ES_HOST =  os.getenv('ES_HOST', 'es01' if is_running_in_docker() else 'localhost')
 
 # 数据库连接配置
 DB_CONFIG = {
@@ -48,7 +43,7 @@ MINIO_CONFIG = {
 
 # Elasticsearch连接配置
 ES_CONFIG = {
-    "host": f"http://{ES_HOST}:{os.getenv('ES_PORT', '1200')}", 
+    "host": f"http://{ES_HOST}:{os.getenv('ES_PORT', '9200')}", 
     "user": os.getenv("ELASTIC_USER", "elastic"),
     "password": os.getenv("ELASTIC_PASSWORD", "infini_rag_flow"),
     "use_ssl": os.getenv("ES_USE_SSL", "false").lower() == "true"

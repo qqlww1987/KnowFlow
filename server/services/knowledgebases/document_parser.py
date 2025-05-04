@@ -147,6 +147,7 @@ def perform_parse(doc_id, doc_info, file_info, embedding_config):
         update_progress(0.2, "OCR开始")
 
         # 执行 OCR 进行文档解析
+        
         from .mineru_parse.process_pdf import process_pdf_entry
         chunk_count = process_pdf_entry(doc_id, temp_pdf_path,kb_id, update_progress)
 

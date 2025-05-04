@@ -127,6 +127,23 @@ pnpm dev
 </div>
 
 
+## 编译 Docker
+
+> ```bash
+docker buildx build --platform linux/arm64 \
+  -f Dockerfile.web \
+  -t zxwei/knowflow-web:v0.3.0 \
+  --load .
+
+
+docker buildx build --platform linux/arm64 \
+  -f Dockerfile.server \
+  -t zxwei/knowflow-server:v0.3.0 \
+  --load .
+
+
+> ```
+
 
 ## TODO
 - [ ] 支持更多格式的混排，如表格、图标等，同时支持可视化界面上传文档 [doing]
