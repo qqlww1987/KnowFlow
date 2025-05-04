@@ -14,11 +14,11 @@ KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的�
 基于 RAGFlow v0.18.0 二次开发全新 UI 页面。
 
 <div align="center">
-  <img src="assets/ui_1.png" width="108" height="124" alt="KnowFlow 企业知识库">
+  <img src="assets/ui_1.png" alt="KnowFlow 企业知识库">
 </div>
 
 <div align="center">
-  <img src="assets/ui_2.png" width="108" height="124" alt="KnowFlow 企业知识库">
+  <img src="assets/ui_2.png" alt="KnowFlow 企业知识库">
 </div>
 
 
