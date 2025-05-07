@@ -71,9 +71,9 @@ ES_PORT='xxxx'(选填)
 ```bash
 python3 server/download_models_hf.py
 ```
-3. 在项目根目录下执行预处理脚本，用于复制宿主 `magic-pdf.json` 到 docker 容器
+3. 在项目根目录下执行预处理脚本，docker 挂载宿主的 MinerU 模型
 ```bash
-python3 copy_file2docker.py
+python3 mineru_volumes.py
 ```
 
 4. 启动容器，开始愉快之旅

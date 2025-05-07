@@ -1,5 +1,5 @@
 # 本项目 mineru 并未打包到镜像内，而是挂载到本地已下载的资源
-# 通过本脚本可以将 magic-pdf.json 文件复制到 docker 镜像内并实现自动挂载
+# 通过本脚本可以将 magic-pdf.json 文件路径添加到环境变量，实现自动挂载
 
 import os
 import json
@@ -31,8 +31,6 @@ def update_env_file(env_path, updates):
             f.write(f"{k}='{v}'\n")
 
 
-
-
 if __name__ == "__main__":
     # 解析 magic-pdf.json
     home_dir = os.path.expanduser('~')
@@ -47,12 +45,6 @@ if __name__ == "__main__":
 
     print(f"env_path: {env_path}")
     
-    update_env_file(env_path, {
-        'MINERU_MODLES_DIR': mineru_models_dir
-    })
-
-    print("已将模型路径追加/更新到 .env 文件。")
-
     # 复制 magic-pdf.json 到 server 目录，用于 docker 构建
     config_file = os.path.join(home_dir, 'magic-pdf.json')
     if not os.path.exists(config_file):
@@ -76,18 +68,17 @@ if __name__ == "__main__":
     if 'layoutreader-model-dir' in config_json:
         config_json['layoutreader-model-dir'] = fix_cache_path(config_json['layoutreader-model-dir'])
 
-
     server_dir = os.path.join(os.path.dirname(__file__), "server")
     target_config_file = os.path.join(server_dir, "magic-pdf.json")
     
     with open(target_config_file, 'w', encoding='utf-8') as f:
         json.dump(config_json, f, ensure_ascii=False, indent=4)
     print(f"已将修正后的配置文件复制到: {target_config_file}")
-
-    # 执行 copy 逻辑到 docker 内
-    container_name = "knowflow-backend"
-    docker_target_path = "/root"
-    cp_cmd = f"docker cp {target_config_file} {container_name}:{docker_target_path}"
-    print(f"正在执行: {cp_cmd}")
-    os.system(cp_cmd)
-    print("docker cp 执行完成。")
+    
+    # 更新环境变量，添加 MINERU_MAGIC_PDF_JSON_PATH
+    update_env_file(env_path, {
+        'MINERU_MODLES_DIR': mineru_models_dir,
+        'MINERU_MAGIC_PDF_JSON_PATH': target_config_file
+    })
+    
+    print("已将配置文件路径添加到环境变量，可以通过 volume 挂载到容器内。")
