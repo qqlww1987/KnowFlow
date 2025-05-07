@@ -62,16 +62,19 @@ KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的�
 ```bash
 RAGFLOW_API_KEY=  从 RAGFlow 后台获取 (必须)
 RAGFLOW_BASE_URL= 从 RAGFlow 后台获取 (必须)
+# 填服务器 ip
+ES_HOST='xxxxx'（必填）
+# 填 ES docker 对宿主暴露的端口号，比如 1200:9200 ，此时填 1200
+ES_PORT='xxxx'(必填)
+
 DB_HOST='xxxx' (选填)
 MINIO_HOST='xxxx'(选填)
-ES_HOST='xxxxx'(选填)
-ES_PORT='xxxx'(选填)
 ```
 2. 在宿主机器上下载 MinerU 模型文件
 ```bash
 python3 server/download_models_hf.py
 ```
-3. 在项目根目录下执行预处理脚本，docker 挂载宿主的 MinerU 模型
+3. 在项目根目录下执行预处理脚本，用于 docker 挂载宿主的 
 ```bash
 python3 mineru_volumes.py
 ```

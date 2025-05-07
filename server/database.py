@@ -20,9 +20,9 @@ def is_running_in_docker():
         return docker_env
 
 # 根据运行环境选择合适的主机地址
-DB_HOST = os.getenv('DB_HOST', 'host.docker.internal' if is_running_in_docker() else 'localhost')
-MINIO_HOST =  os.getenv('MINIO_HOST', 'host.docker.internal' if is_running_in_docker() else 'localhost')
-ES_HOST =  os.getenv('ES_HOST', 'es01' if is_running_in_docker() else 'localhost')
+DB_HOST = os.getenv('DB_HOST') or ('host.docker.internal' if is_running_in_docker() else 'localhost')
+MINIO_HOST = os.getenv('MINIO_HOST') or ('host.docker.internal' if is_running_in_docker() else 'localhost')
+ES_HOST = os.getenv('ES_HOST') or ('es01' if is_running_in_docker() else 'localhost')
 
 # 数据库连接配置
 DB_CONFIG = {
@@ -79,7 +79,7 @@ def get_es_client():
         es_params = {
             "hosts": [ES_CONFIG["host"]]
         }
-        
+                
         # 如果提供了用户名和密码，添加认证信息
         if ES_CONFIG["user"] and ES_CONFIG["password"]:
             es_params["basic_auth"] = (ES_CONFIG["user"], ES_CONFIG["password"])
