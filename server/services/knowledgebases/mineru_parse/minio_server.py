@@ -92,7 +92,23 @@ def get_image_url(kb_id, image_key):
         minio_endpoint = MINIO_CONFIG["endpoint"]
         use_ssl = MINIO_CONFIG["secure"]
         protocol = "https" if use_ssl else "http"
-        url = f"{protocol}://{minio_endpoint}/{kb_id}/{image_key}"
+        url = f"{protocol}://{minio_endpoint}/{kb_id}/{image_key}"  
+
+        # 如果图片显示 CROS 跨域问题，此时可以通过 nginx 反向代理实现或者配置 minio 证书解决，下面给出 nginx 反向代理方案:
+        # 1. 替换上述 url 实现：
+        #  RAGFLOW_BASE_URL = os.getenv('RAGFLOW_BASE_URL') 
+        #  url = f"{RAGFLOW_BASE_URL}/minio/{kb_id}/{image_key}"   
+        # 2. 在服务器的 nginx 配置如下：
+        #   location /minio/ {
+        #        proxy_pass http://localhost:9000/;
+        #       proxy_set_header Host $host;
+        #        proxy_set_header X-Real-IP $remote_addr;
+        #       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        #       proxy_set_header X-Forwarded-Proto $scheme;
+        #       # 去掉 /minio 前缀
+        #       rewrite ^/minio/(.*)$ /$1 break;
+        #    }
+
         print(f"[DEBUG] 图片URL: {url}")
         return url
     except Exception as e:

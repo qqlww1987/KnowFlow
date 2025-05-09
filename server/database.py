@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from elasticsearch import Elasticsearch  
 
 # 加载环境变量
-load_dotenv("../../.env")
+load_dotenv()
 
 # 检测是否在Docker容器中运行
 def is_running_in_docker():
@@ -97,8 +97,9 @@ def get_es_client():
 
 def test_connections():
     """测试数据库和MinIO连接"""
-    try:
-        # 测试MySQL连接
+    try:        
+        # 测试 MySQL 连接
+        print(f"尝试连接到 MySQL: {DB_HOST}:{DB_CONFIG['port']}")
         db_conn = get_db_connection()
         cursor = db_conn.cursor()
         cursor.execute("SELECT 1")
