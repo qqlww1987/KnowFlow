@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import os
 from .mineru_test import process_pdf_with_minerU
 from .ragflow_build import create_ragflow_resources
 # 聊天助手 Prompt 模板:
@@ -32,7 +33,8 @@ def process_pdf_entry(doc_id, pdf_path, kb_id, update_progress):
     """
     try:
         md_file_path = _safe_process_pdf(pdf_path, update_progress)
-        result = _safe_create_ragflow(doc_id, kb_id, md_file_path, 'output/images', update_progress)
+        images_dir = os.path.join(os.path.dirname(md_file_path), 'images')
+        result = _safe_create_ragflow(doc_id, kb_id, md_file_path, images_dir, update_progress)
         return result
     except Exception as e:
         print(e)

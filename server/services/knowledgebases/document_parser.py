@@ -139,17 +139,17 @@ def perform_parse(doc_id, doc_info, file_info, embedding_config):
            raise ValueError(f"[Parser-ERROR] 无法获取文件内容: {file_location}")
         
         temp_dir = tempfile.gettempdir()
-        temp_pdf_path = os.path.join(temp_dir, f"{doc_id}.pdf")
-        with open(temp_pdf_path, 'wb') as f:
+        temp_file_path = os.path.join(temp_dir, f"{doc_id}{file_extension}")
+        print(f"[Parser-INFO] 临时文件路径: {temp_file_path}")
+        with open(temp_file_path, 'wb') as f:
             f.write(file_content)
 
         # 初始化进度
         update_progress(0.2, "OCR开始")
 
         # 执行 OCR 进行文档解析
-        
         from .mineru_parse.process_pdf import process_pdf_entry
-        chunk_count = process_pdf_entry(doc_id, temp_pdf_path,kb_id, update_progress)
+        chunk_count = process_pdf_entry(doc_id, temp_file_path,kb_id, update_progress)
 
         return {"success": True, "chunk_count": chunk_count}
             
