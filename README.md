@@ -58,25 +58,22 @@ KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的�
 
 ### 1. 使用Docker Compose运行
 
-1. 在项目根目录下新建 `.env` 文件，添加如下内容
-```bash
-RAGFLOW_API_KEY=  从 RAGFlow 后台获取 (必须)
-RAGFLOW_BASE_URL= 从 RAGFlow 后台获取 (必须)
-# 填服务器 ip
-ES_HOST='xxxxx'（必填）
-# 填 ES docker 对宿主暴露的端口号，比如 1200:9200 ，此时填 1200
-ES_PORT='xxxx'(必填)
+1. 在宿主机器上下载 MinerU 模型文件
 
-DB_HOST='xxxx' (选填)
-MINIO_HOST='xxxx'(选填)
-```
-2. 在宿主机器上下载 MinerU 模型文件
 ```bash
 python3 server/download_models_hf.py
 ```
-3. 在项目根目录下执行预处理脚本，用于 docker 挂载宿主的 
+2. 在项目根目录下新建 `.env` 文件，添加如下内容
+
 ```bash
-python3 mineru_volumes.py
+RAGFLOW_API_KEY=  从 RAGFlow API 页面后台获取 (必须)
+RAGFLOW_BASE_URL= 从 RAGFlow API 页面获取 (必须)
+```
+
+3. 执行安装脚本，在 .env 里追加环境变量
+
+```bash
+./scripts/install.sh
 ```
 
 4. 启动容器，开始愉快之旅
@@ -88,7 +85,8 @@ docker compose up -d
 
 ### 2. 源码运行
 
-也可以通过下面的方式单独运行管理系统
+参照 Docker Compose 使用方式的前面 1、2、3 步骤，这是前提。
+
 
 启动后端：
 
@@ -100,11 +98,19 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-2.启动后端
+
+2.开启文件格式转化服务（可选，支持 PDF 以外文件格式需要开启）
+
+```bash
+docker run -d -p 3000:3000 gotenberg/gotenberg:8
+```
+
+3.启动后端
 
 ```bash
 python3 app.py
 ```
+
 
 启动前端：
 
@@ -119,6 +125,7 @@ pnpm dev
 ```
 
 浏览器访问启动后的地址，即可进入系统。
+
 
 > 💡 **提示：** **图文混排功能**，聊天助手的提示词很重要，配置不正确会无法显示图片。模板如下：<br>
 > 请参考{knowledge}内容回答用户问题。<br>
@@ -169,5 +176,6 @@ docker buildx build --platform linux/amd64 --target frontend -t zxwei/knowflow-w
 - [ragflow-plus](https://github.com/zstar1003/ragflow-plus/)
 
 ## 更新信息获取
+
 
 目前该项目仍在持续更新中，更新日志会在我的微信公众号[KnowFlow 企业知识库]上发布，欢迎关注。

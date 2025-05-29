@@ -45,6 +45,14 @@ services:
     networks:
       - management_network
 
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    ports:
+      - "3000:3000"
+    networks:
+      - management_network
+
+
 networks:
   management_network:
     driver: bridge
