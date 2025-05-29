@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/logo.png"  alt="KnowFlow 企业知识库">
+  <img src="assets/logo.png" alt="KnowFlow 企业知识库" width="30%">
 </div>
 
 ## 项目介绍
