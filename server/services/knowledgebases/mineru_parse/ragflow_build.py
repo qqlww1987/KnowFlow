@@ -62,10 +62,20 @@ def _update_chunks_position(doc, md_file_path):
     return chunk_count
 
 def _cleanup_temp_files(md_file_path):
+    """清理临时文件"""
+    # 检查环境变量是否允许删除临时文件
+    cleanup_enabled = os.getenv('CLEANUP_TEMP_FILES', 'true').lower() in ('true', '1', 'yes', 'on')
+    
+    if not cleanup_enabled:
+        print(f"[INFO] 环境变量 CLEANUP_TEMP_FILES 设置为 false，保留临时文件: {os.path.dirname(os.path.abspath(md_file_path))}")
+        return
+    
     try:
-        shutil.rmtree(os.path.dirname(os.path.abspath(md_file_path)))
+        temp_dir = os.path.dirname(os.path.abspath(md_file_path))
+        shutil.rmtree(temp_dir)
+        print(f"[INFO] 已清理临时文件目录: {temp_dir}")
     except Exception as e:
-        print(f"清理临时文件异常: {e}")
+        print(f"[WARNING] 清理临时文件异常: {e}")
 
 def create_ragflow_resources(doc_id, kb_id, md_file_path, image_dir, update_progress):
     """
@@ -94,6 +104,7 @@ def create_ragflow_resources(doc_id, kb_id, md_file_path, image_dir, update_prog
 
         update_document_progress(doc.id, progress=1.0, message="解析完成", status='1', run='3', chunk_count=chunk_count, process_duration=None)
 
+        # 根据环境变量决定是否清理临时文件
         _cleanup_temp_files(md_file_path)
 
         return chunk_count

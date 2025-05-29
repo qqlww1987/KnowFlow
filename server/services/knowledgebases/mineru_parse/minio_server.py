@@ -14,11 +14,18 @@ def _set_bucket_policy(minio_client, kb_id):
         "Statement": [{
             "Effect": "Allow",
             "Principal": {"AWS": "*"},
-            "Action": ["s3:GetObject"],
-            "Resource": [f"arn:aws:s3:::{kb_id}/*"]
+            "Action": [
+                "s3:GetObject",
+                "s3:ListBucket"
+            ],
+            "Resource": [
+                f"arn:aws:s3:::{kb_id}",
+                f"arn:aws:s3:::{kb_id}/*"
+            ]
         }]
     }
     minio_client.set_bucket_policy(kb_id, json.dumps(policy))
+    print(f"[INFO] 已设置bucket {kb_id} 为公开访问")
 
 def _ensure_bucket_exists(minio_client, kb_id):
     """确保桶存在，不存在则创建并设置策略"""

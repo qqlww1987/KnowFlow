@@ -165,11 +165,22 @@ def perform_parse(doc_id, doc_info, file_info, embedding_config):
         return {"success": False, "error": error_message}
 
     finally:
-        # 清理临时文件
-        try:
-            if temp_pdf_path and os.path.exists(temp_pdf_path):
-                os.remove(temp_pdf_path)
-            if temp_image_dir and os.path.exists(temp_image_dir):
-                shutil.rmtree(temp_image_dir, ignore_errors=True)
-        except Exception as clean_e:
-            print(f"[Parser-WARNING] 清理临时文件失败: {clean_e}")
+        # 清理临时文件 - 根据环境变量控制
+        cleanup_enabled = os.getenv('CLEANUP_TEMP_FILES', 'true').lower() in ('true', '1', 'yes', 'on')
+        
+        if cleanup_enabled:
+            try:
+                if temp_pdf_path and os.path.exists(temp_pdf_path):
+                    os.remove(temp_pdf_path)
+                    print(f"[Parser-INFO] 已清理临时PDF文件: {temp_pdf_path}")
+                if temp_image_dir and os.path.exists(temp_image_dir):
+                    shutil.rmtree(temp_image_dir, ignore_errors=True)
+                    print(f"[Parser-INFO] 已清理临时图片目录: {temp_image_dir}")
+            except Exception as clean_e:
+                print(f"[Parser-WARNING] 清理临时文件失败: {clean_e}")
+        else:
+            print(f"[Parser-INFO] 环境变量 CLEANUP_TEMP_FILES 设置为 false，保留临时文件")
+            if temp_pdf_path:
+                print(f"[Parser-INFO] 保留临时PDF文件: {temp_pdf_path}")
+            if temp_image_dir:
+                print(f"[Parser-INFO] 保留临时图片目录: {temp_image_dir}")

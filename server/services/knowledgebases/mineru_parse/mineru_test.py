@@ -127,45 +127,18 @@ def process_pdf_with_minerU(file_input, update_progress=None):
             logger.info(f"任务专属临时目录 {job_specific_temp_dir} 及其内容 (包括最终输出的 markdown 和图片) 被保留。调用者负责后续清理。")
             pass
 
+
 def update_markdown_image_urls(md_file_path, kb_id):
     """更新Markdown文件中的图片URL"""
     def _replace_img(match):
-        alt_text = match.group(1)
-        img_src = match.group(2)
-        img_name = os.path.basename(img_src)
-        
-        if not img_src.startswith(('http://', 'https://')):
-            final_img_url = get_image_url(kb_id, img_name)
-        else:
-            final_img_url = img_src
-        return f'<img src="{final_img_url}" style="max-width: 300px;" alt="{alt_text if alt_text else img_name}">'
-    
-    if not md_file_path or not os.path.exists(md_file_path):
-        logger.error(f"Markdown文件路径无效或文件不存在: {md_file_path} (update_markdown_image_urls)")
-        return ""
-
-    try:
-        with open(md_file_path, 'r+', encoding='utf-8') as f:
-            content = f.read()
-            updated_content = re.sub(r'!\[(.*?)\]\\((.*?)\\)', _replace_img, content)
-            if content != updated_content:
-                f.seek(0)
-                f.write(updated_content)
-                f.truncate()
-                logger.info(f"Markdown文件中的图片链接已更新: {md_file_path}")
-            else:
-                logger.info(f"Markdown文件中没有图片链接需要更新: {md_file_path}")
-        return updated_content
-    except FileNotFoundError:
-        logger.error(f"Markdown文件 {md_file_path} 未找到 (update_markdown_image_urls)")
-        return ""
-    except Exception as e:
-        logger.exception(f"更新Markdown图片URL时发生错误: {md_file_path}, 错误: {e}")
-        try:
-            with open(md_file_path, 'r', encoding='utf-8') as f_orig:
-                return f_orig.read()
-        except Exception:
-            return ""
-
-
-
+        img_url = os.path.basename(match.group(1))
+        if not img_url.startswith(('http://', 'https://')):
+            img_url = get_image_url(kb_id, img_url)
+        return f'<img src="{img_url}" style="max-width: 300px;" alt="图片">'
+    with open(md_file_path, 'r+', encoding='utf-8') as f:
+        content = f.read()
+        updated_content = re.sub(r'!\[\]\((.*?)\)', _replace_img, content)
+        f.seek(0)
+        f.write(updated_content)
+        f.truncate()
+    return updated_content
