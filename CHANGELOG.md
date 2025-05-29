@@ -18,7 +18,11 @@
     ".wks", ".wmf", ".wpd", ".wpg", ".wps", ".xbm", ".xhtml", ".xls", ".xlsb", ".xlsm", ".xlsx", 
     ".xlt", ".xltm", ".xltx", ".xlw", ".xml", ".xpm", ".zabw" 
 
+- Markdown 文件分块规则和官方保持一致，支持图片和表格向量化
+
+### 优化
 - 简化配置流程，避免配置错误导致链接失败
+- 支持在 .env 配置是否保存 MinerU 生成产物
 
 
 ## [v0.3.0] - 2025-05-02（兼容 RAGFlow v0.18.0）
