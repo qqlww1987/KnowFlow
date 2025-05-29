@@ -36,9 +36,9 @@ KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的�
 
 ### 图文混排输出 
 
-1. 能够回答结果图文混排，可将回答结果中的图片和文本进行混排，以增强回答的可读性。后续将持续支持表格、图标等格式，增强其结构化输出能力。
-2. 支持自定义 chunk 以及分块坐标溯源
-3. 支持 RAGFlow 添加的文档在 KnowFlow 进行一键解析
+1. 支持市面上常见的文件格式，如 ppt/png/word/doc/excel/...等等
+2. 保持和官方 markdown **完全一致**的分块规则，保证分块和向量化检索效果，且具备开放性，后续可持续增强
+3. 无缝对接 RAGFlow 知识库系统，文档自动解析和分块
 
 <div align="center">
   <img src="assets/mulcontent.png"  alt="图文混排">
@@ -155,8 +155,9 @@ docker buildx build --platform linux/amd64 --target frontend -t zxwei/knowflow-w
 
 
 ## TODO
-- [ ] 支持更多文档格式的 MinerU 解析
-- [ ] 前端 UI 源码 API 化
+- [x] 支持更多文档格式的 MinerU 解析
+- [ ] 增强 MarkDown 文件的分块规则
+- [ ] 
 
 
 ## 交流群

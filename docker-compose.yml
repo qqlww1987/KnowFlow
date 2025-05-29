@@ -1,7 +1,7 @@
 services:
   frontend:
     container_name: knowflow-frontend
-    image: zxwei/knowflow-web:v0.3.0
+    image: zxwei/knowflow-web:v0.4.0
     build:
       context: .
       dockerfile: Dockerfile
@@ -17,7 +17,7 @@ services:
 
   backend:
     container_name: knowflow-backend
-    image: zxwei/knowflow-server:v0.3.0
+    image: zxwei/knowflow-server:v0.4.0
     build:
       context: .
       dockerfile: Dockerfile
