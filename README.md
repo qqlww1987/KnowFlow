@@ -70,7 +70,7 @@ python3 download_models.py
 ```bash
 #  从 RAGFlow API 页面后台获取 (必须)
 RAGFLOW_API_KEY=
-# 注意不支持 127.0.0.1、localhost，需要把 127.0.0.1 或 localhost 替换成部署机器的 IP 地址
+# 注意不支持 127.0.0.1、localhost，需要把 127.0.0.1 或 localhost 替换成部署机器的 IP 地址（）
 RAGFLOW_BASE_URL=
 ```
 
@@ -181,5 +181,45 @@ docker buildx build --platform linux/amd64 --target frontend -t zxwei/knowflow-w
 
 ## 更新信息获取
 
-
 目前该项目仍在持续更新中，更新日志会在我的微信公众号[KnowFlow 企业知识库]上发布，欢迎关注。
+
+
+## 常见问题
+
+1. 如何给 MinerU 进行 GPU 加速
+
+   1） 安装 nvidia-container-toolkit
+
+      ```bash
+      # 添加源
+      distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+      curl -s -L https://nvidia.github.io/libnvidia-container/gpgkey | sudo apt-key add -
+      curl -s -L https://nvidia.github.io/libnvidia-container/$distribution/libnvidia-container.list | \
+        sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+
+      # 安装组件
+      sudo apt-get update
+      sudo apt-get install -y nvidia-container-toolkit
+
+      # 重启 Docker
+      sudo systemctl restart docker
+      ```
+
+   2）修改 `docker-compose.yml` 的 `backend` 容器下，增加：
+
+      ```yaml
+      backend:
+        deploy:
+          resources:
+            reservations:
+              devices:
+                - driver: nvidia
+                  count: all
+                  capabilities: [gpu]
+      ```
+
+   3）修改 `server/magic-pdf.json`，把 `device-mode` 从 `cpu` 为 `cuda`：
+
+      ```json
+      "device-mode": "cuda"
+      ```

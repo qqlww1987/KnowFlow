@@ -22,7 +22,13 @@ services:
       context: .
       dockerfile: Dockerfile
       target: backend
-
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     ports:
       - "5000:5000"
     environment:
