@@ -8,7 +8,7 @@ from werkzeug.security import generate_password_hash
 
 # 生成随机的 UUID 作为 id
 def generate_uuid():
-    return str(uuid.uuid4()).replace("-", "")
+    return uuid.uuid1().hex
 
 # RSA 加密密码
 def rsa_psw(password: str) -> str:

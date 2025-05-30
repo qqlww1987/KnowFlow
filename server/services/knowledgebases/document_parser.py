@@ -123,6 +123,7 @@ def perform_parse(doc_id, doc_info, file_info, embedding_config):
 
 
         minio_client = get_minio_client()
+        file_content = None # 初始化 file_content
         # 从MinIO下载文件
         try:
             if minio_client.bucket_exists(bucket_name):
@@ -132,10 +133,13 @@ def perform_parse(doc_id, doc_info, file_info, embedding_config):
                 response.close()
         except Exception as e:
             print(f"[Parser-WARNING] MinIO 下载异常: {e}，尝试从 RAGFlow API获取文件")
+       
+        # 从 RAGFlow 系统重查询
+        if not file_content: # 确保此 if 与 minio_client = ... 在同一缩进级别
             from .utils import get_doc_content     
             file_content = get_doc_content(kb_id, doc_id)
 
-        if not file_content:
+        if not file_content: # 确保此 if 与上一个 if 在同一缩进级别
            raise ValueError(f"[Parser-ERROR] 无法获取文件内容: {file_location}")
         
         temp_dir = tempfile.gettempdir()
