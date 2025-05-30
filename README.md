@@ -68,8 +68,10 @@ python3 download_models.py
 2. 在项目根目录下新建 `.env` 文件，添加如下内容
 
 ```bash
-RAGFLOW_API_KEY=  从 RAGFlow API 页面后台获取 (必须)
-RAGFLOW_BASE_URL= 从 RAGFlow API 页面获取 (必须)
+#  从 RAGFlow API 页面后台获取 (必须)
+RAGFLOW_API_KEY=
+# 注意不支持 127.0.0.1、localhost，需要把 127.0.0.1 或 localhost 替换成部署机器的 IP 地址
+RAGFLOW_BASE_URL=
 ```
 
 3. 执行安装脚本，在 .env 里追加环境变量
