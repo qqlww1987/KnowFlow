@@ -61,7 +61,9 @@ KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的�
 1. 在宿主机器上下载 MinerU 模型文件
 
 ```bash
-python3 server/download_models_hf.py
+pip install modelscope
+wget https://gcore.jsdelivr.net/gh/opendatalab/MinerU@master/scripts/download_models.py -O download_models.py
+python3 download_models.py
 ```
 2. 在项目根目录下新建 `.env` 文件，添加如下内容
 
