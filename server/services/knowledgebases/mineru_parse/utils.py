@@ -245,7 +245,6 @@ def get_blocks_from_md(md_file_path):
                 if not bbox:
                     continue
 
-                # Process text and title blocks by their spans
                 if block['type'] in ('text', 'title'):
                     for line in block.get('lines', []):
                         for span in line.get('spans', []):
@@ -253,10 +252,23 @@ def get_blocks_from_md(md_file_path):
                             if content:
                                 block_list.append({'content': content, 'bbox': bbox, 'page_number': page_idx })
                 
-                # Process table blocks by their HTML content
                 elif block['type'] == 'table':
-                    html_content = block.get('html', '').strip()
+                    html_content = ""
+                    # Traverse the nested structure to find the HTML content
+                    for inner_block in block.get('blocks', []):
+                        for line in inner_block.get('lines', []):
+                            for span in line.get('spans', []):
+                                if 'html' in span:
+                                    html_content = span.get('html', '').strip()
+                                    if html_content:
+                                        break  # Exit spans loop
+                            if html_content:
+                                break  # Exit lines loop
+                        if html_content:
+                            break  # Exit inner_blocks loop
+                    
                     if html_content:
+                        # Use the top-level block's bbox for the entire table
                         block_list.append({'content': html_content, 'bbox': bbox, 'page_number': page_idx })
 
     _blocks_cache[md_file_path] = block_list
