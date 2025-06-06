@@ -48,25 +48,29 @@ def _update_chunks_position(doc, md_file_path, chunk_content_to_index):
             print(f"警告: 无法为块 id={chunk.id} 的内容找到原始索引，将跳过此块。")
             continue
         
-        position_int_temp = get_bbox_for_chunk(md_file_path, chunk.content)
-        if position_int_temp is not None:
-            doc_fields = {}
-            try:
+        direct_update = {
+            "doc": {
+                "top_int": original_index
+            }
+        }
+        
+        # 尝试获取位置信息，如果成功则添加到更新中
+        try:
+            position_int_temp = get_bbox_for_chunk(md_file_path, chunk.content)
+            if position_int_temp is not None:
+                doc_fields = {}
                 _add_positions(doc_fields, position_int_temp)
-                direct_update = {
-                    "doc": {
-
-                        "position_int": doc_fields.get("position_int"),
-                        "top_int": original_index,
-                    }
-                }
-                try:
-                    es_client.update(index=index_name, id=chunk.id, body=direct_update, refresh=True)
-                except Exception as es_e:
-                    print(f"ES更新异常: {es_e}")
-            except Exception as e:
-                print(f"处理chunk位置异常: {e}")
-        chunk_count += 1
+                direct_update["doc"]["position_int"] = doc_fields.get("position_int")
+        except Exception as e:
+            print(f"获取chunk位置异常: {e}")
+        
+        # 执行ES更新
+        try:
+            es_client.update(index=index_name, id=chunk.id, body=direct_update, refresh=True)
+            chunk_count += 1
+        except Exception as es_e:
+            print(f"ES更新异常: {es_e}")
+        
     return chunk_count
 
 def _cleanup_temp_files(md_file_path):
