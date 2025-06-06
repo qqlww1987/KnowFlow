@@ -26,20 +26,28 @@ def _upload_images(kb_id, image_dir, update_progress):
 
 def _add_chunks_to_doc(doc, chunks, update_progress):
     update_progress(0.8, "添加 chunk 到文档...")
-    for chunk in chunks:
+    print(f"总共接收到 {len(chunks)} 个 chunks 准备添加。")
+    for i, chunk in enumerate(chunks):
+        chunk_preview = chunk.strip()[:50].replace('\n', ' ')
+        print(f"准备添加 Chunk {i}: \"{chunk_preview}...\"")
         if chunk and chunk.strip():
             try:
                 doc.add_chunk(content=chunk)
             except Exception as e:
                 print(f"添加 chunk 失败: {e}")
 
-def _update_chunks_position(doc, md_file_path):
+def _update_chunks_position(doc, md_file_path, chunk_content_to_index):
     es_client = get_es_client()
     print(f"文档: id: {doc.id})")
     chunk_count = 0
     tenant_id = doc.created_by
     index_name = f"ragflow_{tenant_id}"
     for chunk in doc.list_chunks(keywords=None, page=1, page_size=10000):
+        original_index = chunk_content_to_index.get(chunk.content)
+        if original_index is None:
+            print(f"警告: 无法为块 id={chunk.id} 的内容找到原始索引，将跳过此块。")
+            continue
+        
         position_int_temp = get_bbox_for_chunk(md_file_path, chunk.content)
         if position_int_temp is not None:
             doc_fields = {}
@@ -47,9 +55,9 @@ def _update_chunks_position(doc, md_file_path):
                 _add_positions(doc_fields, position_int_temp)
                 direct_update = {
                     "doc": {
-                        "page_num_int": doc_fields.get("page_num_int"),
+
                         "position_int": doc_fields.get("position_int"),
-                        "top_int": doc_fields.get("top_int"),
+                        "top_int": original_index,
                     }
                 }
                 try:
@@ -92,7 +100,8 @@ def create_ragflow_resources(doc_id, kb_id, md_file_path, image_dir, update_prog
         _upload_images(kb_id, image_dir, update_progress)
 
         enhanced_text = update_markdown_image_urls(md_file_path, kb_id)
-        chunks = split_markdown_to_chunks(enhanced_text, chunk_token_num=128)
+        chunks = split_markdown_to_chunks(enhanced_text, chunk_token_num=512)
+        chunk_content_to_index = {chunk: i for i, chunk in enumerate(chunks)}
 
         docs = dataset.list_documents(id=doc_id)
         if not docs:
@@ -100,7 +109,7 @@ def create_ragflow_resources(doc_id, kb_id, md_file_path, image_dir, update_prog
         doc = docs[0]
 
         _add_chunks_to_doc(doc, chunks, update_progress)
-        chunk_count = _update_chunks_position(doc, md_file_path)
+        chunk_count = _update_chunks_position(doc, md_file_path, chunk_content_to_index)
 
         update_document_progress(doc.id, progress=1.0, message="解析完成", status='1', run='3', chunk_count=chunk_count, process_duration=None)
 

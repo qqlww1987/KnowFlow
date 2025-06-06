@@ -241,34 +241,75 @@ def get_blocks_from_md(md_file_path):
         block_list = []
         for page_idx, page in enumerate(data['pdf_info']):
             for block in page['preproc_blocks']:
+                bbox = block.get('bbox')
+                if not bbox:
+                    continue
+
+                # Process text and title blocks by their spans
                 if block['type'] in ('text', 'title'):
                     for line in block.get('lines', []):
                         for span in line.get('spans', []):
                             content = span.get('content', '').strip()
-                            bbox = block.get('bbox')
-                            if content and bbox:
+                            if content:
                                 block_list.append({'content': content, 'bbox': bbox, 'page_number': page_idx })
+                
+                # Process table blocks by their HTML content
+                elif block['type'] == 'table':
+                    html_content = block.get('html', '').strip()
+                    if html_content:
+                        block_list.append({'content': html_content, 'bbox': bbox, 'page_number': page_idx })
+
     _blocks_cache[md_file_path] = block_list
     return block_list
 
 def get_bbox_for_chunk(md_file_path, chunk_content):
     """
-    根据 md 文件路径和 chunk 内容，返回 chunk_content 中包含的最长 block['content'] 的 bbox，并追加 page_number。
+    根据 md 文件路径和 chunk 内容，返回 chunk 中所有独立内容的"最大匹配" block 的 bbox 列表。
+    该算法首先找到所有匹配的 block，然后过滤掉那些本身是其他更长匹配项子集的 block。
     """
     block_list = get_blocks_from_md(md_file_path)
-    best_block = None
-    max_len = 0
+    if not block_list:
+        return None
+
+    chunk_content_clean = chunk_content.strip()
+    if not chunk_content_clean:
+        return None
+
+    # Step 1: Find all blocks whose content is a substring of the chunk content.
+    matched_blocks = []
     for block in block_list:
-        if block['content'] and block['content'] in chunk_content:
-            if len(block['content']) > max_len:
-                best_block = block
-                max_len = len(block['content'])
-    if best_block:
-        bbox = best_block['bbox']
-        page_number = best_block['page_number']
-        position_int = [[page_number, bbox[0], bbox[2], bbox[1], bbox[3]]]
-        return position_int
-    return None
+        if block.get('content') and block['content'] in chunk_content_clean:
+            matched_blocks.append(block)
+
+    if not matched_blocks:
+        return None
+
+    # Step 2: Filter for "maximal" matches. A match is maximal if its content
+    # is not a substring of any other longer match's content.
+    maximal_matches = []
+    for b1 in matched_blocks:
+        is_maximal = True
+        for b2 in matched_blocks:
+            if b1 is b2:
+                continue
+            # If b1's content is a proper substring of b2's content, it's not maximal.
+            if b1['content'] in b2['content'] and len(b1['content']) < len(b2['content']):
+                is_maximal = False
+                break
+        if is_maximal:
+            maximal_matches.append(b1)
+
+    # Step 3: Format and deduplicate the final positions.
+    found_positions = []
+    for block in maximal_matches:
+        bbox = block.get('bbox')
+        page_number = block.get('page_number')
+        if bbox and page_number is not None:
+            position = [page_number, bbox[0], bbox[2], bbox[1], bbox[3]]
+            if position not in found_positions:
+                found_positions.append(position)
+    
+    return found_positions if found_positions else None
 
 
 def update_document_progress(doc_id, progress=None, message=None, status=None, run=None, chunk_count=None, process_duration=None):

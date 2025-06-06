@@ -152,8 +152,40 @@ def perform_parse(doc_id, doc_info, file_info, embedding_config):
         update_progress(0.2, "OCR开始")
 
         # 执行 OCR 进行文档解析
-        from .mineru_parse.process_pdf import process_pdf_entry
-        chunk_count = process_pdf_entry(doc_id, temp_file_path,kb_id, update_progress)
+        # 原版本 - 临时注释掉用于测试
+        # from .mineru_parse.process_pdf import process_pdf_entry
+        # chunk_count = process_pdf_entry(doc_id, temp_file_path,kb_id, update_progress)
+
+        # === 临时测试版本 - 直接使用 output 目录中的 markdown 文件 ===
+        print(f"[Parser-INFO] 临时测试模式：跳过 MinerU 处理，直接使用现有 markdown 文件")
+        
+        # 使用现有的 markdown 文件路径
+        output_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'output')
+        md_file_path = os.path.join(output_dir, '0c344536404411f0ba3a66fc51ac58de.md')
+        
+        if os.path.exists(md_file_path):
+            print(f"[Parser-INFO] 找到测试 markdown 文件: {md_file_path}")
+            update_progress(0.4, "跳过 MinerU 处理，使用现有 markdown 文件")
+            
+            # 使用现有的 ragflow_build 逻辑处理 markdown
+            from .mineru_parse.ragflow_build import create_ragflow_resources
+            
+            # 假设 images 目录也在 output 目录下
+            images_dir = os.path.join(output_dir, 'images')
+            chunk_count = create_ragflow_resources(doc_id, kb_id, md_file_path, images_dir, update_progress)
+            
+            print(f"[Parser-INFO] 测试模式完成，生成 {chunk_count} 个块")
+        else:
+            print(f"[Parser-WARNING] 测试 markdown 文件不存在: {md_file_path}")
+            print(f"[Parser-INFO] 可用的 output 文件:")
+            if os.path.exists(output_dir):
+                for f in os.listdir(output_dir):
+                    print(f"  - {f}")
+            
+            # 回退到错误状态
+            chunk_count = 0
+            update_progress(0.9, "测试 markdown 文件不存在")
+        # === 临时测试版本结束 ===
 
         return {"success": True, "chunk_count": chunk_count}
             
