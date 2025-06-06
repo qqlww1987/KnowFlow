@@ -5,7 +5,7 @@ import shutil
 from dotenv import load_dotenv
 from .minio_server import upload_directory_to_minio
 from .mineru_test import update_markdown_image_urls
-from .utils import split_markdown_to_chunks, get_bbox_for_chunk, update_document_progress
+from .utils import split_markdown_to_chunks_smart, get_bbox_for_chunk, update_document_progress
 from database import get_es_client
 
 def _validate_environment():
@@ -104,7 +104,7 @@ def create_ragflow_resources(doc_id, kb_id, md_file_path, image_dir, update_prog
         _upload_images(kb_id, image_dir, update_progress)
 
         enhanced_text = update_markdown_image_urls(md_file_path, kb_id)
-        chunks = split_markdown_to_chunks(enhanced_text, chunk_token_num=512)
+        chunks = split_markdown_to_chunks_smart(enhanced_text, chunk_token_num=512)
         chunk_content_to_index = {chunk: i for i, chunk in enumerate(chunks)}
 
         docs = dataset.list_documents(id=doc_id)
