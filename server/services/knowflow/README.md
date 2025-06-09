@@ -1,59 +1,157 @@
-# RAGFlow Chat 插件用于 ChatGPT-on-WeChat
-本文件夹包含 ragflow_chat 插件的源代码，该插件扩展了 RAGFlow API 的核心功能，支持基于检索增强生成（RAG）的对话交互。该插件可无缝集成到 ChatGPT-on-WeChat 项目中，使微信及其他平台能够在聊天交互中利用 RAGFlow 提供的知识检索能力。
+# RAGFlow Chat 插件
 
-### 功能特性
-- 对话交互 ：将微信的对话界面与强大的 RAG（检索增强生成）能力结合。
-- 基于知识的回复 ：通过检索外部知识源中的相关数据并将其融入聊天回复，丰富对话内容。
-- 多平台支持 ：可在微信、企业微信以及 ChatGPT-on-WeChat 框架支持的多种平台上运行。
+本插件集成 RAGFlow API，利用知识库提供智能对话回复功能。
 
-### 插件与 ChatGPT-on-WeChat 配置说明
-注意 ：本集成涉及两个不同的配置文件——一个用于 ChatGPT-on-WeChat 核心项目，另一个专用于 ragflow_chat 插件。请务必正确配置两者，以确保顺利集成。
- ChatGPT-on-WeChat 根配置（ config.json ）
-该文件位于 ChatGPT-on-WeChat 项目的根目录，用于定义通信渠道和整体行为。例如，它负责配置微信、企业微信以及飞书、钉钉等服务。
+## 功能特性
 
-微信渠道的 config.json 示例：
+- **自动会话管理**: 为每个用户自动创建和管理 RAGFlow 会话
+- **动态会话创建**: 使用上下文中的 `session_id` 创建唯一的 RAGFlow 会话
+- **图片支持**: 从 RAGFlow 响应中提取并发送图片
+- **异步处理**: 非阻塞消息处理，提供初始加载响应
 
-```json
-{
-  "channel_type": "wechatmp",
-  "wechatmp_app_id": "YOUR_APP_ID",
-  "wechatmp_app_secret": "YOUR_APP_SECRET",
-  "wechatmp_token": "YOUR_TOKEN",
-  "wechatmp_port": 80,
-  ...
-}
- ```
+## 配置说明
 
-该文件也可修改以支持其他通信平台，例如：
-
-- 个人微信 （ channel_type: wx ）
-- 微信公众号 （ wechatmp 或 wechatmp_service ）
-- 企业微信 （ wechatcom_app ）
-- 飞书 （ feishu ）
-- 钉钉 （ dingtalk ）
-详细配置选项请参见官方 LinkAI 文档 。
- RAGFlow Chat 插件配置（ plugins/ragflow_chat/config.json ）
-该配置文件专用于 ragflow_chat 插件，用于设置与 RAGFlow 服务器的通信。请确保你的 RAGFlow 服务器已启动，并将插件的 config.json 文件更新为你的服务器信息：
-
-ragflow_chat 的 config.json 示例：
+通过编辑 `config.json` 配置插件：
 
 ```json
 {
-    "api_key": "ragflow-xxxx",
-    "host_address": "xxxx",
-    "dialog_id": "助理 ID",
-    "conversation_id":"会话 ID"
+    "api_key": "your-ragflow-api-key",
+    "host_address": "your-ragflow-host.com",
+    "dialog_id": "your-dialog-id"
 }
- ```
+```
 
-该文件必须正确指向你的 RAGFlow 实例，`api_key` 和 `host_address` 字段需正确设置。 `dialog_id`， `ragflow_api_key` 可在 RAGFlow 前端页面 url 或者调试模式中获取。
+### 配置参数
 
-### 使用要求
-在使用本插件前，请确保：
+- `api_key`: 您的 RAGFlow API 密钥（必需）
+- `host_address`: RAGFlow 服务器地址（必需）  
+- `dialog_id`: RAGFlow 对话/助手 ID（必需）
 
-1. 你已安装并配置好 `ChatGPT-on-WeChat`。
-2. 将 knowflow 文件夹放到 `chatgpt-on-wechat/plugins/` 目录下
-3. 在 knowflow 目录下运行 `pip instal -r requirement.txt`
-4. 重启 ChatGPT-on-WeChat 服务
-5. 你已部署并运行 RAGFlow 服务器
-请确保上述两个 config.json 文件（ChatGPT-on-WeChat 和 RAGFlow Chat 插件）均已按示例正确配置。
+## 工作原理
+
+1. **会话管理**: 当用户发送第一条消息时，插件会使用用户的 `session_id` 自动创建一个新的 RAGFlow 会话
+2. **会话缓存**: 会话按用户缓存，避免为后续消息重复创建会话
+3. **API 集成**: 使用 RAGFlow 基于会话的聊天完成 API
+4. **响应处理**: 处理来自 RAGFlow 的文本和图片响应
+
+## 使用的 API 端点
+
+基于 [RAGFlow HTTP API 参考文档](https://ragflow.io/docs/dev/http_api_reference)：
+
+- `POST /api/v1/chats/{dialog_id}/sessions` - 创建会话
+- `POST /api/v1/chats/{dialog_id}/completions` - 获取聊天完成
+
+## 会话流程
+
+```
+用户消息 → 从上下文获取 session_id → 
+检查 RAGFlow 会话是否存在 → 
+如果不存在，通过 API 创建新会话 → 
+向 RAGFlow 发送消息 → 
+处理响应（文本 + 图片） → 
+发送回复给用户
+```
+
+## 与之前版本的变化
+
+- **移除硬编码的 `conversation_id`**: 不再需要手动配置会话
+- **添加自动会话创建**: 按需为用户创建会话
+- **改进用户隔离**: 每个用户都有自己的 RAGFlow 会话
+- **更好的错误处理**: 为会话创建失败提供更详细的错误信息
+
+## 错误处理
+
+插件处理各种错误场景：
+- 配置参数缺失
+- 会话创建失败
+- API 请求失败
+- 响应解析错误
+
+所有错误都会被记录，并返回用户友好的错误消息。
+
+## 测试工具
+
+本插件提供了完整的测试套件：
+
+### 快速 API 测试
+```bash
+python quick_api_test.py
+```
+- 测试基本连接
+- 验证会话创建
+- 测试多轮对话
+
+### 单元测试
+```bash
+python test_ragflow_chat_simple.py
+```
+- Mock 测试会话创建
+- 测试配置加载
+- 验证错误处理
+
+### 配置更新工具
+```bash
+python update_config.py
+```
+- 交互式配置更新
+- API 密钥管理
+- 连接测试
+
+## 技术实现
+
+### 核心方法
+
+1. **`get_or_create_session(session_id)`**
+   - 检查会话缓存
+   - 创建新的 RAGFlow 会话
+   - 缓存会话映射
+
+2. **`get_ragflow_reply(question, session_id)`**
+   - 获取或创建会话
+   - 发送问题到 RAGFlow
+   - 处理响应和图片
+
+### 会话缓存机制
+
+使用 `user_sessions` 字典维护 `session_id` 到 `ragflow_session_id` 的映射：
+
+```python
+user_sessions = {
+    "user_session_123": "ragflow_session_abc",
+    "user_session_456": "ragflow_session_def"
+}
+```
+
+这确保：
+- 每个用户会话对应一个 RAGFlow 会话
+- 避免重复创建会话
+- 支持多轮对话连续性
+
+## 最佳实践
+
+1. **定期检查 API 密钥有效性**
+2. **监控会话创建成功率**
+3. **定期清理过期会话缓存**
+4. **配置适当的请求超时时间**
+
+## 故障排除
+
+### 常见问题
+
+1. **401 Unauthorized**
+   - 检查 API 密钥是否正确
+   - 确认 API 密钥未过期
+
+2. **404 Not Found**
+   - 验证 dialog_id 是否正确
+   - 检查服务器地址是否正确
+
+3. **连接超时**
+   - 检查网络连接
+   - 增加请求超时时间
+
+4. **会话创建失败**
+   - 检查 RAGFlow 服务状态
+   - 验证 dialog_id 权限
+
+更多问题请参考 `TEST_GUIDE.md` 文档。

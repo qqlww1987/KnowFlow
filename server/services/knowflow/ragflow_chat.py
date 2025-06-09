@@ -15,7 +15,8 @@ class RAGFlowChat(Plugin):
         super().__init__()
         self.cfg = self.load_config()
         self.handlers[Event.ON_HANDLE_CONTEXT] = self.on_handle_context
-        self.conversations = {}
+        # Store session_id for each user (session_id -> ragflow_session_id)
+        self.user_sessions = {}
         logging.info("[RAGFlowChat] Plugin initialized")
 
     def on_handle_context(self, e_context: EventContext):
@@ -38,8 +39,11 @@ class RAGFlowChat(Plugin):
     def send_messages(self, user_input, channel, context):
         """发送多条消息，包括文本和图片"""
         try:
+            # 获取session_id
+            session_id = context.get('session_id')
+            
             # 获取实际回复
-            reply_text = self.get_ragflow_reply(user_input)
+            reply_text = self.get_ragflow_reply(user_input, session_id)
             
             # 提取图片URL
             img_urls = self.extract_image_urls(reply_text)
@@ -87,20 +91,69 @@ class RAGFlowChat(Plugin):
         # Extract the full URL from each match (first element of each tuple)
         return [match[0] for match in matches]
 
-    def get_ragflow_reply(self, user_input):
+    def get_or_create_session(self, session_id):
+        """获取或创建RAGFlow会话"""
+        # 如果已经有该用户的会话，直接返回
+        if session_id in self.user_sessions:
+            return self.user_sessions[session_id]
+        
+        # 创建新会话
         dialog_id = self.cfg.get('dialog_id')  
-        conversation_id = self.cfg.get("conversation_id")
-        
         host_address = self.cfg.get("host_address")
-        if not host_address:
-            logging.error("[RAGFlowChat] Missing host address")
-            return "插件配置缺少 Host Address，请检查配置。"
-        url = f"https://{host_address}/api/v1/chats/{dialog_id}/completions"
-        
         api_token = self.cfg.get("api_key")
-        if not api_token:
-            logging.error("[RAGFlowChat] Missing API token")
-            return "插件配置缺少 API Token，请检查配置。"
+        
+        if not dialog_id or not host_address or not api_token:
+            logging.error("[RAGFlowChat] Missing required configuration")
+            return None
+            
+        headers = {
+            "Authorization": f"Bearer {api_token}",
+            "Content-Type": "application/json",
+        }
+        
+        # 创建会话的API调用 (根据RAGFlow API文档)
+        url = f"https://{host_address}/api/v1/chats/{dialog_id}/sessions"
+        payload = {
+            "name": f"Session_{session_id}"  # 使用session_id作为会话名称
+        }
+        
+        try:
+            response = requests.post(url, headers=headers, json=payload)
+            logging.debug(f"[RAGFlowChat] Create session response: {response.text}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("code") == 0:
+                    ragflow_session_id = data["data"]["id"]
+                    self.user_sessions[session_id] = ragflow_session_id
+                    logging.info(f"[RAGFlowChat] Created new session: {ragflow_session_id} for user: {session_id}")
+                    return ragflow_session_id
+                else:
+                    logging.error(f"[RAGFlowChat] Failed to create session: {data.get('message')}")
+                    return None
+            else:
+                logging.error(f"[RAGFlowChat] HTTP error when creating session: {response.status_code}")
+                return None
+                
+        except Exception as e:
+            logging.exception("[RAGFlowChat] Exception when creating session")
+            return None
+
+    def get_ragflow_reply(self, user_input, session_id):
+        # 获取或创建会话
+        ragflow_session_id = self.get_or_create_session(session_id)
+        if not ragflow_session_id:
+            return "无法创建或获取会话，请检查配置。"
+            
+        dialog_id = self.cfg.get('dialog_id')  
+        host_address = self.cfg.get("host_address")
+        api_token = self.cfg.get("api_key")
+        
+        if not host_address or not api_token:
+            logging.error("[RAGFlowChat] Missing configuration")
+            return "插件配置不完整，请检查配置。"
+            
+        url = f"https://{host_address}/api/v1/chats/{dialog_id}/completions"
 
         headers = {
             "Authorization": f"Bearer {api_token}",
@@ -110,7 +163,7 @@ class RAGFlowChat(Plugin):
         payload = {
             "question": user_input,
             "stream": False,
-            "session_id": conversation_id
+            "session_id": ragflow_session_id  # 使用动态创建的session_id
         }
 
         try:
