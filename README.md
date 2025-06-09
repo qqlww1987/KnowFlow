@@ -184,6 +184,7 @@ docker buildx build --platform linux/amd64 --target frontend -t zxwei/knowflow-w
 目前该项目仍在持续更新中，更新日志会在我的微信公众号[KnowFlow 企业知识库]上发布，欢迎关注。
 
 
+
 ## 常见问题
 
 1. 如何给 MinerU 进行 GPU 加速
@@ -223,3 +224,4 @@ docker buildx build --platform linux/amd64 --target frontend -t zxwei/knowflow-w
       ```json
       "device-mode": "cuda"
       ```
+

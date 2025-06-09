@@ -435,7 +435,7 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description="Export markdown chunks to readable formats")
-    parser.add_argument("--input", "-i", default="../output/0c344536404411f0ba3a66fc51ac58de.md", 
+    parser.add_argument("--input", "-i", default="./46c619ba451011f0b03266fc51ac58de.md", 
                        help="Input markdown file")
     parser.add_argument("--format", "-f", choices=["html", "markdown", "json", "all"], 
                        default="all", help="Output format")

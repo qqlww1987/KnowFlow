@@ -29,6 +29,83 @@ except ImportError:
     print("Warning: markdown-it-py not available. Please install with: pip install markdown-it-py")
 
 
+# 分块模式配置
+# CHUNK_METHOD = os.getenv('CHUNK_METHOD', 'smart')  # 默认使用 smart 模式
+
+
+def get_configured_chunk_method():
+    """获取配置的分块方法"""
+    method = os.getenv('CHUNK_METHOD', 'smart').lower()  # 每次都重新读取环境变量
+    if method in ['advanced', 'smart', 'basic']:
+        return method
+    else:
+        print(f"Warning: Unknown chunk method '{method}', falling back to 'smart'")
+        return 'smart'
+
+
+def is_dev_mode():
+    """检查是否启用开发模式"""
+    dev_mode = os.getenv('DEV', 'false').lower()
+    return dev_mode in ['true', '1', 'yes', 'on']
+
+
+def should_cleanup_temp_files():
+    """检查是否应该清理临时文件"""
+    # 在dev模式下，默认不清理临时文件
+    if is_dev_mode():
+        cleanup = os.getenv('CLEANUP_TEMP_FILES', 'false').lower()
+    else:
+        cleanup = os.getenv('CLEANUP_TEMP_FILES', 'true').lower()
+    
+    return cleanup in ['true', '1', 'yes', 'on']
+
+
+def split_markdown_to_chunks_configured(txt, chunk_token_num=512, min_chunk_tokens=100, **kwargs):
+    """
+    根据配置选择合适的分块方法的统一接口
+    
+    支持的分块方法：
+    - 'advanced': split_markdown_to_chunks_advanced (高级分块，混合策略)
+    - 'smart': split_markdown_to_chunks_smart (智能分块，基于AST，默认)
+    - 'basic': split_markdown_to_chunks (基础分块)
+    
+    可通过环境变量 CHUNK_METHOD 配置，支持的值：advanced, smart, basic
+    """
+    method = get_configured_chunk_method()
+    
+    if method == 'advanced':
+        # 提取 advanced 方法特有的参数
+        include_metadata = kwargs.pop('include_metadata', False)
+        overlap_ratio = kwargs.pop('overlap_ratio', 0.0)
+        
+        return split_markdown_to_chunks_advanced(
+            txt, 
+            chunk_token_num=chunk_token_num, 
+            min_chunk_tokens=min_chunk_tokens,
+            overlap_ratio=overlap_ratio,
+            include_metadata=include_metadata
+        )
+    elif method == 'smart':
+        return split_markdown_to_chunks_smart(
+            txt, 
+            chunk_token_num=chunk_token_num, 
+            min_chunk_tokens=min_chunk_tokens
+        )
+    elif method == 'basic':
+        delimiter = kwargs.get('delimiter', "\n!?。；！？")
+        return split_markdown_to_chunks(
+            txt, 
+            chunk_token_num=chunk_token_num,
+            delimiter=delimiter
+        )
+    else:
+        # 默认回退到 smart 方法
+        return split_markdown_to_chunks_smart(
+            txt, 
+            chunk_token_num=chunk_token_num, 
+            min_chunk_tokens=min_chunk_tokens
+        )
+
 
 def singleton(cls, *args, **kw):
     instances = {}
@@ -616,14 +693,17 @@ def _finalize_ast_chunk(chunk_parts, context_stack):
 
 
 def split_markdown_to_chunks_advanced(txt, chunk_token_num=512, min_chunk_tokens=100, 
-                                     overlap_ratio=0.1, include_metadata=False):
+                                     overlap_ratio=0.0, include_metadata=False):
     """
-    高级RAG分块方法，包含以下优化：
-    1. 上下文增强: 为没有标题的分块添加父级标题上下文
-    2. 智能分块边界: 考虑语义完整性，避免在句子中间分块
-    3. 表格关联处理: 将表格与其前后的说明文字关联
-    4. 嵌套结构处理: 正确处理多层嵌套的markdown结构
-    5. 性能优化: 缓存token计算，减少重复计算
+    基于标题层级的高级 Markdown 分块方法 (混合分块策略 + 动态阈值调整)
+    
+    核心特性：
+    1. 保持标题作为主要分块边界
+    2. 动态大小控制：目标300-600 tokens，最大800 tokens，最小50 tokens  
+    3. 处理超大分块：在段落边界进一步分割
+    4. 处理超小分块：与相邻分块合并
+    5. 特殊内容处理：保持表格、代码块、公式完整性
+    6. 智能上下文增强
     """
     if not MARKDOWN_IT_AVAILABLE:
         return split_markdown_to_chunks(txt, chunk_token_num)
@@ -631,16 +711,14 @@ def split_markdown_to_chunks_advanced(txt, chunk_token_num=512, min_chunk_tokens
     if not txt or not txt.strip():
         return []
 
-    # 性能优化：Token计算缓存
-    token_cache = {}
+    # 动态阈值配置
+    target_min_tokens = max(50, min_chunk_tokens // 2)  # 最小50 tokens
+    target_tokens = min(600, chunk_token_num)  # 目标大小：300-600 tokens
+    target_max_tokens = min(800, chunk_token_num * 1.5)  # 最大800 tokens
     
-    def cached_token_count(content):
-        if content in token_cache:
-            return token_cache[content]
-        count = num_tokens_from_string(content)
-        token_cache[content] = count
-        return count
-
+    # 配置要作为分块边界的标题级别
+    headers_to_split_on = [1, 2, 3]  # H1, H2, H3 作为分块边界
+    
     # 初始化 markdown-it 解析器
     md = MarkdownIt("commonmark", {"breaks": True, "html": True})
     md.enable(['table'])
@@ -650,632 +728,283 @@ def split_markdown_to_chunks_advanced(txt, chunk_token_num=512, min_chunk_tokens
         tokens = md.parse(txt)
         tree = SyntaxTreeNode(tokens)
         
-        # 第一步：深度解析文档结构，建立上下文关系
-        doc_structure = _extract_advanced_document_structure(tree)
+        # 提取所有节点和标题信息
+        nodes_with_headers = _extract_nodes_with_header_info(tree, headers_to_split_on)
         
-        # 第二步：智能分块处理
-        chunks = []
-        current_chunk = AdvancedChunkBuilder()
-        context_stack = []  # 标题上下文栈
+        # 基于标题层级进行初步分块
+        initial_chunks = _split_by_header_levels(nodes_with_headers, headers_to_split_on)
         
-        # 遍历所有节点进行智能分块
-        for i, node in enumerate(tree.children):
-            # 获取节点的详细信息和关联关系
-            node_info = _analyze_advanced_node(node, context_stack, doc_structure, i, cached_token_count)
-            
-            if not node_info:
-                continue
-            
-            # 决定分块策略
-            should_break, break_reason = _should_break_chunk_advanced(
-                current_chunk, node_info, chunk_token_num, min_chunk_tokens
-            )
-            
-            if should_break and not current_chunk.is_empty() and current_chunk.token_count >= min_chunk_tokens:
-                # 完成当前块并添加上下文
-                chunk_content = _finalize_advanced_chunk(current_chunk, context_stack, doc_structure)
-                if chunk_content.strip():
-                    chunks.append(chunk_content)
-                current_chunk = AdvancedChunkBuilder()
-            
-            # 将节点添加到当前块
-            current_chunk.add_node(node_info)
-            
-            # 更新上下文栈
-            if node_info['type'] == 'heading':
-                _update_context_stack(context_stack, node_info['level'], node_info['title'])
+        # 应用动态大小控制和优化
+        optimized_chunks = _apply_size_control_and_optimization(
+            initial_chunks, target_min_tokens, target_tokens, target_max_tokens
+        )
         
-        # 处理最后的块
-        if not current_chunk.is_empty():
-            chunk_content = _finalize_advanced_chunk(current_chunk, context_stack, doc_structure)
-            if chunk_content.strip():
-                chunks.append(chunk_content)
+        # 生成最终分块内容
+        final_chunks = []
+        for chunk_info in optimized_chunks:
+            content = _render_header_chunk_advanced(chunk_info)
+            if content.strip():
+                if include_metadata:
+                    chunk_data = {
+                        'content': content,
+                        'metadata': chunk_info.get('headers', {}),
+                        'token_count': num_tokens_from_string(content),
+                        'chunk_type': chunk_info.get('chunk_type', 'header_based'),
+                        'has_special_content': chunk_info.get('has_special_content', False),
+                        'source_sections': chunk_info.get('source_sections', 1)
+                    }
+                    final_chunks.append(chunk_data)
+                else:
+                    final_chunks.append(content)
         
-        # 后处理：重叠分块（如果启用）
-        if overlap_ratio > 0:
-            chunks = _create_semantic_overlap_chunks(chunks, overlap_ratio, chunk_token_num, cached_token_count)
-        
-        # 元数据处理
-        if include_metadata:
-            enhanced_chunks = []
-            for i, chunk in enumerate(chunks):
-                chunk_data = {
-                    'content': chunk,
-                    'index': i,
-                    'token_count': cached_token_count(chunk)
-                }
-                metadata = _extract_advanced_chunk_metadata(chunk, doc_structure, i)
-                chunk_data.update(metadata)
-                enhanced_chunks.append(chunk_data)
-            return enhanced_chunks
-        
-        return [chunk for chunk in chunks if chunk.strip()]
+        return final_chunks
     
     except Exception as e:
-        print(f"Advanced parsing failed: {e}, falling back to smart chunking")
+        print(f"Advanced header-based parsing failed: {e}, falling back to smart chunking")
         return split_markdown_to_chunks_smart(txt, chunk_token_num, min_chunk_tokens)
 
 
-class AdvancedChunkBuilder:
-    """高级分块构建器，支持智能边界和关联处理"""
+def _apply_size_control_and_optimization(chunks, min_tokens, target_tokens, max_tokens):
+    """应用动态大小控制和优化策略"""
+    optimized_chunks = []
     
-    def __init__(self):
-        self.nodes = []
-        self.token_count = 0
-        self.has_heading = False
-        self.content_types = set()
+    i = 0
+    while i < len(chunks):
+        chunk = chunks[i]
+        chunk_content = _render_header_chunk(chunk)
+        chunk_tokens = num_tokens_from_string(chunk_content)
         
-    def add_node(self, node_info):
-        """添加节点到当前块"""
-        self.nodes.append(node_info)
-        self.token_count += node_info['tokens']
+        # 检查特殊内容类型
+        has_special_content = _has_special_content(chunk)
         
-        if node_info['type'] == 'heading':
-            self.has_heading = True
-        
-        self.content_types.add(node_info['type'])
-    
-    def is_empty(self):
-        return len(self.nodes) == 0
-    
-    def get_last_node(self):
-        return self.nodes[-1] if self.nodes else None
-    
-    def contains_type(self, node_type):
-        return node_type in self.content_types
-
-
-def _extract_advanced_document_structure(tree):
-    """提取高级文档结构，包含节点关系和位置信息"""
-    structure = {
-        'headings': [],
-        'tables': [],
-        'table_contexts': {},  # 表格与前后文的关联
-        'code_blocks': [],
-        'lists': [],
-        'nested_structures': {},  # 嵌套结构映射
-        'node_positions': {},  # 节点位置映射
-    }
-    
-    def traverse_advanced(node, path=[], parent=None, depth=0):
-        node_id = f"{node.type}_{len(path)}"
-        position = len(structure.get('node_positions', {}))
-        
-        # 记录节点位置
-        structure['node_positions'][node_id] = {
-            'position': position,
-            'depth': depth,
-            'parent': parent,
-            'path': path.copy()
-        }
-        
-        if node.type == 'heading':
-            level = int(node.tag[1]) if node.tag else 1
-            title = _extract_text_from_node(node)
-            heading_info = {
-                'level': level,
-                'title': title,
-                'position': position,
-                'node_id': node_id
-            }
-            structure['headings'].append(heading_info)
+        if chunk_tokens <= max_tokens and chunk_tokens >= min_tokens:
+            # 大小合适，直接添加
+            chunk['chunk_type'] = 'normal'
+            chunk['has_special_content'] = has_special_content
+            optimized_chunks.append(chunk)
             
-        elif node.type == 'table':
-            table_content = _render_table_from_ast(node)
-            table_info = {
-                'content': table_content,
-                'position': position,
-                'node_id': node_id
-            }
-            structure['tables'].append(table_info)
+        elif chunk_tokens > max_tokens and not has_special_content:
+            # 超大分块，需要进一步分割（除非包含特殊内容）
+            split_chunks = _split_oversized_chunk(chunk, target_tokens, max_tokens)
+            optimized_chunks.extend(split_chunks)
             
-            # 分析表格前后文（前后2个节点）
-            _analyze_table_context(structure, position, tree.children)
+        elif chunk_tokens < min_tokens:
+            # 超小分块，尝试与下一个分块合并
+            merged_chunk = _try_merge_with_next(chunk, chunks, i, target_tokens)
+            if merged_chunk:
+                optimized_chunks.append(merged_chunk)
+                # 跳过被合并的分块
+                i += merged_chunk.get('merged_count', 1) - 1
+            else:
+                # 无法合并，添加上下文增强
+                enhanced_chunk = _enhance_small_chunk_with_context(chunk)
+                optimized_chunks.append(enhanced_chunk)
+        else:
+            # 包含特殊内容的超大分块，保持完整性但添加标记
+            chunk['chunk_type'] = 'oversized_special'
+            chunk['has_special_content'] = has_special_content
+            optimized_chunks.append(chunk)
+        
+        i += 1
+    
+    return optimized_chunks
+
+
+def _has_special_content(chunk):
+    """检查分块是否包含特殊内容（表格、代码块、公式等）"""
+    for node_info in chunk.get('nodes', []):
+        node_type = node_info.get('type', '')
+        content = node_info.get('content', '')
+        
+        # 检查特殊内容类型
+        if node_type in ['table', 'code_block']:
+            return True
+        
+        # 检查数学公式
+        if '$$' in content or '$' in content:
+            return True
             
-        elif node.type == 'code_block':
-            structure['code_blocks'].append({
-                'language': getattr(node, 'info', '') or '',
-                'content': getattr(node, 'content', ''),
-                'position': position,
-                'node_id': node_id
-            })
+        # 检查HTML表格
+        if '<table>' in content and '</table>' in content:
+            return True
             
-        elif node.type in ['bullet_list', 'ordered_list']:
-            list_info = {
-                'type': node.type,
-                'content': _render_list_from_ast(node),
-                'position': position,
-                'node_id': node_id,
-                'nested_items': []
-            }
-            
-            # 处理嵌套列表
-            _extract_nested_list_structure(node, list_info['nested_items'], depth + 1)
-            structure['lists'].append(list_info)
-        
-        # 递归处理子节点
-        if hasattr(node, 'children') and node.children:
-            for i, child in enumerate(node.children):
-                child_path = path + [i]
-                traverse_advanced(child, child_path, node_id, depth + 1)
-    
-    # 遍历根节点
-    for i, node in enumerate(tree.children):
-        traverse_advanced(node, [i])
-    
-    return structure
-
-
-def _analyze_table_context(structure, table_position, all_nodes):
-    """分析表格的前后文关系"""
-    context_range = 2  # 前后各2个节点
-    context_info = {
-        'preceding': [],
-        'following': []
-    }
-    
-    # 分析前文
-    start_idx = max(0, table_position - context_range)
-    for i in range(start_idx, table_position):
-        if i < len(all_nodes):
-            node = all_nodes[i]
-            if node.type in ['paragraph', 'heading']:
-                context_info['preceding'].append({
-                    'type': node.type,
-                    'content': _extract_text_from_node(node)[:200],  # 限制长度
-                    'position': i
-                })
-    
-    # 分析后文
-    end_idx = min(len(all_nodes), table_position + context_range + 1)
-    for i in range(table_position + 1, end_idx):
-        if i < len(all_nodes):
-            node = all_nodes[i]
-            if node.type in ['paragraph', 'heading']:
-                context_info['following'].append({
-                    'type': node.type,
-                    'content': _extract_text_from_node(node)[:200],
-                    'position': i
-                })
-    
-    structure['table_contexts'][table_position] = context_info
-
-
-def _extract_nested_list_structure(list_node, nested_items, depth):
-    """提取嵌套列表结构"""
-    for item in list_node.children:
-        if item.type == "list_item":
-            item_info = {
-                'content': _extract_text_from_node(item),
-                'depth': depth,
-                'sub_items': []
-            }
-            
-            # 检查是否有嵌套列表
-            if hasattr(item, 'children'):
-                for child in item.children:
-                    if child.type in ['bullet_list', 'ordered_list']:
-                        _extract_nested_list_structure(child, item_info['sub_items'], depth + 1)
-            
-            nested_items.append(item_info)
-
-
-def _analyze_advanced_node(node, context_stack, doc_structure, position, cached_token_count):
-    """深度分析节点，返回详细的节点信息"""
-    node_type = node.type
-    content = ""
-    metadata = {}
-    
-    if node_type == "heading":
-        level = int(node.tag[1])
-        title = _extract_text_from_node(node)
-        content = node.markup + " " + title
-        metadata = {
-            'level': level,
-            'title': title,
-            'is_major_section': level <= 2
-        }
-        
-    elif node_type == "table":
-        content = _render_table_from_ast(node)
-        
-        # 获取表格关联的上下文
-        table_context = doc_structure['table_contexts'].get(position, {})
-        metadata = {
-            'has_context': bool(table_context.get('preceding') or table_context.get('following')),
-            'context_info': table_context
-        }
-        
-    elif node_type == "code_block":
-        content = f"```{node.info or ''}\n{node.content}```"
-        metadata = {
-            'language': getattr(node, 'info', '') or '',
-            'is_executable': getattr(node, 'info', '') in ['python', 'javascript', 'bash', 'sql']
-        }
-        
-    elif node_type == "paragraph":
-        content = _extract_text_from_node(node)
-        
-        # 智能分析段落的语义完整性
-        metadata = {
-            'sentence_count': len([s for s in content.split('.') if s.strip()]),
-            'ends_complete': content.strip().endswith(('.', '!', '?', '。', '！', '？')),
-            'is_transition': any(keyword in content.lower() for keyword in 
-                               ['因此', '所以', '总之', '另外', 'therefore', 'however', 'moreover'])
-        }
-        
-    elif node_type in ["bullet_list", "ordered_list"]:
-        content = _render_list_from_ast(node)
-        
-        # 分析列表的嵌套深度
-        nested_info = next((item for item in doc_structure['lists'] 
-                          if item['position'] == position), {})
-        metadata = {
-            'list_type': node_type,
-            'has_nested': bool(nested_info.get('nested_items')),
-            'nested_depth': _calculate_max_nested_depth(nested_info.get('nested_items', []))
-        }
-        
-    elif node_type == "blockquote":
-        content = _render_blockquote_from_ast(node)
-        metadata = {'is_citation': True}
-        
-    elif node_type == "hr":
-        content = "---"
-        metadata = {'is_section_break': True}
-        
-    else:
-        content = _extract_text_from_node(node)
-        metadata = {}
-    
-    if not content:
-        return None
-    
-    return {
-        'type': node_type,
-        'content': content,
-        'tokens': cached_token_count(content),
-        'position': position,
-        'metadata': metadata,
-        **metadata  # 展开metadata到顶层，方便访问
-    }
-
-
-def _calculate_max_nested_depth(nested_items):
-    """计算嵌套列表的最大深度"""
-    if not nested_items:
-        return 0
-    
-    max_depth = 0
-    for item in nested_items:
-        if item.get('sub_items'):
-            depth = 1 + _calculate_max_nested_depth(item['sub_items'])
-            max_depth = max(max_depth, depth)
-    
-    return max_depth
-
-
-def _should_break_chunk_advanced(current_chunk, node_info, chunk_token_num, min_chunk_tokens):
-    """高级分块边界判断，考虑语义完整性"""
-    node_type = node_info['type']
-    node_tokens = node_info['tokens']
-    
-    # 强制分块情况
-    force_break_conditions = [
-        # 1. 主要标题（h1, h2）
-        (node_type == 'heading' and node_info.get('is_major_section', False)),
-        
-        # 2. 分隔符
-        (node_type == 'hr'),
-        
-        # 3. 大表格独立成块
-        (node_type == 'table' and node_tokens > chunk_token_num * 0.8),
-        
-        # 4. 大代码块独立成块
-        (node_type == 'code_block' and node_tokens > chunk_token_num * 0.6),
-    ]
-    
-    if any(force_break_conditions):
-        return True, "force_break"
-    
-    # 智能分块判断
-    if current_chunk.token_count + node_tokens > chunk_token_num:
-        
-        # 如果当前块还没到最小大小，优先不分块
-        if current_chunk.token_count < min_chunk_tokens:
-            return False, "under_min_size"
-        
-        # 语义完整性检查
-        last_node = current_chunk.get_last_node()
-        if last_node:
-            # 避免在句子中间分块
-            if (last_node['type'] == 'paragraph' and 
-                not last_node.get('ends_complete', False)):
-                # 如果不会造成严重超标，就不分块
-                if current_chunk.token_count + node_tokens < chunk_token_num * 1.3:
-                    return False, "incomplete_sentence"
-            
-            # 保持相关内容的连贯性
-            if _should_keep_together(last_node, node_info):
-                if current_chunk.token_count + node_tokens < chunk_token_num * 1.5:
-                    return False, "keep_related_content"
-        
-        return True, "size_limit"
-    
-    return False, "continue"
-
-
-def _should_keep_together(last_node, current_node):
-    """判断两个节点是否应该保持在一起"""
-    # 表格与其说明文字保持在一起
-    if (last_node['type'] == 'paragraph' and current_node['type'] == 'table'):
-        return True
-    
-    if (last_node['type'] == 'table' and current_node['type'] == 'paragraph'):
-        return True
-    
-    # 代码块与其说明保持在一起
-    if (last_node['type'] == 'paragraph' and current_node['type'] == 'code_block'):
-        return True
-    
-    # 列表项之间保持连贯性
-    if (last_node['type'] in ['bullet_list', 'ordered_list'] and 
-        current_node['type'] in ['bullet_list', 'ordered_list']):
-        return True
-    
-    # 小标题与紧随的内容保持在一起
-    if (last_node['type'] == 'heading' and 
-        last_node.get('level', 1) >= 3 and
-        current_node['type'] in ['paragraph', 'list']):
-        return True
-    
     return False
 
 
-def _finalize_advanced_chunk(chunk_builder, context_stack, doc_structure):
-    """完成高级分块的格式化，添加上下文增强"""
-    if chunk_builder.is_empty():
-        return ""
+def _split_oversized_chunk(chunk, target_tokens, max_tokens):
+    """分割超大分块，在段落边界进行分割"""
+    split_chunks = []
+    nodes = chunk.get('nodes', [])
+    headers = chunk.get('headers', {})
     
-    content_parts = []
+    current_nodes = []
+    current_tokens = 0
     
-    # 1. 上下文增强：如果块没有标题，添加父级标题上下文
-    if not chunk_builder.has_heading and context_stack:
-        # 选择最相关的上下文标题
-        context_title = _select_relevant_context(context_stack, chunk_builder)
-        if context_title:
-            content_parts.append(f"## 上下文: {context_title}\n")
-    
-    # 2. 按类型优化排序和格式化
-    sorted_nodes = _sort_chunk_nodes_semantically(chunk_builder.nodes)
-    
-    # 3. 生成最终内容
-    for node_info in sorted_nodes:
-        content = node_info['content']
+    for node_info in nodes:
+        node_content = node_info.get('content', '')
+        node_tokens = num_tokens_from_string(node_content)
         
-        # 特殊处理：为表格添加关联说明
-        if node_info['type'] == 'table' and node_info.get('has_context'):
-            context_info = node_info.get('context_info', {})
+        # 检查是否是标题节点
+        is_heading = node_info.get('type') == 'heading'
+        
+        # 如果当前节点会导致超出目标大小，且当前已有内容
+        if current_tokens + node_tokens > target_tokens and current_nodes:
+            # 创建一个分块
+            new_chunk = {
+                'headers': headers.copy(),
+                'nodes': current_nodes.copy(),
+                'chunk_type': 'split_from_oversized',
+                'has_special_content': any(_has_special_content({'nodes': [n]}) for n in current_nodes)
+            }
+            split_chunks.append(new_chunk)
             
-            # 添加前文说明
-            preceding = context_info.get('preceding', [])
-            if preceding:
-                relevant_context = [p['content'] for p in preceding[-1:]]  # 最近的1个前文
-                if relevant_context:
-                    content = f"*相关说明: {relevant_context[0][:100]}...*\n\n{content}"
-        
-        content_parts.append(content)
+            # 开始新分块
+            current_nodes = [node_info]
+            current_tokens = node_tokens
+            
+            # 如果是标题，更新headers上下文
+            if is_heading:
+                level = node_info.get('level', 3)
+                title = node_info.get('title', '')
+                new_headers = {k: v for k, v in headers.items() if k < level}
+                new_headers[level] = title
+                headers = new_headers
+        else:
+            current_nodes.append(node_info)
+            current_tokens += node_tokens
+            
+            # 更新标题上下文
+            if is_heading:
+                level = node_info.get('level', 3)
+                title = node_info.get('title', '')
+                headers = {k: v for k, v in headers.items() if k < level}
+                headers[level] = title
     
-    return "\n\n".join(content_parts).strip()
+    # 添加最后一个分块
+    if current_nodes:
+        final_chunk = {
+            'headers': headers.copy(),
+            'nodes': current_nodes,
+            'chunk_type': 'split_from_oversized',
+            'has_special_content': any(_has_special_content({'nodes': [n]}) for n in current_nodes)
+        }
+        split_chunks.append(final_chunk)
+    
+    return split_chunks
 
 
-def _select_relevant_context(context_stack, chunk_builder):
-    """选择最相关的上下文标题"""
-    if not context_stack:
+def _try_merge_with_next(current_chunk, all_chunks, current_index, target_tokens):
+    """尝试将小分块与后续分块合并"""
+    if current_index >= len(all_chunks) - 1:
         return None
     
-    # 优先选择最近的、级别合适的标题
-    for i in range(len(context_stack) - 1, -1, -1):
-        context = context_stack[i]
-        if context['level'] <= 3:  # 只使用较高级别的标题作为上下文
-            return context['title']
+    next_chunk = all_chunks[current_index + 1]
     
-    return context_stack[-1]['title']  # 默认使用最近的标题
-
-
-def _sort_chunk_nodes_semantically(nodes):
-    """按语义相关性对块内节点排序"""
-    # 排序优先级：标题 > 段落 > 列表 > 表格 > 代码块 > 其他
-    priority_map = {
-        'heading': 1,
-        'paragraph': 2,
-        'bullet_list': 3,
-        'ordered_list': 3,
-        'table': 4,
-        'code_block': 5,
-        'blockquote': 6,
-        'hr': 7
-    }
+    # 计算合并后的大小
+    current_content = _render_header_chunk(current_chunk)
+    next_content = _render_header_chunk(next_chunk)
+    merged_tokens = num_tokens_from_string(current_content + "\n\n" + next_content)
     
-    return sorted(nodes, key=lambda x: (priority_map.get(x['type'], 8), x['position']))
-
-
-def _create_semantic_overlap_chunks(chunks, overlap_ratio, max_tokens, cached_token_count):
-    """创建语义感知的重叠分块"""
-    if overlap_ratio <= 0 or len(chunks) < 2:
-        return chunks
-    
-    overlapped_chunks = []
-    
-    for i in range(len(chunks)):
-        # 添加原始分块
-        overlapped_chunks.append(chunks[i])
-        
-        # 在相邻分块之间创建重叠分块
-        if i < len(chunks) - 1:
-            current_content = chunks[i]
-            next_content = chunks[i + 1]
-            
-            # 创建语义感知的重叠
-            overlap_content = _create_semantic_overlap(
-                current_content, next_content, overlap_ratio, max_tokens, cached_token_count
-            )
-            
-            if overlap_content:
-                overlapped_chunks.append(overlap_content)
-    
-    return overlapped_chunks
-
-
-def _create_semantic_overlap(current_content, next_content, overlap_ratio, max_tokens, cached_token_count):
-    """创建语义感知的重叠内容"""
-    # 按段落分割，而不是按词分割
-    current_paragraphs = [p.strip() for p in current_content.split('\n\n') if p.strip()]
-    next_paragraphs = [p.strip() for p in next_content.split('\n\n') if p.strip()]
-    
-    if not current_paragraphs or not next_paragraphs:
-        return None
-    
-    # 取最后的段落和开头的段落
-    overlap_parts = []
-    
-    # 从当前内容的末尾取段落
-    current_tokens = cached_token_count(current_content)
-    target_overlap_tokens = int(current_tokens * overlap_ratio)
-    
-    for p in reversed(current_paragraphs):
-        overlap_parts.insert(0, p)
-        if cached_token_count('\n\n'.join(overlap_parts)) >= target_overlap_tokens // 2:
-            break
-    
-    # 从下一个内容的开头取段落
-    next_tokens = cached_token_count(next_content)
-    target_next_tokens = int(next_tokens * overlap_ratio)
-    
-    for p in next_paragraphs:
-        overlap_parts.append(p)
-        if cached_token_count('\n\n'.join(overlap_parts)) >= target_overlap_tokens:
-            break
-    
-    overlap_content = '\n\n'.join(overlap_parts)
-    
-    # 确保重叠内容有意义
-    if cached_token_count(overlap_content) >= 50:
-        return overlap_content
+    # 如果合并后大小合适
+    if merged_tokens <= target_tokens * 1.2:  # 允许轻微超出目标大小
+        merged_chunk = {
+            'headers': next_chunk.get('headers', current_chunk.get('headers', {})),
+            'nodes': current_chunk.get('nodes', []) + next_chunk.get('nodes', []),
+            'chunk_type': 'merged_small',
+            'has_special_content': (_has_special_content(current_chunk) or 
+                                  _has_special_content(next_chunk)),
+            'merged_count': 2,
+            'source_sections': 2
+        }
+        return merged_chunk
     
     return None
 
 
-def _extract_advanced_chunk_metadata(chunk_content, doc_structure, chunk_index):
-    """提取高级块元数据"""
-    metadata = {
-        'chunk_type': 'mixed',
-        'has_context_enhancement': '[上下文:' in chunk_content,
-        'contains_table': False,
-        'contains_code': False,
-        'contains_list': False,
-        'contains_overlap_marker': '[...内容继续...]' in chunk_content,
-        'semantic_completeness': 0.0,
-        'content_density': 0.0,
-        'structure_types': []
-    }
+def _enhance_small_chunk_with_context(chunk):
+    """为小分块增强上下文信息"""
+    enhanced_chunk = chunk.copy()
+    enhanced_chunk['chunk_type'] = 'small_enhanced'
+    enhanced_chunk['has_special_content'] = _has_special_content(chunk)
     
-    # 分析内容类型
-    if '<table' in chunk_content or '|' in chunk_content:
-        metadata['contains_table'] = True
-        metadata['structure_types'].append('table')
-        if metadata['chunk_type'] == 'mixed':
-            metadata['chunk_type'] = 'table'
+    # 确保包含足够的标题上下文
+    headers = chunk.get('headers', {})
+    if headers:
+        # 添加完整的标题路径作为上下文
+        context_parts = []
+        for level in sorted(headers.keys()):
+            context_parts.append(f"{'#' * level} {headers[level]}")
+        
+        # 在节点前添加上下文信息
+        if context_parts:
+            context_node = {
+                'type': 'context',
+                'content': '\n'.join(context_parts),
+                'headers': headers.copy(),
+                'is_split_boundary': False
+            }
+            enhanced_chunk['nodes'] = [context_node] + enhanced_chunk.get('nodes', [])
     
-    if '```' in chunk_content:
-        metadata['contains_code'] = True
-        metadata['structure_types'].append('code')
-        if metadata['chunk_type'] == 'mixed':
-            metadata['chunk_type'] = 'code'
-    
-    if any(line.strip().startswith(('- ', '* ', '+ ')) or 
-           (len(line.strip()) > 2 and line.strip()[0].isdigit() and line.strip()[1:3] in ['. ', ') ']) 
-           for line in chunk_content.split('\n')):
-        metadata['contains_list'] = True
-        metadata['structure_types'].append('list')
-        if metadata['chunk_type'] == 'mixed':
-            metadata['chunk_type'] = 'list'
-    
-    # 语义完整性评分
-    metadata['semantic_completeness'] = _calculate_semantic_completeness_score(chunk_content)
-    
-    # 内容密度评分
-    metadata['content_density'] = _calculate_content_density_score(chunk_content)
-    
-    return metadata
+    return enhanced_chunk
 
 
-def _calculate_semantic_completeness_score(content):
-    """计算语义完整性评分"""
-    score = 0.0
+def _render_header_chunk_advanced(chunk_info):
+    """高级渲染基于标题的分块内容，包含更好的格式化"""
+    content_parts = []
     
-    # 检查是否有完整的句子结构
-    sentences = [s.strip() for s in content.replace('。', '.').split('.') if s.strip()]
-    if sentences:
-        complete_sentences = sum(1 for s in sentences if len(s.split()) >= 3)
-        score += min(complete_sentences / len(sentences), 0.4)
+    # 处理标题上下文
+    chunk_has_header = any(node['type'] == 'heading' for node in chunk_info.get('nodes', []))
+    headers = chunk_info.get('headers', {})
     
-    # 检查是否有标题结构
-    if any(line.strip().startswith('#') for line in content.split('\n')):
-        score += 0.3
+    # 为某些类型的分块添加标题上下文
+    chunk_type = chunk_info.get('chunk_type', 'normal')
+    if chunk_type in ['split_from_oversized', 'small_enhanced'] and headers and not chunk_has_header:
+        # 添加最相关的上下文标题
+        context_header = _get_most_relevant_header_advanced(headers, chunk_type)
+        if context_header:
+            content_parts.append(context_header)
     
-    # 检查内容是否以完整句子结束
-    if content.strip().endswith(('.', '。', '!', '！', '?', '？')):
-        score += 0.3
+    # 渲染所有节点内容（移除标记，保持内容干净）
+    for node_info in chunk_info.get('nodes', []):
+        if node_info.get('content', '').strip():
+            content = node_info['content']
+            # 直接使用原始内容，不添加任何标记
+            content_parts.append(content)
     
-    return min(score, 1.0)
+    result = "\n\n".join(content_parts).strip()
+    
+    # 移除重叠分块的标识，保持内容干净
+    # if chunk_type == 'overlap':
+    #     result = f"[上下文关联内容]\n{result}"
+    
+    return result
 
 
-def _calculate_content_density_score(content):
-    """计算内容密度评分"""
-    if not content.strip():
-        return 0.0
+def _get_most_relevant_header_advanced(headers, chunk_type):
+    """获取最相关的上下文标题（高级版本）"""
+    if not headers:
+        return None
     
-    # 计算信息词汇比例
-    words = content.split()
-    if not words:
-        return 0.0
+    # 根据分块类型选择不同的上下文策略
+    if chunk_type == 'split_from_oversized':
+        # 分割分块：显示最深层级的标题
+        max_level = max(headers.keys())
+        return f"{'#' * max_level} {headers[max_level]}"
     
-    # 过滤停用词和功能词汇
-    stopwords = {'的', '是', '在', '有', '和', '与', '或', '但', '因为', '所以', 'the', 'is', 'in', 'and', 'or', 'but'}
-    content_words = [w for w in words if len(w) > 2 and w.lower() not in stopwords]
+    elif chunk_type in ['small_enhanced']:
+        # 增强分块：显示最相关的标题
+        max_level = max(headers.keys())
+        return f"{'#' * max_level} {headers[max_level]}"
     
-    density = len(content_words) / len(words)
-    return min(density, 1.0)
+    else:
+        # 普通分块：显示最相关的标题
+        max_level = max(headers.keys())
+        return f"{'#' * max_level} {headers[max_level]}"
 
 
 def optimize_chunks_for_rag(chunks, target_vector_dim=1536):
     """
-    针对RAG优化分块：
-    1. 长度标准化
-    2. 质量评分
-    3. 向量化友好性
-    4. 语义完整性增强
+    基础RAG分块优化，为向量化做准备
     """
     optimized_chunks = []
     
@@ -1283,70 +1012,191 @@ def optimize_chunks_for_rag(chunks, target_vector_dim=1536):
         if isinstance(chunk_data, str):
             chunk_data = {'content': chunk_data, 'token_count': num_tokens_from_string(chunk_data)}
         
-        # 质量评分
-        quality_score = _calculate_chunk_quality(chunk_data['content'])
-        chunk_data['quality_score'] = quality_score
-        
-        # 向量化友好性评分
-        vector_friendliness = _calculate_vector_friendliness(chunk_data['content'])
-        chunk_data['vector_friendliness'] = vector_friendliness
-        
-        # 语义完整性检查
-        semantic_completeness = _calculate_semantic_completeness_score(chunk_data['content'])
-        chunk_data['semantic_completeness'] = semantic_completeness
-        
         optimized_chunks.append(chunk_data)
-    
-    # 按质量评分排序（可选）
-    optimized_chunks.sort(key=lambda x: x.get('quality_score', 0), reverse=True)
     
     return optimized_chunks
 
+def _extract_nodes_with_header_info(tree, headers_to_split_on):
+    """提取所有节点及其对应的标题信息"""
+    nodes_with_headers = []
+    current_headers = {}  # 当前的标题层级路径
+    
+    for node in tree.children:
+        if node.type == "heading":
+            level = int(node.tag[1])  # h1 -> 1, h2 -> 2, etc.
+            title = _extract_text_from_node(node)
+            
+            # 更新当前标题路径
+            # 移除比当前级别更深的标题
+            current_headers = {k: v for k, v in current_headers.items() if k < level}
+            # 添加当前标题
+            current_headers[level] = title
+            
+            # 如果是分块边界标题，标记为分块起始点
+            is_split_boundary = level in headers_to_split_on
+            
+            nodes_with_headers.append({
+                'node': node,
+                'type': 'heading',
+                'level': level,
+                'title': title,
+                'headers': current_headers.copy(),
+                'is_split_boundary': is_split_boundary,
+                'content': node.markup + " " + title
+            })
+        else:
+            # 非标题节点
+            content = _render_node_content(node)
+            if content.strip():
+                nodes_with_headers.append({
+                    'node': node,
+                    'type': node.type,
+                    'headers': current_headers.copy(),
+                    'is_split_boundary': False,
+                    'content': content
+                })
+    
+    return nodes_with_headers
 
-def _calculate_chunk_quality(content):
-    """计算chunk质量评分"""
-    score = 0.0
-    
-    # 长度适中加分
-    token_count = num_tokens_from_string(content)
-    if 100 <= token_count <= 800:
-        score += 0.3
-    
-    # 包含完整句子加分
-    sentences = content.split('.')
-    complete_sentences = sum(1 for s in sentences if len(s.strip()) > 10)
-    score += min(complete_sentences * 0.1, 0.3)
-    
-    # 结构化内容加分
-    if any(marker in content for marker in ['#', '##', '###', '- ', '* ', '1. ']):
-        score += 0.2
-    
-    # 信息密度
-    words = content.split()
-    unique_words = len(set(word.lower() for word in words if len(word) > 3))
-    if words:
-        diversity_ratio = unique_words / len(words)
-        score += diversity_ratio * 0.2
-    
-    return min(score, 1.0)
+
+def _render_node_content(node):
+    """渲染单个节点的内容"""
+    if node.type == "table":
+        return _render_table_from_ast(node)
+    elif node.type == "code_block":
+        return f"```{node.info or ''}\n{node.content}```"
+    elif node.type == "blockquote":
+        return _render_blockquote_from_ast(node)
+    elif node.type in ["bullet_list", "ordered_list"]:
+        return _render_list_from_ast(node)
+    elif node.type == "paragraph":
+        return _extract_text_from_node(node)
+    elif node.type == "hr":
+        return "---"
+    else:
+        return _extract_text_from_node(node)
 
 
-def _calculate_vector_friendliness(content):
-    """计算向量化友好性"""
-    score = 0.0
+def _split_by_header_levels(nodes_with_headers, headers_to_split_on):
+    """基于标题层级进行分块，智能处理连续标题"""
+    chunks = []
+    current_chunk = {
+        'headers': {},
+        'nodes': []
+    }
     
-    # 避免过多的特殊字符
-    special_char_ratio = sum(1 for c in content if not c.isalnum() and c not in ' \n\t.,!?') / len(content)
-    score += max(0, 0.3 - special_char_ratio)
+    i = 0
+    while i < len(nodes_with_headers):
+        node_info = nodes_with_headers[i]
+        
+        # 检查是否为分块边界标题
+        if node_info['is_split_boundary']:
+            # 先检查是否为连续短标题的情况
+            if node_info['type'] == 'heading':
+                current_title = node_info.get('title', '').strip()
+                
+                # 检查当前标题是否很短（可能只是编号）
+                is_short_title = (
+                    len(current_title) <= 12 and 
+                    (
+                        # 纯数字编号如 "3.7", "4.1"
+                        (current_title.replace('.', '').replace(' ', '').isdigit()) or
+                        # 短编号如 "3.7", "4", "A.1"  
+                        (len(current_title.split()) <= 2 and 
+                         any(char.isdigit() for char in current_title))
+                    )
+                )
+                
+                # 如果是短标题，向前查找看是否有紧跟的内容标题
+                if is_short_title:
+                    # 查找接下来的几个节点，看是否有实质性内容标题
+                    found_content_header = False
+                    j = i + 1
+                    
+                    # 向前查看最多3个节点
+                    while j < len(nodes_with_headers) and j < i + 4:
+                        next_node = nodes_with_headers[j]
+                        
+                        # 如果找到另一个标题
+                        if next_node.get('type') == 'heading':
+                            next_title = next_node.get('title', '').strip()
+                            
+                            # 检查是否为更有实质内容的标题
+                            is_content_header = (
+                                len(next_title) > 12 or  # 较长的标题
+                                (len(next_title.split()) > 2) or  # 多个词
+                                any(word for word in next_title.split() 
+                                    if len(word) > 3 and not word.replace('.', '').isdigit())  # 有非数字词汇
+                            )
+                            
+                            if is_content_header:
+                                found_content_header = True
+                                break
+                        
+                        # 如果遇到其他内容，停止查找
+                        elif next_node.get('content', '').strip():
+                            break
+                        
+                        j += 1
+                    
+                    # 如果找到了内容标题，跳过当前标题的分块处理
+                    if found_content_header:
+                        # 直接添加到当前块，不作为分块边界
+                        current_chunk['nodes'].append(node_info)
+                        i += 1
+                        continue
+            
+            # 正常的分块边界处理
+            # 完成当前块（如果有内容）
+            if (current_chunk['nodes'] and 
+                any(n for n in current_chunk['nodes'] if n['content'].strip())):
+                chunks.append(current_chunk)
+                current_chunk = {
+                    'headers': {},
+                    'nodes': []
+                }
+        
+        # 更新当前块的标题信息
+        if node_info['headers']:
+            current_chunk['headers'] = node_info['headers'].copy()
+        
+        # 添加节点到当前块
+        current_chunk['nodes'].append(node_info)
+        i += 1
     
-    # 包含关键信息词汇
-    key_indicators = ['是', '的', '在', '有', '为', '与', '和', '或', '但', '因为', '所以']
-    indicator_count = sum(1 for word in key_indicators if word in content)
-    score += min(indicator_count * 0.05, 0.3)
+    # 添加最后一个块
+    if current_chunk['nodes'] and any(n for n in current_chunk['nodes'] if n['content'].strip()):
+        chunks.append(current_chunk)
     
-    # 语言连贯性
-    sentences = [s.strip() for s in content.split('.') if s.strip()]
-    if len(sentences) >= 2:
-        score += 0.4
+    return chunks
+
+
+def _render_header_chunk(chunk_info):
+    """渲染基于标题的分块内容（原始版本，用于兼容性）"""
+    content_parts = []
     
-    return min(score, 1.0)
+    # 添加标题上下文（如果分块本身不包含标题）
+    chunk_has_header = any(node['type'] == 'heading' for node in chunk_info.get('nodes', []))
+    
+    if not chunk_has_header and chunk_info.get('headers'):
+        # 添加最相关的上下文标题
+        context_header = _get_most_relevant_header(chunk_info['headers'])
+        if context_header:
+            content_parts.append(context_header)
+    
+    # 渲染所有节点内容
+    for node_info in chunk_info.get('nodes', []):
+        if node_info.get('content', '').strip():
+            content_parts.append(node_info['content'])
+    
+    return "\n\n".join(content_parts).strip()
+
+
+def _get_most_relevant_header(headers):
+    """获取最相关的上下文标题（原始版本）"""
+    if not headers:
+        return None
+    
+    # 选择最深层级的标题作为上下文
+    max_level = max(headers.keys())
+    return f"{'#' * max_level} {headers[max_level]}"

@@ -151,41 +151,44 @@ def perform_parse(doc_id, doc_info, file_info, embedding_config):
         # 初始化进度
         update_progress(0.2, "OCR开始")
 
-        # 执行 OCR 进行文档解析
-        # 原版本 - 临时注释掉用于测试
-        # from .mineru_parse.process_pdf import process_pdf_entry
-        # chunk_count = process_pdf_entry(doc_id, temp_file_path,kb_id, update_progress)
-
-        # === 临时测试版本 - 直接使用 output 目录中的 markdown 文件 ===
-        print(f"[Parser-INFO] 临时测试模式：跳过 MinerU 处理，直接使用现有 markdown 文件")
+        # 检查是否启用开发模式
+        from .mineru_parse.utils import is_dev_mode
         
-        # 使用现有的 markdown 文件路径
-        output_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'output')
-        md_file_path = os.path.join(output_dir, '0c344536404411f0ba3a66fc51ac58de.md')
-        
-        if os.path.exists(md_file_path):
-            print(f"[Parser-INFO] 找到测试 markdown 文件: {md_file_path}")
-            update_progress(0.4, "跳过 MinerU 处理，使用现有 markdown 文件")
+        if is_dev_mode():
+            # === 开发模式：跳过 MinerU 处理，直接使用现有 markdown 文件 ===
+            print(f"[Parser-INFO] 开发模式已启用：跳过 MinerU 处理，直接使用现有 markdown 文件")
             
-            # 使用现有的 ragflow_build 逻辑处理 markdown
-            from .mineru_parse.ragflow_build import create_ragflow_resources
+            # 使用现有的 markdown 文件路径
+            output_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'output')
+            md_file_path = os.path.join(output_dir, '0c344536404411f0ba3a66fc51ac58de.md')
             
-            # 假设 images 目录也在 output 目录下
-            images_dir = os.path.join(output_dir, 'images')
-            chunk_count = create_ragflow_resources(doc_id, kb_id, md_file_path, images_dir, update_progress)
-            
-            print(f"[Parser-INFO] 测试模式完成，生成 {chunk_count} 个块")
+            if os.path.exists(md_file_path):
+                print(f"[Parser-INFO] 找到测试 markdown 文件: {md_file_path}")
+                update_progress(0.4, "跳过 MinerU 处理，使用现有 markdown 文件")
+                
+                # 使用现有的 ragflow_build 逻辑处理 markdown
+                from .mineru_parse.ragflow_build import create_ragflow_resources
+                
+                # 假设 images 目录也在 output 目录下
+                images_dir = os.path.join(output_dir, 'images')
+                chunk_count = create_ragflow_resources(doc_id, kb_id, md_file_path, images_dir, update_progress)
+                
+                print(f"[Parser-INFO] 开发模式完成，生成 {chunk_count} 个块")
+            else:
+                print(f"[Parser-WARNING] 测试 markdown 文件不存在: {md_file_path}")
+                print(f"[Parser-INFO] 可用的 output 文件:")
+                if os.path.exists(output_dir):
+                    for f in os.listdir(output_dir):
+                        print(f"  - {f}")
+                
+                # 回退到错误状态
+                chunk_count = 0
+                update_progress(0.9, "测试 markdown 文件不存在")
         else:
-            print(f"[Parser-WARNING] 测试 markdown 文件不存在: {md_file_path}")
-            print(f"[Parser-INFO] 可用的 output 文件:")
-            if os.path.exists(output_dir):
-                for f in os.listdir(output_dir):
-                    print(f"  - {f}")
-            
-            # 回退到错误状态
-            chunk_count = 0
-            update_progress(0.9, "测试 markdown 文件不存在")
-        # === 临时测试版本结束 ===
+            # === 生产模式：执行正常的 OCR 文档解析 ===
+            print(f"[Parser-INFO] 生产模式：执行 MinerU 处理")
+            from .mineru_parse.process_pdf import process_pdf_entry
+            chunk_count = process_pdf_entry(doc_id, temp_file_path, kb_id, update_progress)
 
         return {"success": True, "chunk_count": chunk_count}
             
@@ -201,21 +204,33 @@ def perform_parse(doc_id, doc_info, file_info, embedding_config):
         return {"success": False, "error": error_message}
 
     finally:
-        # 清理临时文件 - 根据环境变量控制
-        cleanup_enabled = os.getenv('CLEANUP_TEMP_FILES', 'true').lower() in ('true', '1', 'yes', 'on')
+        # 清理临时文件 - 根据开发模式和环境变量控制
+        from .mineru_parse.utils import should_cleanup_temp_files
+        
+        cleanup_enabled = should_cleanup_temp_files()
         
         if cleanup_enabled:
             try:
+                # 清理通过temp_file_path变量创建的临时文件
+                if 'temp_file_path' in locals() and temp_file_path and os.path.exists(temp_file_path):
+                    os.remove(temp_file_path)
+                    print(f"[Parser-INFO] 已清理临时文件: {temp_file_path}")
+                
+                # 清理可能的临时PDF文件（向后兼容）
                 if temp_pdf_path and os.path.exists(temp_pdf_path):
                     os.remove(temp_pdf_path)
                     print(f"[Parser-INFO] 已清理临时PDF文件: {temp_pdf_path}")
+                    
+                # 清理可能的临时图片目录
                 if temp_image_dir and os.path.exists(temp_image_dir):
                     shutil.rmtree(temp_image_dir, ignore_errors=True)
                     print(f"[Parser-INFO] 已清理临时图片目录: {temp_image_dir}")
             except Exception as clean_e:
                 print(f"[Parser-WARNING] 清理临时文件失败: {clean_e}")
         else:
-            print(f"[Parser-INFO] 环境变量 CLEANUP_TEMP_FILES 设置为 false，保留临时文件")
+            print(f"[Parser-INFO] 配置为保留临时文件（dev模式或CLEANUP_TEMP_FILES=false）")
+            if 'temp_file_path' in locals() and temp_file_path:
+                print(f"[Parser-INFO] 保留临时文件: {temp_file_path}")
             if temp_pdf_path:
                 print(f"[Parser-INFO] 保留临时PDF文件: {temp_pdf_path}")
             if temp_image_dir:

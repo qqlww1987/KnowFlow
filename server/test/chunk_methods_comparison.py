@@ -549,7 +549,7 @@ class ChunkMethodComparator:
 def main():
     """主函数"""
     # 配置参数
-    source_file = "../output/0c344536404411f0ba3a66fc51ac58de.md"
+    source_file = "./46c619ba451011f0b03266fc51ac58de.md"
     chunk_token_num = 512
     min_chunk_tokens = 100
     
