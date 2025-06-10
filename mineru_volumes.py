@@ -32,53 +32,28 @@ def update_env_file(env_path, updates):
 
 
 if __name__ == "__main__":
-    # 解析 magic-pdf.json
     home_dir = os.path.expanduser('~')
-  
+    
+    # 宿主机模型目录
     mineru_models_dir = os.path.join(home_dir, '.cache/huggingface/hub/')
-
-    # 打印处理后的路径
     print(f"mineru_models_dir: {mineru_models_dir}")
 
-    # 更新 .env 文件
-    env_path = os.path.join(os.path.dirname(__file__), '.env')
-
-    print(f"env_path: {env_path}")
-    
-    # 复制 magic-pdf.json 到 server 目录，用于 docker 构建
+    # 宿主机配置文件路径
     config_file = os.path.join(home_dir, 'magic-pdf.json')
     if not os.path.exists(config_file):
         print(f"配置文件不存在: {config_file}")
         exit(1)
-
-    with open(config_file, 'r', encoding='utf-8') as f:
-        config_json = json.load(f)
-
-    def fix_cache_path(path):
-        idx = path.find('.cache')
-        if idx == -1:
-            return path
-        # 如果.cache前不是/root，则替换
-        if not path.startswith('/root/.cache'):
-            return '/root/' + path[idx:]
-        return path
-
-    if 'models-dir' in config_json:
-        config_json['models-dir'] = fix_cache_path(config_json['models-dir'])
-    if 'layoutreader-model-dir' in config_json:
-        config_json['layoutreader-model-dir'] = fix_cache_path(config_json['layoutreader-model-dir'])
-
-    server_dir = os.path.join(os.path.dirname(__file__), "server")
-    target_config_file = os.path.join(server_dir, "magic-pdf.json")
     
-    with open(target_config_file, 'w', encoding='utf-8') as f:
-        json.dump(config_json, f, ensure_ascii=False, indent=4)
-    print(f"已将修正后的配置文件复制到: {target_config_file}")
+    print(f"找到配置文件: {config_file}")
+
+    # 更新 .env 文件
+    env_path = os.path.join(os.path.dirname(__file__), '.env')
+    print(f"env_path: {env_path}")
     
-    # 更新环境变量，添加 MINERU_MAGIC_PDF_JSON_PATH
+    # 直接使用宿主机的原始配置文件，无需复制和路径修正
     update_env_file(env_path, {
         'MINERU_MODLES_DIR': mineru_models_dir,
-        'MINERU_MAGIC_PDF_JSON_PATH': target_config_file
+        'MINERU_MAGIC_PDF_JSON_PATH': config_file  # 直接指向宿主机配置文件
     })
     
-    print("已将配置文件路径添加到环境变量，可以通过 volume 挂载到容器内。")
+    print("已将宿主机配置文件路径添加到环境变量，将通过 Docker volume 直接挂载到容器内。")
