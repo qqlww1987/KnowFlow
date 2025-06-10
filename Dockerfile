@@ -37,9 +37,6 @@ RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua
 # 复制后端代码
 COPY server /app
 
-# /root/.cache/huggingface/hub/models--opendatalab--PDF-Extract-Kit-1.0/snapshots/95817b4b2321769155f05c8d7e2f5a6b6da9e662/models
-# 移除配置文件复制，完全依赖挂载
-# COPY server/magic-pdf.json /root/magic-pdf.json
 
 # 暴露后端端口
 EXPOSE 5000

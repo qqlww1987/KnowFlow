@@ -160,7 +160,7 @@ docker buildx build --platform linux/amd64 --target frontend -t zxwei/knowflow-w
 
 ## TODO
 - [x] 支持更多文档格式的 MinerU 解析
-- [ ] 增强 MarkDown 文件的分块规则
+- [x] 增强 MarkDown 文件的分块规则
 
 
 ## 交流群
