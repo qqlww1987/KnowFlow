@@ -20,6 +20,7 @@ import tempfile
 import json
 from markdown import markdown as md_to_html
 import time
+import difflib
 try:
     from markdown_it import MarkdownIt
     from markdown_it.tree import SyntaxTreeNode
@@ -60,7 +61,7 @@ def should_cleanup_temp_files():
     return cleanup in ['true', '1', 'yes', 'on']
 
 
-def split_markdown_to_chunks_configured(txt, chunk_token_num=512, min_chunk_tokens=100, **kwargs):
+def split_markdown_to_chunks_configured(txt, chunk_token_num=256, min_chunk_tokens=10, **kwargs):
     """
     根据配置选择合适的分块方法的统一接口
     
@@ -361,8 +362,10 @@ def get_blocks_from_md(md_file_path):
 
 def get_bbox_for_chunk(md_file_path, chunk_content):
     """
-    根据 md 文件路径和 chunk 内容，返回 chunk 中所有独立内容的"最大匹配" block 的 bbox 列表。
-    该算法首先找到所有匹配的 block，然后过滤掉那些本身是其他更长匹配项子集的 block。
+    根据 md 文件路径和 chunk 内容，返回构成该 chunk 的连续 block 的 bbox 列表。
+    该算法采用混合评分机制寻找最佳"锚点" block，该评分兼顾了最长公共子串的长度和其占 block 自身长度的比例。
+    然后从该锚点向前后扩展，寻找同样存在于 chunk 中的连续 block。
+    这旨在平衡精确匹配和部分（截断）匹配的场景。
     """
     block_list = get_blocks_from_md(md_file_path)
     if not block_list:
@@ -372,33 +375,84 @@ def get_bbox_for_chunk(md_file_path, chunk_content):
     if not chunk_content_clean:
         return None
 
-    # Step 1: Find all blocks whose content is a substring of the chunk content.
-    matched_blocks = []
-    for block in block_list:
-        if block.get('content') and block['content'] in chunk_content_clean:
-            matched_blocks.append(block)
+    # Step 1: Find anchor block using a hybrid score that balances match length and match ratio.
+    best_score = -1.0
+    best_match_idx = -1
 
-    if not matched_blocks:
+    for i, block in enumerate(block_list):
+        block_content = block.get('content', '').strip()
+        if not block_content:
+            continue
+        
+        matcher = difflib.SequenceMatcher(None, block_content, chunk_content_clean, autojunk=False)
+        match = matcher.find_longest_match(0, len(block_content), 0, len(chunk_content_clean))
+        
+        if match.size == 0:
+            continue
+
+        lcs_size = match.size
+        # The ratio of the match to the block's own length.
+        # This rewards matches that are more "complete" for a given block.
+        match_ratio = lcs_size / len(block_content)
+        
+        # The score prioritizes longer matches but is weighted by how much of the block is matched.
+        score = lcs_size * match_ratio
+
+        if score > best_score:
+            best_score = score
+            best_match_idx = i
+
+    # A minimum score to be considered a valid anchor.
+    # A score of 10.0 could mean a 10-char match covering 100% of a block,
+    # or a 20-char match covering 50% of a 40-char block.
+    MIN_ANCHOR_SCORE = 10.0
+    if best_match_idx == -1 or best_score < MIN_ANCHOR_SCORE:
         return None
 
-    # Step 2: Filter for "maximal" matches. A match is maximal if its content
-    # is not a substring of any other longer match's content.
-    maximal_matches = []
-    for b1 in matched_blocks:
-        is_maximal = True
-        for b2 in matched_blocks:
-            if b1 is b2:
-                continue
-            # If b1's content is a proper substring of b2's content, it's not maximal.
-            if b1['content'] in b2['content'] and len(b1['content']) < len(b2['content']):
-                is_maximal = False
-                break
-        if is_maximal:
-            maximal_matches.append(b1)
+    # Step 2: Expand from the anchor block to find a contiguous sequence.
+    # The list of matched blocks will be keyed by index to avoid duplicates.
+    matched_blocks = {best_match_idx: block_list[best_match_idx]}
 
-    # Step 3: Format and deduplicate the final positions.
+    # Expand backwards from the anchor
+    for i in range(best_match_idx - 1, -1, -1):
+        block = block_list[i]
+        block_content = block.get('content', '').strip()
+        if not block_content:
+            continue
+
+        matcher = difflib.SequenceMatcher(None, block_content, chunk_content_clean, autojunk=False)
+        match = matcher.find_longest_match(0, len(block_content), 0, len(chunk_content_clean))
+        
+        # Condition for a neighbor block to be considered part of the chunk
+        MIN_NEIGHBOR_MATCH_LEN = 10
+        MIN_NEIGHBOR_MATCH_RATIO = 0.5 # at least 50% of the block must match
+        if match.size > MIN_NEIGHBOR_MATCH_LEN and (match.size / len(block_content)) >= MIN_NEIGHBOR_MATCH_RATIO:
+            matched_blocks[i] = block
+        else:
+            break  # Stop if contiguity is broken
+
+    # Expand forwards from the anchor
+    for i in range(best_match_idx + 1, len(block_list)):
+        block = block_list[i]
+        block_content = block.get('content', '').strip()
+        if not block_content:
+            continue
+        
+        matcher = difflib.SequenceMatcher(None, block_content, chunk_content_clean, autojunk=False)
+        match = matcher.find_longest_match(0, len(block_content), 0, len(chunk_content_clean))
+
+        MIN_NEIGHBOR_MATCH_LEN = 10
+        MIN_NEIGHBOR_MATCH_RATIO = 0.5
+        if match.size > MIN_NEIGHBOR_MATCH_LEN and (match.size / len(block_content)) >= MIN_NEIGHBOR_MATCH_RATIO:
+            matched_blocks[i] = block
+        else:
+            break  # Stop if contiguity is broken
+    
+    # Step 3: Format and return the bboxes for the matched contiguous blocks.
     found_positions = []
-    for block in maximal_matches:
+    # Sort indices to maintain original document order.
+    for idx in sorted(matched_blocks.keys()):
+        block = matched_blocks[idx]
         bbox = block.get('bbox')
         page_number = block.get('page_number')
         if bbox and page_number is not None:
@@ -456,7 +510,7 @@ def update_document_progress(doc_id, progress=None, message=None, status=None, r
             conn.close()
 
 
-def split_markdown_to_chunks_smart(txt, chunk_token_num=512, min_chunk_tokens=100):
+def split_markdown_to_chunks_smart(txt, chunk_token_num=256, min_chunk_tokens=10):
     """
     基于 markdown-it-py AST 的智能分块方法，解决 RAG Markdown 文件分块问题：
     1. 基于语义切分（使用 AST）
@@ -692,7 +746,7 @@ def _finalize_ast_chunk(chunk_parts, context_stack):
     return chunk_content
 
 
-def split_markdown_to_chunks_advanced(txt, chunk_token_num=512, min_chunk_tokens=100, 
+def split_markdown_to_chunks_advanced(txt, chunk_token_num=256, min_chunk_tokens=10, 
                                      overlap_ratio=0.0, include_metadata=False):
     """
     基于标题层级的高级 Markdown 分块方法 (混合分块策略 + 动态阈值调整)

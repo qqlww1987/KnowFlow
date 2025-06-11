@@ -160,7 +160,7 @@ def perform_parse(doc_id, doc_info, file_info, embedding_config):
             
             # 使用现有的 markdown 文件路径
             output_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'output')
-            md_file_path = os.path.join(output_dir, '0c344536404411f0ba3a66fc51ac58de.md')
+            md_file_path = os.path.join(output_dir, '322abfde46a411f0873a66fc51ac58de.md')
             
             if os.path.exists(md_file_path):
                 print(f"[Parser-INFO] 找到测试 markdown 文件: {md_file_path}")
