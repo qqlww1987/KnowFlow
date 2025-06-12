@@ -29,8 +29,8 @@ if "%HOST_IP%"=="" set "HOST_IP=localhost"
 call :log_info "宿主机 IP: %HOST_IP%"
 echo.
 
-set /p ES_PORT="请输入 Elasticsearch 端口 (默认: 9200): "
-if "%ES_PORT%"=="" set "ES_PORT=9200"
+:: 设置默认 Elasticsearch 端口
+set "ES_PORT=1200"
 
 :: 创建临时文件
 set "TEMP_FILE=%TEMP%\ragflow_env_%RANDOM%.tmp"
