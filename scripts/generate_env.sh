@@ -44,8 +44,8 @@ log_info "=== RAGFlow 配置生成器 ==="
 log_info "宿主机 IP: $HOST_IP"
 echo
 
-read -p "请输入 Elasticsearch 端口 (默认: 9200): " ES_PORT
-ES_PORT=${ES_PORT:-9200}
+read -p "请输入 Elasticsearch 端口 (默认: 1200，ES 宿主暴露的都口号，而非 docker 内端口): " ES_PORT
+ES_PORT=${ES_PORT:-1200}
 
 # 创建临时文件
 TEMP_FILE=$(mktemp)
