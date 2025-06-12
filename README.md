@@ -36,7 +36,7 @@ KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的�
 ### 图文混排输出
 
 1. 支持市面上常见的文件格式，如 ppt/png/word/doc/excel/...等等
-2. 保持和官方 markdown **完全一致**的分块规则，保证分块和向量化检索效果，且具备开放性，后续可持续增强
+2. 保持和官方 markdown **完全一致**的分块规则，共提供了三种分块策略，保证分块和向量化检索效果，且具备开放性，后续可持续增强
 3. 无缝对接 RAGFlow 知识库系统，文档自动解析和分块
 
 <div align="center">
@@ -84,7 +84,7 @@ KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的�
    ```bash
    #  从 RAGFlow API 页面后台获取 (必须)
    RAGFLOW_API_KEY=
-   # 注意不支持 127.0.0.1、localhost，需要把 127.0.0.1 或 localhost 替换成部署机器的 IP 地址（）
+   # 注意不支持 127.0.0.1、localhost，需要把 127.0.0.1 或 localhost 替换成部署机器的 IP 地址
    RAGFLOW_BASE_URL=
    ```
 
@@ -145,6 +145,7 @@ KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的�
 浏览器访问启动后的地址，即可进入系统。
 
 > 💡 **提示：** **图文混排功能**，聊天助手的提示词很重要，配置不正确会无法显示图片。模板如下：<br>
+
 > 请参考{knowledge}内容回答用户问题。<br>
 > 如果知识库内容包含图片，请在回答中包含图片URL。<br>
 > 注意这个 html 格式的 URL 是来自知识库本身，URL 不能做任何改动。<br>
@@ -218,14 +219,14 @@ sudo systemctl restart docker
 "device-mode": "cuda"
 ```
 
-> 💡 **`magic-pdf.json`**<br>
+> 💡 `magic-pdf.json` <br>
 > magic-pdf.json 文件在 MinerU 模型下载完成后会自动生成，路径可以在 .env 的 MINERU_MAGIC_PDF_JSON_PATH 查询。
 
 ### 2. 文件解析过程中出现 MinerU 模型文件路径找不到
 
 1）确认 MinerU 模型是否正常下载
 
-2）确实 .env 中的模型路径是否真实存在
+2）确认 .env 中的模型路径是否真实存在
 
 3）尝试手动配置 `MINERU_MODLES_DIR`，比如：
 
