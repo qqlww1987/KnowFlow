@@ -60,11 +60,28 @@ KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的�
 
 1. 在宿主机器上下载 MinerU 模型文件
 
+支持两种下载方式，任选其一：
+
+**方式一：使用 ModelScope（推荐，国内用户速度更快）**
 ```bash
 pip install modelscope
 wget https://gcore.jsdelivr.net/gh/opendatalab/MinerU@master/scripts/download_models.py -O download_models.py
 python3 download_models.py
 ```
+
+**方式二：使用 HuggingFace**
+```bash
+pip install huggingface_hub
+wget https://gcore.jsdelivr.net/gh/opendatalab/MinerU@master/scripts/download_models_hf.py -O download_models_hf.py
+python3 download_models_hf.py
+```
+
+**智能检测说明：**
+- 安装脚本会自动检测您系统中的模型缓存路径
+- 优先使用 ModelScope 路径（如果存在且包含模型文件）
+- 自动选择模型文件较多或目录较大的路径
+- 支持的路径：`~/.cache/modelscope/hub` 和 `~/.cache/huggingface/hub`
+
 2. 在项目根目录下新建 `.env` 文件，添加如下内容
 
 ```bash
@@ -206,22 +223,13 @@ docker buildx build --platform linux/amd64 --target frontend -t zxwei/knowflow-w
       sudo systemctl restart docker
       ```
 
-   2）修改 `docker-compose.yml` 的 `backend` 容器下，增加：
 
-      ```yaml
-      backend:
-        deploy:
-          resources:
-            reservations:
-              devices:
-                - driver: nvidia
-                  count: all
-                  capabilities: [gpu]
-      ```
-
-   3）修改 `server/magic-pdf.json`，把 `device-mode` 从 `cpu` 为 `cuda`：
+   2）修改 `magic-pdf.json`，把 `device-mode` 从 `cpu` 为 `cuda`：
 
       ```json
       "device-mode": "cuda"
       ```
+
+      > 💡 ** magic-pdf.json **<br>
+      > magic-pdf.json 文件在 MinerU 模型下载完成后会自动生成，路径可以在 .env 的 MINERU_MAGIC_PDF_JSON_PATH 查询。<br>
 

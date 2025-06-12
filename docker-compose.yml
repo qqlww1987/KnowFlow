@@ -45,6 +45,7 @@ services:
       - MANAGEMENT_ADMIN_PASSWORD=${MANAGEMENT_ADMIN_PASSWORD:-12345678}
       - MANAGEMENT_JWT_SECRET=${MANAGEMENT_JWT_SECRET:-12345678}
     volumes:
+      - ${MINERU_MODLES_DIR}:/root/.cache/modelscope/hub
       - ${MINERU_MODLES_DIR}:/root/.cache/huggingface/hub
       - ${MINERU_MAGIC_PDF_JSON_PATH}:/root/magic-pdf.json
     extra_hosts:
