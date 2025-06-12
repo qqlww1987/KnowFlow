@@ -230,6 +230,23 @@ docker buildx build --platform linux/amd64 --target frontend -t zxwei/knowflow-w
       "device-mode": "cuda"
       ```
 
-      > 💡 ** magic-pdf.json **<br>
+      > 💡 ** `magic-pdf.json` **<br>
       > magic-pdf.json 文件在 MinerU 模型下载完成后会自动生成，路径可以在 .env 的 MINERU_MAGIC_PDF_JSON_PATH 查询。<br>
+
+
+2. 文件解析过程中出现 MinerU 模型文件路径找不到
+
+  1）确认 MinerU 模型是否正常下载
+
+  2）确实 .env 中的模型路径是否真实存在
+
+  3) 尝试手动配置 `MINERU_MODLES_DIR`，比如：
+  
+    ```json
+     /Users/用户名称/.cache/modelscope/hub/models/opendatalab/PDF-Extract-Kit-1___0/models:/Users/用户名称/.cache/modelscope/hub/models/opendatalab/PDF-Extract-Kit-1___0/models
+    ```
+
+
+
+
 
