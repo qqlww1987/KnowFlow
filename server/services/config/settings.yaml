@@ -20,7 +20,7 @@ app:
   # true: 在处理完成后自动清理临时文件（如上传的原始文件、中间文件）。
   # false: 保留临时文件，便于调试。
   # 注意：在开发模式下，此项默认为 false，但仍可被环境变量覆盖。
-  cleanup_temp_files: false
+  cleanup_temp_files: true
 
   # 全局分块方法
   # 'smart': 智能分块，基于AST的语义分块（默认推荐）。

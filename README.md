@@ -173,6 +173,10 @@ docker buildx build --platform linux/amd64 --target frontend -t zxwei/knowflow-w
 
 - [x] 支持更多文档格式的 MinerU 解析
 - [x] 增强 MarkDown 文件的分块规则
+- [x] 优化 Excel 文件分块
+- [ ] MinerU 2.0 接入
+- [ ] RAGFlow 前端 UI 源码开源
+
 
 ## 交流群
 
