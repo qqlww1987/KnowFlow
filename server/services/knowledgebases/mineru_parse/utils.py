@@ -29,6 +29,8 @@ except ImportError:
     MARKDOWN_IT_AVAILABLE = False
     print("Warning: markdown-it-py not available. Please install with: pip install markdown-it-py")
 
+from ...config import APP_CONFIG
+
 
 # 分块模式配置
 # CHUNK_METHOD = os.getenv('CHUNK_METHOD', 'smart')  # 默认使用 smart 模式
@@ -36,29 +38,21 @@ except ImportError:
 
 def get_configured_chunk_method():
     """获取配置的分块方法"""
-    method = os.getenv('CHUNK_METHOD', 'smart').lower()  # 每次都重新读取环境变量
-    if method in ['advanced', 'smart', 'basic']:
-        return method
-    else:
-        print(f"Warning: Unknown chunk method '{method}', falling back to 'smart'")
-        return 'smart'
+    return APP_CONFIG.chunk_method
 
 
 def is_dev_mode():
-    """检查是否启用开发模式"""
-    dev_mode = os.getenv('DEV', 'false').lower()
-    return dev_mode in ['true', '1', 'yes', 'on']
+    """检查是否处于开发模式"""
+    return APP_CONFIG.dev_mode
 
 
 def should_cleanup_temp_files():
     """检查是否应该清理临时文件"""
-    # 在dev模式下，默认不清理临时文件
+    # 在dev模式下，默认不清理临时文件，但环境变量仍可覆盖
     if is_dev_mode():
-        cleanup = os.getenv('CLEANUP_TEMP_FILES', 'false').lower()
-    else:
-        cleanup = os.getenv('CLEANUP_TEMP_FILES', 'true').lower()
-    
-    return cleanup in ['true', '1', 'yes', 'on']
+        return APP_CONFIG.cleanup_temp_files
+    # 在非dev模式下，默认清理，但环境变量仍可覆盖
+    return APP_CONFIG.cleanup_temp_files
 
 
 def split_markdown_to_chunks_configured(txt, chunk_token_num=256, min_chunk_tokens=10, **kwargs):
@@ -126,7 +120,7 @@ os.environ["TIKTOKEN_CACHE_DIR"] = tiktoken_cache_dir
 encoder = tiktoken.get_encoding("cl100k_base")
 
 
-def num_tokens_from_string(string: str) -> int:
+def num_tokens_from_string(string: str, model_name: str = "cl100k_base") -> int:
     """Returns the number of tokens in a text string."""
     try:
         return len(encoder.encode(string))

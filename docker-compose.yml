@@ -45,6 +45,7 @@ services:
       - MANAGEMENT_ADMIN_PASSWORD=${MANAGEMENT_ADMIN_PASSWORD:-12345678}
       - MANAGEMENT_JWT_SECRET=${MANAGEMENT_JWT_SECRET:-12345678}
     volumes:
+      - ./server/services/config:/app/server/services/config:ro
       - ${MINERU_MODLES_DIR}:${MINERU_MODLES_DIR}
       - ${MINERU_MAGIC_PDF_JSON_PATH}:/root/magic-pdf.json
     extra_hosts:

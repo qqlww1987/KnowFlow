@@ -5,7 +5,7 @@ import shutil
 from dotenv import load_dotenv
 from .minio_server import upload_directory_to_minio
 from .mineru_test import update_markdown_image_urls
-from .utils import split_markdown_to_chunks_configured, get_bbox_for_chunk, update_document_progress
+from .utils import split_markdown_to_chunks_configured, get_bbox_for_chunk, update_document_progress, should_cleanup_temp_files
 from database import get_es_client
 
 def _validate_environment():
@@ -24,7 +24,20 @@ def _upload_images(kb_id, image_dir, update_progress):
     print(f"第4步：上传图片到MinIO...")
     upload_directory_to_minio(kb_id, image_dir)
 
-def _add_chunks_to_doc(doc, chunks, update_progress):
+def get_ragflow_doc(doc_id, kb_id):
+    """获取RAGFlow文档对象"""
+    api_key, base_url = _validate_environment()
+    rag_object = RAGFlow(api_key=api_key, base_url=base_url)
+    datasets = rag_object.list_datasets(id=kb_id)
+    if not datasets:
+        raise Exception(f"未找到知识库 {kb_id}")
+    dataset = datasets[0]
+    docs = dataset.list_documents(id=doc_id)
+    if not docs:
+        raise Exception(f"未找到文档 {doc_id}")
+    return docs[0]
+
+def add_chunks_to_doc(doc, chunks, update_progress):
     update_progress(0.8, "添加 chunk 到文档...")
     print(f"总共接收到 {len(chunks)} 个 chunks 准备添加。")
     for i, chunk in enumerate(chunks):
@@ -75,11 +88,8 @@ def _update_chunks_position(doc, md_file_path, chunk_content_to_index):
 
 def _cleanup_temp_files(md_file_path):
     """清理临时文件"""
-    # 检查环境变量是否允许删除临时文件
-    cleanup_enabled = os.getenv('CLEANUP_TEMP_FILES', 'true').lower() in ('true', '1', 'yes', 'on')
-    
-    if not cleanup_enabled:
-        print(f"[INFO] 环境变量 CLEANUP_TEMP_FILES 设置为 false，保留临时文件: {os.path.dirname(os.path.abspath(md_file_path))}")
+    if not should_cleanup_temp_files():
+        print(f"[INFO] 配置为保留临时文件，路径: {os.path.dirname(os.path.abspath(md_file_path))}")
         return
     
     try:
@@ -94,12 +104,7 @@ def create_ragflow_resources(doc_id, kb_id, md_file_path, image_dir, update_prog
     使用增强文本创建RAGFlow知识库和聊天助手
     """
     try:
-        api_key, base_url = _validate_environment()
-        rag_object = RAGFlow(api_key=api_key, base_url=base_url)
-        datasets = rag_object.list_datasets(id=kb_id)
-        if not datasets:
-            raise Exception("未找到对应的知识库")
-        dataset = datasets[0]
+        doc = get_ragflow_doc(doc_id, kb_id)
 
         _upload_images(kb_id, image_dir, update_progress)
 
@@ -107,16 +112,8 @@ def create_ragflow_resources(doc_id, kb_id, md_file_path, image_dir, update_prog
         chunks = split_markdown_to_chunks_configured(enhanced_text, chunk_token_num=256)
         chunk_content_to_index = {chunk: i for i, chunk in enumerate(chunks)}
 
-        docs = dataset.list_documents(id=doc_id)
-        if not docs:
-            raise Exception("未找到对应的文档")
-        doc = docs[0]
-
-        _add_chunks_to_doc(doc, chunks, update_progress)
+        add_chunks_to_doc(doc, chunks, update_progress)
         chunk_count = _update_chunks_position(doc, md_file_path, chunk_content_to_index)
-
-        update_document_progress(doc.id, progress=1.0, message="解析完成", status='1', run='3', chunk_count=chunk_count, process_duration=None)
-
         # 根据环境变量决定是否清理临时文件
         _cleanup_temp_files(md_file_path)
 

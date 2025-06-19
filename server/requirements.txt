@@ -18,3 +18,8 @@ ragflow-sdk==0.18.0
 markdown==3.6
 markdown-to-json==2.1.1
 markdown-it-py[linkify,plugins]==3.0.0
+geopy
+Pillow
+PyYAML
+pydantic
+openpyxl
