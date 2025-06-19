@@ -57,9 +57,3 @@ excel:
 
   # 是否在HTML分块中尽量保持表格结构
   preserve_table_structure: true
-
-# 数据库配置
-database:
-  # Elasticsearch配置
-  elasticsearch_timeout: 30
-  elasticsearch_max_retries: 3 

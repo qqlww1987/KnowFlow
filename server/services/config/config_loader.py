@@ -82,7 +82,6 @@ def load_configuration() -> RootConfig:
 CONFIG = load_configuration()
 APP_CONFIG = CONFIG.app
 EXCEL_CONFIG = CONFIG.excel
-DATABASE_CONFIG = CONFIG.database
 
 # 打印加载的配置（在开发模式下）
 if APP_CONFIG.dev_mode:

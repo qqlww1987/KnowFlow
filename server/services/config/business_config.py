@@ -21,14 +21,7 @@ class ExcelConfig(BaseModel):
     preserve_table_structure: bool = Field(True, description="是否保持表格结构")
 
 
-class DatabaseConfig(BaseModel):
-    """数据库与缓存配置"""
-    elasticsearch_timeout: int = Field(30, description="Elasticsearch请求超时时间（秒）")
-    elasticsearch_max_retries: int = Field(3, description="Elasticsearch请求最大重试次数")
-
-
 class RootConfig(BaseModel):
     """配置根模型"""
     app: AppConfig = Field(default_factory=AppConfig)
-    excel: ExcelConfig = Field(default_factory=ExcelConfig)
-    database: DatabaseConfig = Field(default_factory=DatabaseConfig) 
+    excel: ExcelConfig = Field(default_factory=ExcelConfig) 
