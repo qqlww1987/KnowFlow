@@ -87,6 +87,14 @@ interface ChunkingConfig {
   regex_pattern?: string
 }
 
+interface ApiResponse {
+  data?: {
+    chunking_config?: ChunkingConfig
+  }
+  code?: number
+  message?: string
+}
+
 interface Props {
   visible: boolean
   documentId: string
@@ -123,11 +131,33 @@ const rules = {
   ],
   chunk_token_num: [
     { required: true, message: '请输入分块大小', trigger: 'blur' },
-    { type: 'number', min: 50, max: 2048, message: '分块大小必须在50-2048之间', trigger: 'blur' }
+    { 
+      validator: (rule: any, value: any, callback: any) => {
+        if (value === null || value === undefined || value === '') {
+          callback(new Error('请输入分块大小'))
+        } else if (typeof value !== 'number' || value < 50 || value > 2048) {
+          callback(new Error('分块大小必须在50-2048之间'))
+        } else {
+          callback()
+        }
+      }, 
+      trigger: 'blur' 
+    }
   ],
   min_chunk_tokens: [
     { required: true, message: '请输入最小分块大小', trigger: 'blur' },
-    { type: 'number', min: 10, max: 500, message: '最小分块大小必须在10-500之间', trigger: 'blur' }
+    { 
+      validator: (rule: any, value: any, callback: any) => {
+        if (value === null || value === undefined || value === '') {
+          callback(new Error('请输入最小分块大小'))
+        } else if (typeof value !== 'number' || value < 10 || value > 500) {
+          callback(new Error('最小分块大小必须在10-500之间'))
+        } else {
+          callback()
+        }
+      }, 
+      trigger: 'blur' 
+    }
   ],
   regex_pattern: [
     { 
@@ -165,10 +195,10 @@ async function loadChunkingConfig() {
   
   loading.value = true
   try {
-    const response = await getDocumentChunkingConfigApi(props.documentId)
+    const response = await getDocumentChunkingConfigApi(props.documentId) as ApiResponse
     const config = response?.data?.chunking_config
     
-    if (config) {
+    if (config && typeof config === 'object') {
       Object.assign(form, {
         strategy: config.strategy || 'smart',
         chunk_token_num: config.chunk_token_num || 256,
