@@ -24,7 +24,6 @@ class ExcelConfig(BaseModel):
 class ChunkingConfig(BaseModel):
     """分块预分段配置"""
     regex_pattern: str = Field("", description="正则表达式分段模式")
-    delimiter: str = Field("\n!?;。；！？", description="普通分段标识符")
     strict_regex_split: bool = Field(False, description="严格按正则表达式分块，忽略token限制")
 
 
