@@ -23,8 +23,8 @@ def get_document_chunking_config(doc_id):
         
         chunking_config = parser_config.get('chunking_config', {
             'strategy': 'smart',
-            'chunk_token_num': 512,
-            'min_chunk_tokens': 50
+            'chunk_token_num': 256,
+            'min_chunk_tokens': 10
         })
         
         return success_response(data={'chunking_config': chunking_config})

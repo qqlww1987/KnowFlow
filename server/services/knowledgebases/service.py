@@ -230,7 +230,7 @@ class KnowledgebaseService:
             # 设置默认值
             default_parser_config = json.dumps({
                 "layout_recognize": "MinerU", 
-                "chunk_token_num": 512, 
+                "chunk_token_num": 256, 
                 "delimiter": "\n!?;。；！？", 
                 "auto_keywords": 0, 
                 "auto_questions": 0, 
@@ -558,7 +558,7 @@ class KnowledgebaseService:
                 default_parser_id = "naive"
                 default_parser_config = json.dumps({
                     "layout_recognize": "MinerU",
-                    "chunk_token_num": 512,
+                    "chunk_token_num": 256,
                     "delimiter": "\n!?;。；！？",
                     "auto_keywords": 0,
                     "auto_questions": 0,

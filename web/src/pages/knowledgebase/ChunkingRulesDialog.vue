@@ -30,7 +30,7 @@
           v-model="form.chunk_token_num"
           :min="50"
           :max="2048"
-          placeholder="512"
+          placeholder="256"
           style="width: 100%"
         />
         <div class="form-tip">单位：tokens，范围：50-2048</div>
@@ -41,7 +41,7 @@
           v-model="form.min_chunk_tokens"
           :min="10"
           :max="500"
-          placeholder="50"
+          placeholder="10"
           style="width: 100%"
         />
         <div class="form-tip">单位：tokens，范围：10-500</div>
@@ -105,8 +105,8 @@ const submitLoading = ref(false)
 
 const form = reactive<ChunkingConfig>({
   strategy: 'smart',
-  chunk_token_num: 512,
-  min_chunk_tokens: 50,
+  chunk_token_num: 256,
+  min_chunk_tokens: 10,
   regex_pattern: ''
 })
 
@@ -171,8 +171,8 @@ async function loadChunkingConfig() {
     if (config) {
       Object.assign(form, {
         strategy: config.strategy || 'smart',
-        chunk_token_num: config.chunk_token_num || 512,
-        min_chunk_tokens: config.min_chunk_tokens || 50,
+        chunk_token_num: config.chunk_token_num || 256,
+        min_chunk_tokens: config.min_chunk_tokens || 10,
         regex_pattern: config.regex_pattern || ''
       })
     }
