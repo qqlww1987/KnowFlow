@@ -51,3 +51,17 @@ class DocumentService(BaseService):
     @classmethod
     def get_by_kb_id(cls, kb_id: str) -> list[Document]:
         return cls.query(kb_id=kb_id)
+    
+    @classmethod
+    def update(cls, doc_id: str, data: dict) -> int:
+        """
+        更新文档记录
+        
+        Args:
+            doc_id: 文档ID
+            data: 要更新的数据字典
+            
+        Returns:
+            int: 受影响的行数
+        """
+        return cls.model.update(**data).where(cls.model.id == doc_id).execute()
