@@ -188,3 +188,29 @@ export function getSequentialBatchParseProgressApi(kbId: string) {
     method: "get"
   })
 }
+
+// 更新文档分块配置
+export function updateDocumentChunkingConfigApi(data: {
+  doc_id: string
+  chunking_config: {
+    strategy: 'basic' | 'smart' | 'advanced' | 'strict_regex'
+    chunk_token_num: number
+    min_chunk_tokens: number
+    regex_pattern?: string
+    delimiter?: string
+  }
+}) {
+  return request({
+    url: `/api/v1/documents/${data.doc_id}/chunking-config`,
+    method: "put",
+    data: { chunking_config: data.chunking_config }
+  })
+}
+
+// 获取文档分块配置
+export function getDocumentChunkingConfigApi(doc_id: string) {
+  return request({
+    url: `/api/v1/documents/${doc_id}/chunking-config`,
+    method: "get"
+  })
+}

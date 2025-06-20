@@ -27,6 +27,8 @@ import { nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, react
 import "element-plus/dist/index.css"
 import "element-plus/theme-chalk/el-message-box.css"
 import "element-plus/theme-chalk/el-message.css"
+import PreviewDialog from './previewDialog.vue'
+import ChunkingRulesDialog from './ChunkingRulesDialog.vue'
 
 defineOptions({
   // 命名当前组件
@@ -39,6 +41,11 @@ const createDialogVisible = ref(false)
 const uploadLoading = ref(false)
 const showParseProgress = ref(false)
 const currentDocId = ref("")
+
+// 分块规则对话框相关状态
+const chunkingRulesVisible = ref(false)
+const currentChunkingDocId = ref("")
+const currentChunkingDocName = ref("")
 
 // 添加清理函数
 function cleanupResources() {
@@ -57,6 +64,7 @@ function cleanupResources() {
   createDialogVisible.value = false
   addDocumentDialogVisible.value = false
   showParseProgress.value = false
+  chunkingRulesVisible.value = false
 }
 
 // 在组件停用时清理资源
@@ -335,7 +343,7 @@ function handleBatchParse() {
       dangerouslyUseHTMLString: true // 允许使用 HTML 标签
     }
   ).then(async () => {
-    batchParsingLoading.value = true // 标记“正在启动”状态
+    batchParsingLoading.value = true // 标记"正在启动"状态
     batchProgress.value = null
     try {
       const res = await startSequentialBatchParseAsyncApi(kbId)
@@ -345,19 +353,19 @@ function handleBatchParse() {
         ElMessage.success(res.data.message || `已成功启动批量解析任务`)
         // --- 关键：启动轮询来监控进度 ---
         startBatchPolling()
-        // 可以在启动后稍微延迟一下再刷新列表，尝试显示“解析中”的状态
+        // 可以在启动后稍微延迟一下再刷新列表，尝试显示"解析中"的状态
         setTimeout(getDocumentList, 1500)
       } else {
         // 启动 API 本身调用失败，或后端返回了错误
         const errorMsg = res.data?.message || res.message || "启动批量解析任务失败"
         ElMessage.error(errorMsg)
-        batchParsingLoading.value = false // 启动失败，取消“正在启动”状态
+        batchParsingLoading.value = false // 启动失败，取消"正在启动"状态
       }
     } catch (error: any) {
       // 请求启动 API 时发生网络错误或其他异常
       ElMessage.error(`启动批量解析任务时出错: ${error?.message || "网络错误"}`)
       console.error("启动批量解析任务失败:", error)
-      batchParsingLoading.value = false // 启动异常，取消“正在启动”状态
+      batchParsingLoading.value = false // 启动异常，取消"正在启动"状态
     } finally {
       // 只有在 *没有* 成功启动轮询的情况下，才将 batchParsingLoading 设置为 false
       // 如果轮询已开始，则由 isBatchPolling 状态控制按钮和界面的显示
@@ -366,7 +374,7 @@ function handleBatchParse() {
       }
     }
   }).catch(() => {
-    // 用户点击了“取消”按钮
+    // 用户点击了"取消"按钮
     ElMessage.info("已取消批量解析操作")
   })
 }
@@ -490,6 +498,20 @@ function handleRemoveDocument(row: any) {
   }).catch(() => {
     // 用户取消操作
   })
+}
+
+// 处理分块规则配置
+function handleChunkingRules(row: any) {
+  currentChunkingDocId.value = row.id
+  currentChunkingDocName.value = row.name
+  chunkingRulesVisible.value = true
+}
+
+// 分块规则配置成功后的回调
+function handleChunkingRulesSuccess() {
+  ElMessage.success("分块配置已更新")
+  // 刷新文档列表以显示可能的变化
+  getDocumentList()
 }
 
 // 添加文档对话框
@@ -961,7 +983,7 @@ function shouldShowProgressCount(status: string) {
                 {{ scope.row.create_date }}
               </template>
             </el-table-column>
-            <el-table-column fixed="right" label="操作" width="180" align="center">
+            <el-table-column fixed="right" label="操作" width="280" align="center">
               <template #default="scope">
                 <el-button
                   type="primary"
@@ -1102,7 +1124,7 @@ function shouldShowProgressCount(status: string) {
                   </el-tag>
                 </template>
               </el-table-column>
-              <el-table-column label="操作" width="200" align="center">
+              <el-table-column label="操作" width="280" align="center">
                 <template #default="scope">
                   <el-button
                     type="success"
@@ -1111,6 +1133,14 @@ function shouldShowProgressCount(status: string) {
                     @click="handleParseDocument(scope.row)"
                   >
                     解析
+                  </el-button>
+                  <el-button
+                    type="primary"
+                    size="small"
+                    :icon="Setting"
+                    @click="handleChunkingRules(scope.row)"
+                  >
+                    分块规则
                   </el-button>
                   <el-button
                     type="danger"
@@ -1301,6 +1331,12 @@ function shouldShowProgressCount(status: string) {
       @close="showParseProgress = false"
       @parse-complete="handleParseComplete"
       @parse-failed="handleParseFailed"
+    />
+    <ChunkingRulesDialog
+      v-model:visible="chunkingRulesVisible"
+      :document-id="currentChunkingDocId"
+      :document-name="currentChunkingDocName"
+      @success="handleChunkingRulesSuccess"
     />
   </div>
 </template>

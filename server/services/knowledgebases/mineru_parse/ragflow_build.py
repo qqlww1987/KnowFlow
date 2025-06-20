@@ -2,11 +2,12 @@ from ragflow_sdk import RAGFlow
 import os
 import time
 import shutil
+import json
 from dotenv import load_dotenv
 from .minio_server import upload_directory_to_minio
 from .mineru_test import update_markdown_image_urls
 from .utils import split_markdown_to_chunks_configured, get_bbox_for_chunk, update_document_progress, should_cleanup_temp_files
-from database import get_es_client
+from database import get_es_client, get_db_connection
 
 def _validate_environment():
     """验证环境变量配置"""
@@ -36,6 +37,34 @@ def get_ragflow_doc(doc_id, kb_id):
     if not docs:
         raise Exception(f"未找到文档 {doc_id}")
     return docs[0]
+
+def _get_document_chunking_config(doc_id):
+    """从数据库获取文档的分块配置"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT parser_config FROM document WHERE id = %s", (doc_id,))
+        result = cursor.fetchone()
+        
+        if result and result[0]:
+            parser_config = json.loads(result[0])
+            chunking_config = parser_config.get('chunking_config')
+            if chunking_config:
+                print(f"🔧 [DEBUG] 从数据库获取到分块配置: {chunking_config}")
+                return chunking_config
+        
+        print(f"📄 [DEBUG] 文档 {doc_id} 没有自定义分块配置，使用默认配置")
+        return None
+        
+    except Exception as e:
+        print(f"⚠️ [WARNING] 获取文档分块配置失败: {e}")
+        return None
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 def add_chunks_to_doc(doc, chunks, update_progress):
     update_progress(0.8, "添加 chunk 到文档...")
@@ -108,8 +137,22 @@ def create_ragflow_resources(doc_id, kb_id, md_file_path, image_dir, update_prog
 
         _upload_images(kb_id, image_dir, update_progress)
 
+        # 获取文档的分块配置
+        chunking_config = _get_document_chunking_config(doc_id)
+        
         enhanced_text = update_markdown_image_urls(md_file_path, kb_id)
-        chunks = split_markdown_to_chunks_configured(enhanced_text, chunk_token_num=256)
+        
+        # 传递分块配置给分块函数
+        if chunking_config:
+            chunks = split_markdown_to_chunks_configured(
+                enhanced_text, 
+                chunk_token_num=chunking_config.get('chunk_token_num', 256),
+                min_chunk_tokens=chunking_config.get('min_chunk_tokens', 10),
+                chunking_config=chunking_config
+            )
+        else:
+            chunks = split_markdown_to_chunks_configured(enhanced_text, chunk_token_num=256)
+        
         chunk_content_to_index = {chunk: i for i, chunk in enumerate(chunks)}
 
         add_chunks_to_doc(doc, chunks, update_progress)

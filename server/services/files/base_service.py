@@ -1,5 +1,5 @@
-from peewee import Model
-from typing import Type, TypeVar, Dict, Any
+from peewee import Model, DoesNotExist
+from typing import Type, TypeVar, Dict, Any, Optional
 
 T = TypeVar('T', bound=Model)
 
@@ -7,8 +7,12 @@ class BaseService:
     model: Type[T]
     
     @classmethod
-    def get_by_id(cls, id: str) -> T:
-        return cls.model.get_by_id(id)
+    def get_by_id(cls, id: str) -> Optional[T]:
+        """根据ID获取记录，如果不存在返回None"""
+        try:
+            return cls.model.get_by_id(id)
+        except DoesNotExist:
+            return None
     
     @classmethod 
     def insert(cls, data: Dict[str, Any]) -> T:

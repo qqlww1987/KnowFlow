@@ -67,53 +67,105 @@ def split_markdown_to_chunks_configured(txt, chunk_token_num=256, min_chunk_toke
     - 'basic': split_markdown_to_chunks (基础分块)
     
     可通过环境变量 CHUNK_METHOD 配置，支持的值：advanced, smart, basic
+    也可通过kwargs传入自定义配置：
+    - chunking_config: 分块配置字典，包含strategy等字段
     """
-    # 首先检查是否启用了严格正则分块模式 - 修复：使用CONFIG而不是APP_CONFIG
-    strict_regex_split = getattr(CONFIG, 'chunking', None)
-    if strict_regex_split and hasattr(strict_regex_split, 'strict_regex_split'):
-        strict_regex_split = strict_regex_split.strict_regex_split
-    else:
-        strict_regex_split = False
+    # 添加调试打印
+    print("=" * 80)
+    print("🔍 [DEBUG] split_markdown_to_chunks_configured 调用参数:")
+    print(f"📝 文本长度: {len(txt) if txt else 0} 字符")
+    print(f"🔢 chunk_token_num: {chunk_token_num}")
+    print(f"🔢 min_chunk_tokens: {min_chunk_tokens}")
+    print(f"📋 kwargs 键值对:")
+    for key, value in kwargs.items():
+        if key == 'chunking_config' and isinstance(value, dict):
+            print(f"  📌 {key}:")
+            for sub_key, sub_value in value.items():
+                print(f"    🔸 {sub_key}: {sub_value}")
+        else:
+            print(f"  📌 {key}: {value}")
+    print("=" * 80)
     
-    if strict_regex_split:
-        # 如果启用了严格正则分块，直接使用该模式，忽略其他配置
-        return split_markdown_to_chunks_strict_regex(txt, chunk_token_num, min_chunk_tokens)
+    # 检查是否有自定义的分块配置（从文档配置传入）
+    custom_chunking_config = kwargs.get('chunking_config', None)
     
-    # 否则按原有逻辑选择分块方法
-    method = get_configured_chunk_method()
-    
-    if method == 'advanced':
-        # 提取 advanced 方法特有的参数
-        include_metadata = kwargs.pop('include_metadata', False)
-        overlap_ratio = kwargs.pop('overlap_ratio', 0.0)
+    if custom_chunking_config:
+        print(f"🎯 [DEBUG] 使用自定义分块配置: {custom_chunking_config}")
+        # 使用文档级别的分块配置
+        strategy = custom_chunking_config.get('strategy', 'smart')
+        chunk_token_num = custom_chunking_config.get('chunk_token_num', chunk_token_num)
+        min_chunk_tokens = custom_chunking_config.get('min_chunk_tokens', min_chunk_tokens)
         
-        return split_markdown_to_chunks_advanced(
-            txt, 
-            chunk_token_num=chunk_token_num, 
-            min_chunk_tokens=min_chunk_tokens,
-            overlap_ratio=overlap_ratio,
-            include_metadata=include_metadata
-        )
-    elif method == 'smart':
-        return split_markdown_to_chunks_smart(
-            txt, 
-            chunk_token_num=chunk_token_num, 
-            min_chunk_tokens=min_chunk_tokens
-        )
-    elif method == 'basic':
-        delimiter = kwargs.get('delimiter', "\n!?。；！？")
-        return split_markdown_to_chunks(
-            txt, 
-            chunk_token_num=chunk_token_num,
-            delimiter=delimiter
-        )
+        print(f"🚀 [DEBUG] 最终分块参数:")
+        print(f"  📋 策略: {strategy}")
+        print(f"  🔢 分块大小: {chunk_token_num}")
+        print(f"  🔢 最小分块: {min_chunk_tokens}")
+        
+        # 其他策略的处理
+        if strategy == 'advanced':
+            include_metadata = kwargs.pop('include_metadata', False)
+            overlap_ratio = kwargs.pop('overlap_ratio', 0.0)
+            print(f"  🎯 使用高级分块策略")
+            return split_markdown_to_chunks_advanced(
+                txt, 
+                chunk_token_num=chunk_token_num, 
+                min_chunk_tokens=min_chunk_tokens,
+                overlap_ratio=overlap_ratio,
+                include_metadata=include_metadata
+            )
+
+        elif strategy == 'strict_regex':
+            regex_pattern = custom_chunking_config.get('regex_pattern', '')
+            print(f"  🎯 使用正则分块策略, 模式: {regex_pattern}")
+            if regex_pattern:
+                return split_markdown_to_chunks_strict_regex_custom(
+                    txt, chunk_token_num, min_chunk_tokens, regex_pattern
+                )
+            else:
+                print(f"  ⚠️ 正则表达式为空，回退到智能分块")
+                # 如果没有正则表达式，回退到智能分块
+                return split_markdown_to_chunks_smart(txt, chunk_token_num, min_chunk_tokens)
+
+        elif strategy == 'smart':
+            print(f"  🎯 使用智能分块策略")
+            return split_markdown_to_chunks_smart(
+                txt, 
+                chunk_token_num=chunk_token_num, 
+                min_chunk_tokens=min_chunk_tokens
+            )
+        elif strategy == 'basic':
+            delimiter = custom_chunking_config.get('delimiter', "\n!?。；！？")
+            print(f"  🎯 使用基础分块策略, 分隔符: {delimiter}")
+            return split_markdown_to_chunks(
+                txt, 
+                chunk_token_num=chunk_token_num,
+                delimiter=delimiter
+            )
     else:
-        # 默认回退到 smart 方法
-        return split_markdown_to_chunks_smart(
-            txt, 
-            chunk_token_num=chunk_token_num, 
-            min_chunk_tokens=min_chunk_tokens
-        )
+        print(f"🔄 [DEBUG] 使用默认配置 - 环境变量或回退到智能分块")
+        # 原有的环境变量配置逻辑...
+        method = get_configured_chunk_method()
+        print(f"  📊 环境配置方法: {method}")
+        
+        if method == 'advanced':
+            include_metadata = kwargs.pop('include_metadata', False)
+            overlap_ratio = kwargs.pop('overlap_ratio', 0.0)
+            return split_markdown_to_chunks_advanced(
+                txt, 
+                chunk_token_num=chunk_token_num, 
+                min_chunk_tokens=min_chunk_tokens,
+                overlap_ratio=overlap_ratio,
+                include_metadata=include_metadata
+            )
+        elif method == 'basic':
+            delimiter = kwargs.pop('delimiter', "\n!?。；！？")
+            return split_markdown_to_chunks(
+                txt, 
+                chunk_token_num=chunk_token_num,
+                delimiter=delimiter
+            )
+        else:  # 默认使用智能分块
+            return split_markdown_to_chunks_smart(txt, chunk_token_num, min_chunk_tokens)
 
 
 def singleton(cls, *args, **kw):
@@ -1318,4 +1370,73 @@ def split_markdown_to_chunks_strict_regex(txt, chunk_token_num=256, min_chunk_to
             return split_markdown_to_chunks_smart(txt, chunk_token_num, min_chunk_tokens)
     else:
         # 如果没有配置正则表达式，回退到智能分块
+        return split_markdown_to_chunks_smart(txt, chunk_token_num, min_chunk_tokens)
+
+
+def split_markdown_to_chunks_strict_regex_custom(txt, chunk_token_num=256, min_chunk_tokens=10, regex_pattern=''):
+    """
+    使用自定义正则表达式进行严格分块
+    
+    Args:
+        txt: 要分块的文本
+        chunk_token_num: 目标分块大小（tokens）
+        min_chunk_tokens: 最小分块大小（tokens）
+        regex_pattern: 自定义正则表达式
+        
+    Returns:
+        分块列表
+    """
+    if not txt or not txt.strip():
+        return []
+    
+    if not regex_pattern or not regex_pattern.strip():
+        print(f"⚠️ [WARNING] 正则表达式为空，回退到智能分块")
+        return split_markdown_to_chunks_smart(txt, chunk_token_num, min_chunk_tokens)
+    
+    try:
+        print(f"🎯 [DEBUG] 使用自定义正则表达式进行分块: {regex_pattern}")
+        
+        # 使用更精确的方法：逐行处理，确保每个匹配都开始新分块
+        # 优化正则表达式，只匹配行开头或前面只有空格的条文
+        precise_pattern = r'^\s*' + regex_pattern
+        
+        lines = txt.split('\n')
+        chunks = []
+        current_chunk = []
+        
+        for line in lines:
+            # 检查当前行是否以正则表达式匹配开始（真正的条文开始）
+            if re.search(precise_pattern, line) and current_chunk:
+                # 如果当前行包含匹配且当前已有内容，先保存当前分块
+                chunk_content = '\n'.join(current_chunk).strip()
+                if chunk_content:
+                    chunks.append(chunk_content)
+                
+                # 开始新分块
+                current_chunk = [line]
+            else:
+                # 将当前行添加到当前分块
+                current_chunk.append(line)
+        
+        # 添加最后一个分块
+        if current_chunk:
+            chunk_content = '\n'.join(current_chunk).strip()
+            if chunk_content:
+                chunks.append(chunk_content)
+        
+        # 过滤和统计
+        final_chunks = [chunk for chunk in chunks if chunk.strip()]
+        
+        print(f"📊 [DEBUG] 正则分块结果: {len(final_chunks)} 个分块")
+        if final_chunks:
+            token_counts = [num_tokens_from_string(chunk) for chunk in final_chunks]
+            print(f"📈 [DEBUG] Token分布: {min(token_counts)}-{max(token_counts)} (平均: {sum(token_counts)/len(token_counts):.1f})")
+        
+        return final_chunks
+        
+    except re.error as e:
+        print(f"❌ [ERROR] 自定义正则分块失败，正则表达式错误: {e}，回退到智能分块")
+        return split_markdown_to_chunks_smart(txt, chunk_token_num, min_chunk_tokens)
+    except Exception as e:
+        print(f"❌ [ERROR] 自定义正则分块发生异常: {e}，回退到智能分块")
         return split_markdown_to_chunks_smart(txt, chunk_token_num, min_chunk_tokens)
