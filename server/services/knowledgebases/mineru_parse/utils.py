@@ -18,6 +18,7 @@ import os
 import tiktoken
 import tempfile
 import json
+import re
 from markdown import markdown as md_to_html
 import time
 import difflib
@@ -29,7 +30,7 @@ except ImportError:
     MARKDOWN_IT_AVAILABLE = False
     print("Warning: markdown-it-py not available. Please install with: pip install markdown-it-py")
 
-from ...config import APP_CONFIG
+from ...config import CONFIG, APP_CONFIG
 
 
 # 分块模式配置
@@ -60,12 +61,25 @@ def split_markdown_to_chunks_configured(txt, chunk_token_num=256, min_chunk_toke
     根据配置选择合适的分块方法的统一接口
     
     支持的分块方法：
+    - 'strict_regex': 严格按正则表达式分块（当配置启用时）
     - 'advanced': split_markdown_to_chunks_advanced (高级分块，混合策略)
     - 'smart': split_markdown_to_chunks_smart (智能分块，基于AST，默认)
     - 'basic': split_markdown_to_chunks (基础分块)
     
     可通过环境变量 CHUNK_METHOD 配置，支持的值：advanced, smart, basic
     """
+    # 首先检查是否启用了严格正则分块模式 - 修复：使用CONFIG而不是APP_CONFIG
+    strict_regex_split = getattr(CONFIG, 'chunking', None)
+    if strict_regex_split and hasattr(strict_regex_split, 'strict_regex_split'):
+        strict_regex_split = strict_regex_split.strict_regex_split
+    else:
+        strict_regex_split = False
+    
+    if strict_regex_split:
+        # 如果启用了严格正则分块，直接使用该模式，忽略其他配置
+        return split_markdown_to_chunks_strict_regex(txt, chunk_token_num, min_chunk_tokens)
+    
+    # 否则按原有逻辑选择分块方法
     method = get_configured_chunk_method()
     
     if method == 'advanced':
@@ -1248,3 +1262,60 @@ def _get_most_relevant_header(headers):
     # 选择最深层级的标题作为上下文
     max_level = max(headers.keys())
     return f"{'#' * max_level} {headers[max_level]}"
+
+
+def split_markdown_to_chunks_strict_regex(txt, chunk_token_num=256, min_chunk_tokens=10):
+    """
+    严格按配置的正则表达式进行分块，忽略token数量限制
+    1. 应用正则表达式分段（如果配置了）
+    2. 严格按分段结果分块，每个正则表达式匹配项都会开始新的分块
+    """
+    if not txt or not txt.strip():
+        return []
+    
+    # 获取分段配置 - 只获取正则表达式配置
+    chunking_config = getattr(CONFIG, 'chunking', None)
+    if chunking_config:
+        regex_pattern = chunking_config.regex_pattern if hasattr(chunking_config, 'regex_pattern') else ''
+    else:
+        regex_pattern = ''
+    
+    # 严格按正则表达式进行分块
+    if regex_pattern and regex_pattern.strip():
+        try:
+            # 使用更精确的方法：逐行处理，确保每个匹配都开始新分块
+            # 优化正则表达式，只匹配行开头或前面只有空格的条文
+            precise_pattern = r'^\s*' + regex_pattern
+            
+            lines = txt.split('\n')
+            chunks = []
+            current_chunk = []
+            
+            for line in lines:
+                # 检查当前行是否以正则表达式匹配开始（真正的条文开始）
+                if re.search(precise_pattern, line) and current_chunk:
+                    # 如果当前行包含匹配且当前已有内容，先保存当前分块
+                    chunk_content = '\n'.join(current_chunk).strip()
+                    if chunk_content:
+                        chunks.append(chunk_content)
+                    
+                    # 开始新分块
+                    current_chunk = [line]
+                else:
+                    # 将当前行添加到当前分块
+                    current_chunk.append(line)
+            
+            # 添加最后一个分块
+            if current_chunk:
+                chunk_content = '\n'.join(current_chunk).strip()
+                if chunk_content:
+                    chunks.append(chunk_content)
+            
+            return [chunk for chunk in chunks if chunk.strip()]
+            
+        except re.error as e:
+            print(f"严格正则分块失败，正则表达式错误: {e}，回退到智能分块")
+            return split_markdown_to_chunks_smart(txt, chunk_token_num, min_chunk_tokens)
+    else:
+        # 如果没有配置正则表达式，回退到智能分块
+        return split_markdown_to_chunks_smart(txt, chunk_token_num, min_chunk_tokens)

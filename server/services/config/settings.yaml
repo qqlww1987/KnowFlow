@@ -14,13 +14,13 @@ app:
   # 开发模式
   # true: 启用开发模式，跳过某些耗时步骤，输出更详细的日志。
   # false: 生产模式。
-  dev_mode: false
+  dev_mode: true
 
   # 临时文件清理
   # true: 在处理完成后自动清理临时文件（如上传的原始文件、中间文件）。
   # false: 保留临时文件，便于调试。
   # 注意：在开发模式下，此项默认为 false，但仍可被环境变量覆盖。
-  cleanup_temp_files: true
+  cleanup_temp_files: false
 
   # 全局分块方法
   # 'smart': 智能分块，基于AST的语义分块（默认推荐）。
@@ -57,3 +57,19 @@ excel:
 
   # 是否在HTML分块中尽量保持表格结构
   preserve_table_structure: true
+
+# 分块预分段配置
+chunking:
+  # 正则表达式分段模式（可选，为空则不使用正则表达式分段）
+  # 示例: r'第[一二三四五六七八九十\d]+条|第[一二三四五六七八九十\d]+[章节]|#{1,6}\s+'
+  regex_pattern: "第[零一二三四五六七八九十百千万\\d]+条"
+  
+  # 普通分段标识符
+  # 包含换行符和常见的中英文标点符号
+  delimiter: "\n!?;。；！？"
+  
+  # 严格按正则表达式分块模式
+  # true: 严格按照regex_pattern分块，每个匹配项开始新的分块，忽略token数量限制
+  # false: 正常模式，在预分段的基础上再考虑token限制进行分块（默认）
+  # 注意：启用此模式时，某些分块可能会很大或很小，适用于法律文档等需要保持条文完整性的场景
+  strict_regex_split: true
