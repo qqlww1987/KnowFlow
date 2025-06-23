@@ -23,3 +23,4 @@ Pillow
 PyYAML
 pydantic
 openpyxl
+pymysql>=1.1.0
