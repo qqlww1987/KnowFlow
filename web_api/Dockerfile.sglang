@@ -1,32 +1,19 @@
-# 使用官方的sglang镜像作为基础
+# 使用官方的sglang镜像作为基础（已包含sglang 0.4.7）
 FROM lmsysorg/sglang:v0.4.7-cu124
 
 # 设置时区
 ENV TZ=Asia/Shanghai
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# 安装系统依赖（如果需要）
-RUN apt-get update && apt-get install -y \
-    libgl1-mesa-glx \
-    libgl1-mesa-dev \
-    libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender-dev \
-    && rm -rf /var/lib/apt/lists/*
-
 # 设置pip镜像源（加速安装）
 RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 
-# 安装mineru[all]而不是core版本，包含所有功能
-RUN python3 -m pip install -U 'mineru[all]' --break-system-packages
+# 只安装MinerU和web服务依赖（sglang已经在基础镜像中）
+RUN python3 -m pip install -U 'mineru[all]' fastapi uvicorn python-multipart --break-system-packages
 
-# 安装web服务相关依赖
-RUN python3 -m pip install fastapi uvicorn python-multipart --break-system-packages
-
-# 验证sglang和mineru安装
-RUN python3 -c "import sglang; print(f'✅ sglang {sglang.__version__} ready')" && \
-    python3 -c "import mineru; print('✅ mineru ready')"
+# 验证安装
+RUN python3 -c "import sglang; print(f'✅ sglang {sglang.__version__} (from base image)')" && \
+    python3 -c "import mineru; print('✅ mineru installed')"
 
 # 设置工作目录
 WORKDIR /app
