@@ -1,0 +1,28 @@
+# 纯sglang服务器 - 按照官方示例
+FROM lmsysorg/sglang:v0.4.7-cu124
+
+# 设置时区
+ENV TZ=Asia/Shanghai
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+# 设置pip镜像源
+RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 安装mineru[all]获得完整功能
+RUN python3 -m pip install -U 'mineru[all]' --break-system-packages
+
+# 下载模型并更新配置文件
+RUN /bin/bash -c "mineru-models-download -s modelscope -m all"
+
+# 验证安装
+RUN python3 -c "import sglang; print(f'sglang {sglang.__version__} ready')" && \
+    python3 -c "import mineru; print('mineru ready')"
+
+# 设置环境变量
+ENV MINERU_MODEL_SOURCE=local
+
+# 暴露端口
+EXPOSE 30000
+
+# 设置入口点以激活虚拟环境并运行命令行工具
+ENTRYPOINT ["/bin/bash", "-c", "export MINERU_MODEL_SOURCE=local && exec \"$@\"", "--"] 

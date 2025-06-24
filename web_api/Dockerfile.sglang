@@ -1,58 +1,44 @@
-# 使用CUDA 12开发版镜像，支持sglang
-FROM nvidia/cuda:12.1-devel-ubuntu22.04
+# 使用官方的sglang镜像作为基础
+FROM lmsysorg/sglang:v0.4.7-cu124
 
+# 设置时区
 ENV TZ=Asia/Shanghai
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# 设置构建参数
-ARG INSTALL_TYPE=all
-
-# 设置CUDA环境变量
-ENV CUDA_HOME=/usr/local/cuda
-ENV PATH=${CUDA_HOME}/bin:${PATH}
-ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
-
-# 安装系统依赖
+# 安装系统依赖（如果需要）
 RUN apt-get update && apt-get install -y \
-    python3 \
-    python3-pip \
-    python3-dev \
-    build-essential \
-    cmake \
-    git \
-    wget \
-    curl \
     libgl1-mesa-glx \
     libgl1-mesa-dev \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
     libxrender-dev \
-    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
-# 设置pip镜像源
+# 设置pip镜像源（加速安装）
 RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
-RUN pip3 install --upgrade pip
 
+# 安装mineru[all]而不是core版本，包含所有功能
+RUN python3 -m pip install -U 'mineru[all]' --break-system-packages
+
+# 安装web服务相关依赖
+RUN python3 -m pip install fastapi uvicorn python-multipart --break-system-packages
+
+# 验证sglang和mineru安装
+RUN python3 -c "import sglang; print(f'✅ sglang {sglang.__version__} ready')" && \
+    python3 -c "import mineru; print('✅ mineru ready')"
+
+# 设置工作目录
 WORKDIR /app
-
-# 安装PyTorch (CUDA 12版本)
-RUN pip3 install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-
-# 安装sglang和mineru
-RUN pip3 install --no-cache-dir "sglang[all]==0.4.7" && \
-    pip3 install --no-cache-dir "mineru[all]" && \
-    pip3 install --no-cache-dir fastapi uvicorn python-multipart && \
-    python3 -c "import sglang; print(f'✅ sglang {sglang.__version__} installed successfully')"
 
 # 复制应用代码
 COPY . .
+
+# 设置启动脚本权限
 RUN chmod +x start_services.sh
 
-# 预热模型（可选）
-RUN echo "Pre-downloading models..." && \
-    python3 -c "import os; os.environ['MINERU_MODEL_SOURCE'] = 'modelscope'" && \
+# 下载模型（使用modelscope源）
+RUN export MINERU_MODEL_SOURCE=modelscope && \
     mineru-models-download -s modelscope -m pipeline || echo "Model download will happen on first use"
 
 # 设置环境变量
@@ -62,7 +48,5 @@ ENV MINERU_MODEL_SOURCE=modelscope
 # 暴露端口
 EXPOSE 8888 30000
 
-# 清理缓存
-RUN pip3 cache purge && apt-get clean
-
+# 使用我们的启动脚本
 CMD ["./start_services.sh"] 
