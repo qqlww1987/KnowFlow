@@ -384,44 +384,130 @@ _blocks_cache = {}
 def get_blocks_from_md(md_file_path):
     if md_file_path in _blocks_cache:
         return _blocks_cache[md_file_path]
+    
     json_path = md_file_path.replace('.md', '_middle.json')
-    with open(json_path, 'r') as f:
-        data = json.load(f)
-        block_list = []
-        for page_idx, page in enumerate(data['pdf_info']):
-            for block in page['preproc_blocks']:
-                bbox = block.get('bbox')
-                if not bbox:
-                    continue
-
-                if block['type'] in ('text', 'title'):
-                    for line in block.get('lines', []):
-                        for span in line.get('spans', []):
-                            content = span.get('content', '').strip()
-                            if content:
-                                block_list.append({'content': content, 'bbox': bbox, 'page_number': page_idx })
+    try:
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+            block_list = []
+            
+            # 检查数据结构类型
+            if 'pdf_info' not in data:
+                print(f"[WARNING] 无效的数据结构: 缺少 pdf_info 字段")
+                _blocks_cache[md_file_path] = []
+                return []
+            
+            for page_idx, page in enumerate(data['pdf_info']):
+                # Pipeline模式：有preproc_blocks字段
+                if 'preproc_blocks' in page:
+                    print(f"[INFO] 检测到Pipeline模式数据结构")
+                    for block in page['preproc_blocks']:
+                        bbox = block.get('bbox')
+                        if not bbox:
+                            continue
+                        
+                        # 提取文本内容
+                        text_content = ''
+                        if 'lines' in block:
+                            for line in block['lines']:
+                                if 'spans' in line:
+                                    for span in line['spans']:
+                                        if 'content' in span:
+                                            text_content += span['content']
+                        
+                        block_data = {
+                            'bbox': bbox,
+                            'type': block.get('type', 'unknown'),
+                            'text': text_content.strip(),
+                            'page_idx': page_idx,
+                            'index': block.get('index', 0),
+                            'source_mode': 'pipeline'
+                        }
+                        block_list.append(block_data)
                 
-                elif block['type'] == 'table':
-                    html_content = ""
-                    # Traverse the nested structure to find the HTML content
-                    for inner_block in block.get('blocks', []):
-                        for line in inner_block.get('lines', []):
-                            for span in line.get('spans', []):
-                                if 'html' in span:
-                                    html_content = span.get('html', '').strip()
-                                    if html_content:
-                                        break  # Exit spans loop
-                            if html_content:
-                                break  # Exit lines loop
-                        if html_content:
-                            break  # Exit inner_blocks loop
+                # VLM模式：使用para_blocks字段（数组格式）
+                elif 'para_blocks' in page:
+                    print(f"[INFO] 检测到VLM模式数据结构")
+                    para_blocks = page['para_blocks']
+                    if isinstance(para_blocks, list):
+                        # VLM模式: para_blocks是数组
+                        for block in para_blocks:
+                            bbox = block.get('bbox')
+                            if not bbox:
+                                continue
+                            
+                            # 提取文本内容
+                            text_content = ''
+                            if 'lines' in block:
+                                for line in block['lines']:
+                                    if 'spans' in line:
+                                        for span in line['spans']:
+                                            if 'content' in span:
+                                                text_content += span['content']
+                            
+                            block_data = {
+                                'bbox': bbox,
+                                'type': block.get('type', 'unknown'),
+                                'text': text_content.strip(),
+                                'page_idx': page_idx,
+                                'index': block.get('index', 0),
+                                'source_mode': 'vlm'
+                            }
+                            block_list.append(block_data)
+                    else:
+                        print(f"[WARNING] VLM模式para_blocks格式异常，期望数组但得到: {type(para_blocks)}")
+                
+                else:
+                    print(f"[WARNING] 第{page_idx}页缺少preproc_blocks和para_blocks字段")
+                    # 尝试其他可能的字段名
+                    possible_fields = ['blocks', 'text_blocks', 'content_blocks']
+                    found = False
+                    for field_name in possible_fields:
+                        if field_name in page:
+                            print(f"[INFO] 尝试使用字段: {field_name}")
+                            found = True
+                            break
                     
-                    if html_content:
-                        # Use the top-level block's bbox for the entire table
-                        block_list.append({'content': html_content, 'bbox': bbox, 'page_number': page_idx })
+                    if not found:
+                        print(f"[WARNING] 无法识别页面数据结构，跳过第{page_idx}页")
+            
+            print(f"[INFO] 从{json_path}提取了{len(block_list)}个块")
+            _blocks_cache[md_file_path] = block_list
+            return block_list
+            
+    except FileNotFoundError:
+        print(f"[WARNING] JSON文件不存在: {json_path}")
+        _blocks_cache[md_file_path] = []
+        return []
+    except json.JSONDecodeError as e:
+        print(f"[ERROR] JSON解析失败: {e}")
+        _blocks_cache[md_file_path] = []
+        return []
+    except Exception as e:
+        print(f"[ERROR] 获取块列表失败: {e}")
+        _blocks_cache[md_file_path] = []
+        return []
 
-    _blocks_cache[md_file_path] = block_list
-    return block_list
+def longest_common_substring_length(str1, str2):
+    """计算两个字符串的最长公共子串长度"""
+    if not str1 or not str2:
+        return 0
+    
+    m, n = len(str1), len(str2)
+    # 创建DP表
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+    max_length = 0
+    
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if str1[i-1] == str2[j-1]:
+                dp[i][j] = dp[i-1][j-1] + 1
+                max_length = max(max_length, dp[i][j])
+            else:
+                dp[i][j] = 0
+    
+    return max_length
+
 
 def get_bbox_for_chunk(md_file_path, chunk_content):
     """
@@ -429,101 +515,89 @@ def get_bbox_for_chunk(md_file_path, chunk_content):
     该算法采用混合评分机制寻找最佳"锚点" block，该评分兼顾了最长公共子串的长度和其占 block 自身长度的比例。
     然后从该锚点向前后扩展，寻找同样存在于 chunk 中的连续 block。
     这旨在平衡精确匹配和部分（截断）匹配的场景。
+    
+    支持Pipeline模式和VLM模式的数据结构。
     """
-    block_list = get_blocks_from_md(md_file_path)
-    if not block_list:
-        return None
+    try:
+        block_list = get_blocks_from_md(md_file_path)
+        if not block_list:
+            print(f"[WARNING] 无法获取块列表，跳过位置信息获取")
+            return None
 
-    chunk_content_clean = chunk_content.strip()
-    if not chunk_content_clean:
-        return None
+        chunk_content_clean = chunk_content.strip()
+        if not chunk_content_clean:
+            return None
 
-    # Step 1: Find anchor block using a hybrid score that balances match length and match ratio.
-    best_score = -1.0
-    best_match_idx = -1
-
-    for i, block in enumerate(block_list):
-        block_content = block.get('content', '').strip()
-        if not block_content:
-            continue
+        # 检查是否为VLM模式
+        is_vlm_mode = any(block.get('source_mode', '').startswith('vlm') for block in block_list)
         
-        matcher = difflib.SequenceMatcher(None, block_content, chunk_content_clean, autojunk=False)
-        match = matcher.find_longest_match(0, len(block_content), 0, len(chunk_content_clean))
+        if is_vlm_mode:
+            print(f"[INFO] 检测到VLM模式数据，处理坐标信息")
+
+        # 计算每个block与chunk的匹配分数
+        scored_blocks = []
+        for i, block in enumerate(block_list):
+            block_text = block.get('text', '').strip()
+            if not block_text:
+                continue
+            
+            # 计算最长公共子串
+            lcs_length = longest_common_substring_length(chunk_content_clean, block_text)
+            if lcs_length == 0:
+                continue
+                
+            # 混合评分：LCS长度 + 覆盖率
+            coverage_score = lcs_length / len(block_text) if len(block_text) > 0 else 0
+            combined_score = lcs_length * 0.7 + coverage_score * len(block_text) * 0.3
+            
+            scored_blocks.append((i, combined_score, lcs_length))
+
+        if not scored_blocks:
+            print(f"[WARNING] 未找到匹配的块")
+            return None
+
+        # 找到最佳锚点
+        scored_blocks.sort(key=lambda x: x[1], reverse=True)
+        anchor_idx = scored_blocks[0][0]
         
-        if match.size == 0:
-            continue
-
-        lcs_size = match.size
-        # The ratio of the match to the block's own length.
-        # This rewards matches that are more "complete" for a given block.
-        match_ratio = lcs_size / len(block_content)
+        # 从锚点扩展
+        matched_blocks = [block_list[anchor_idx]]
         
-        # The score prioritizes longer matches but is weighted by how much of the block is matched.
-        score = lcs_size * match_ratio
-
-        if score > best_score:
-            best_score = score
-            best_match_idx = i
-
-    # A minimum score to be considered a valid anchor.
-    # A score of 10.0 could mean a 10-char match covering 100% of a block,
-    # or a 20-char match covering 50% of a 40-char block.
-    MIN_ANCHOR_SCORE = 10.0
-    if best_match_idx == -1 or best_score < MIN_ANCHOR_SCORE:
-        return None
-
-    # Step 2: Expand from the anchor block to find a contiguous sequence.
-    # The list of matched blocks will be keyed by index to avoid duplicates.
-    matched_blocks = {best_match_idx: block_list[best_match_idx]}
-
-    # Expand backwards from the anchor
-    for i in range(best_match_idx - 1, -1, -1):
-        block = block_list[i]
-        block_content = block.get('content', '').strip()
-        if not block_content:
-            continue
-
-        matcher = difflib.SequenceMatcher(None, block_content, chunk_content_clean, autojunk=False)
-        match = matcher.find_longest_match(0, len(block_content), 0, len(chunk_content_clean))
+        # 向前扩展
+        for i in range(anchor_idx - 1, -1, -1):
+            block_text = block_list[i].get('text', '').strip()
+            if block_text and block_text in chunk_content_clean:
+                matched_blocks.insert(0, block_list[i])
+            else:
+                break
         
-        # Condition for a neighbor block to be considered part of the chunk
-        MIN_NEIGHBOR_MATCH_LEN = 10
-        MIN_NEIGHBOR_MATCH_RATIO = 0.5 # at least 50% of the block must match
-        if match.size > MIN_NEIGHBOR_MATCH_LEN and (match.size / len(block_content)) >= MIN_NEIGHBOR_MATCH_RATIO:
-            matched_blocks[i] = block
+        # 向后扩展
+        for i in range(anchor_idx + 1, len(block_list)):
+            block_text = block_list[i].get('text', '').strip()
+            if block_text and block_text in chunk_content_clean:
+                matched_blocks.append(block_list[i])
+            else:
+                break
+        
+        # 提取位置信息
+        positions = []
+        for idx, block in enumerate(matched_blocks):
+            bbox = block.get('bbox')
+            page_number = block.get('page_idx')
+            if bbox and page_number is not None:
+                position = [page_number, bbox[0], bbox[2], bbox[1], bbox[3]]
+                positions.append(position)
+        
+        if positions:
+            print(f"[INFO] 为chunk找到{len(positions)}个位置")
+            return positions
         else:
-            break  # Stop if contiguity is broken
-
-    # Expand forwards from the anchor
-    for i in range(best_match_idx + 1, len(block_list)):
-        block = block_list[i]
-        block_content = block.get('content', '').strip()
-        if not block_content:
-            continue
-        
-        matcher = difflib.SequenceMatcher(None, block_content, chunk_content_clean, autojunk=False)
-        match = matcher.find_longest_match(0, len(block_content), 0, len(chunk_content_clean))
-
-        MIN_NEIGHBOR_MATCH_LEN = 10
-        MIN_NEIGHBOR_MATCH_RATIO = 0.5
-        if match.size > MIN_NEIGHBOR_MATCH_LEN and (match.size / len(block_content)) >= MIN_NEIGHBOR_MATCH_RATIO:
-            matched_blocks[i] = block
-        else:
-            break  # Stop if contiguity is broken
-    
-    # Step 3: Format and return the bboxes for the matched contiguous blocks.
-    found_positions = []
-    # Sort indices to maintain original document order.
-    for idx in sorted(matched_blocks.keys()):
-        block = matched_blocks[idx]
-        bbox = block.get('bbox')
-        page_number = block.get('page_number')
-        if bbox and page_number is not None:
-            position = [page_number, bbox[0], bbox[2], bbox[1], bbox[3]]
-            if position not in found_positions:
-                found_positions.append(position)
-    
-    return found_positions if found_positions else None
+            print(f"[WARNING] 未能提取到有效的位置信息")
+            return None
+            
+    except Exception as e:
+        print(f"[ERROR] 获取chunk位置失败: {e}")
+        return None
 
 
 def update_document_progress(doc_id, progress=None, message=None, status=None, run=None, chunk_count=None, process_duration=None):
