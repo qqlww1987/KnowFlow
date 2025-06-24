@@ -1,0 +1,5 @@
+mineru[pipeline]
+
+fastapi
+uvicorn
+python-multipart
