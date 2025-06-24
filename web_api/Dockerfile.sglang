@@ -11,10 +11,6 @@ RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 # 只安装MinerU和web服务依赖（sglang已经在基础镜像中）
 RUN python3 -m pip install -U 'mineru[all]' fastapi uvicorn python-multipart --break-system-packages
 
-# 验证安装
-RUN python3 -c "import sglang; print(f'✅ sglang {sglang.__version__} (from base image)')" && \
-    python3 -c "import mineru; print('✅ mineru installed')"
-
 # 设置工作目录
 WORKDIR /app
 
