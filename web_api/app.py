@@ -1,5 +1,7 @@
 import json
 import os
+import requests
+from urllib.parse import urlparse
 from base64 import b64encode
 from glob import glob
 from typing import Tuple, Union, Optional
@@ -27,6 +29,49 @@ app = FastAPI()
 pdf_extensions = [".pdf"]
 office_extensions = [".ppt", ".pptx", ".doc", ".docx"]
 image_extensions = [".png", ".jpg", ".jpeg"]
+
+def validate_server_url(url: str) -> bool:
+    """
+    验证 server_url 的格式是否正确
+    
+    Args:
+        url: 要验证的 URL
+        
+    Returns:
+        bool: URL 格式是否有效
+    """
+    try:
+        result = urlparse(url)
+        return all([result.scheme, result.netloc])
+    except Exception:
+        return False
+
+
+def check_sglang_server_health(server_url: str, timeout: int = 10) -> Tuple[bool, str]:
+    """
+    检查 SGLang 服务器的健康状态
+    
+    Args:
+        server_url: SGLang 服务器地址
+        timeout: 超时时间（秒）
+        
+    Returns:
+        Tuple[bool, str]: (是否健康, 状态信息)
+    """
+    try:
+        # 尝试连接健康检查端点
+        health_url = f"{server_url.rstrip('/')}/health"
+        response = requests.get(health_url, timeout=timeout)
+        if response.status_code == 200:
+            return True, "SGLang server is healthy"
+        else:
+            return False, f"SGLang server returned status {response.status_code}"
+    except requests.exceptions.Timeout:
+        return False, f"SGLang server health check timeout after {timeout}s"
+    except requests.exceptions.ConnectionError:
+        return False, "Cannot connect to SGLang server"
+    except Exception as e:
+        return False, f"SGLang server health check failed: {str(e)}"
 
 def init_writers(
     file_path: Optional[str] = None,
@@ -144,23 +189,32 @@ def process_file_vlm(
     server_url: Optional[str] = None,
 ):
     """VLM 模式处理函数"""
+    logger.info(f"Starting VLM processing with backend: {backend}")
+    if server_url:
+        logger.info(f"Using server URL: {server_url}")
+    
     processed_bytes = file_bytes
     if file_extension in pdf_extensions:
         processed_bytes = convert_pdf_bytes_to_bytes_by_pypdfium2(file_bytes, 0, None)
+        logger.info("PDF converted to bytes for VLM processing")
     
     # 使用 VLM 后端进行解析
+    logger.info(f"Calling vlm_doc_analyze with backend={backend}, server_url={server_url}")
     middle_json, infer_result = vlm_doc_analyze(
         processed_bytes, 
         image_writer=image_writer, 
         backend=backend, 
         server_url=server_url
     )
+    logger.info("VLM document analysis completed successfully")
     
     pdf_info = middle_json["pdf_info"]
     
     # 生成 markdown 和内容列表
+    logger.info("Generating markdown and content list from VLM results")
     md_content = vlm_union_make(pdf_info, MakeMode.MM_MD, "images")
     content_list = vlm_union_make(pdf_info, MakeMode.CONTENT_LIST, "images")
+    logger.info("Markdown and content list generation completed")
     
     # 构造类似于 pipeline 的 model_json 格式
     model_json = {
@@ -168,6 +222,7 @@ def process_file_vlm(
         "backend": backend
     }
     
+    logger.info(f"VLM processing completed successfully with backend: {backend}")
     return model_json, middle_json, content_list, md_content, processed_bytes, pdf_info
 
 
@@ -182,7 +237,7 @@ def encode_image(image_path: str) -> str:
     tags=["projects"],
     summary="Parse files (supports local files and S3)",
 )
-async def file_parse(
+def file_parse(
     file: Optional[UploadFile] = None,
     file_path: Optional[str] = Form(None),
     backend: str = Form("pipeline"),
@@ -243,11 +298,64 @@ async def file_parse(
             )
 
         # 对于 vlm-sglang-client，server_url 是必需的
-        if backend == "vlm-sglang-client" and not server_url:
-            return JSONResponse(
-                content={"error": "server_url is required for vlm-sglang-client backend"},
-                status_code=400,
-            )
+        if backend == "vlm-sglang-client":
+            # 检查是否提供了 server_url，如果没有则尝试使用环境变量或默认值
+            if not server_url:
+                server_url = os.environ.get("SGLANG_SERVER_URL", os.environ.get("MINERU_VLM_SERVER_URL"))
+                
+                # 如果仍然没有，尝试使用默认的本地地址
+                if not server_url:
+                    default_url = "http://localhost:30000"
+                    logger.info(f"No server_url provided, attempting to use default: {default_url}")
+                    
+                    # 先检查默认地址是否可用
+                    is_default_healthy, _ = check_sglang_server_health(default_url, timeout=3)
+                    if is_default_healthy:
+                        server_url = default_url
+                        logger.info(f"Using default SGLang server at: {default_url}")
+                    else:
+                        # 提供详细的错误信息和解决方案
+                        error_msg = """server_url is required for vlm-sglang-client backend.
+
+解决方案:
+1. 设置环境变量: export SGLANG_SERVER_URL=http://localhost:30000
+2. 在请求中指定参数: -F "server_url=http://localhost:30000"
+3. 确保SGLang服务正在运行: curl http://localhost:30000/health
+
+如果使用Docker完整版，SGLang服务应该自动在30000端口启动。"""
+                        
+                        return JSONResponse(
+                            content={"error": error_msg},
+                            status_code=400,
+                        )
+            
+            # 验证 server_url 格式
+            if not validate_server_url(server_url):
+                return JSONResponse(
+                    content={"error": f"Invalid server_url format: {server_url}. Please provide a valid URL (e.g., http://localhost:30000)"},
+                    status_code=400,
+                )
+            
+            # 检查 SGLang 服务器健康状态
+            logger.info(f"Checking SGLang server health at: {server_url}")
+            is_healthy, health_msg = check_sglang_server_health(server_url)
+            if not is_healthy:
+                logger.warning(f"SGLang server health check failed: {health_msg}")
+                error_msg = f"""SGLang server is not accessible: {health_msg}
+
+故障排除:
+1. 检查SGLang服务是否运行: curl {server_url}/health  
+2. 确认端口是否正确开放
+3. 如果使用Docker，确保使用完整版镜像 (INSTALL_TYPE=all)
+4. 检查防火墙设置
+
+服务器地址: {server_url}"""
+                
+                return JSONResponse(
+                    content={"error": error_msg},
+                    status_code=503,
+                )
+            logger.info(f"SGLang server health check passed: {health_msg}")
 
         # Get PDF filename
         if file_path:

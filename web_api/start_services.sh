@@ -11,10 +11,13 @@ if [ "${INSTALL_TYPE:-core}" = "all" ]; then
     mineru-sglang-server \
         --port 30000 \
         --host 0.0.0.0 \
-        --mem-fraction-static 0.7 \
-        --cuda-graph-max-bs 16 \
+        --mem-fraction-static 0.65 \
+        --max-running-requests 32 \
+        --max-total-tokens 32768 \
+        --chunked-prefill-size 1024 \
+        --cuda-graph-max-bs 8 \
         --disable-cuda-graph \
-        &
+        --trust-remote-code &
     echo "SGLang server started on port 30000"
     
     # 等待SGLang server启动
