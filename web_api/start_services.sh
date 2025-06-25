@@ -8,7 +8,13 @@ export MINERU_MODEL_SOURCE=modelscope
 # 检查INSTALL_TYPE环境变量，决定是否启动SGLang server
 if [ "${INSTALL_TYPE:-core}" = "all" ]; then
     echo "Starting SGLang server in background..."
-    mineru-sglang-server --port 30000 &
+    mineru-sglang-server \
+        --port 30000 \
+        --host 0.0.0.0 \
+        --mem-fraction-static 0.7 \
+        --cuda-graph-max-bs 16 \
+        --disable-cuda-graph \
+        &
     echo "SGLang server started on port 30000"
     
     # 等待SGLang server启动
