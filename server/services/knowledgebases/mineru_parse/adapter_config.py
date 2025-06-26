@@ -4,12 +4,20 @@
 MinerU FastAPI 适配器配置管理
 
 提供统一的配置管理接口，支持环境变量、配置文件等多种配置来源。
+现在支持从KnowFlow的统一配置系统加载配置。
 """
 
 import os
 import json
 from typing import Dict, Any, Optional
 from pathlib import Path
+
+# 尝试导入KnowFlow的配置系统
+try:
+    from server.services.config.config_loader import MINERU_CONFIG
+    KNOWFLOW_CONFIG_AVAILABLE = True
+except ImportError:
+    KNOWFLOW_CONFIG_AVAILABLE = False
 
 
 class AdapterConfig:
@@ -19,7 +27,7 @@ class AdapterConfig:
     DEFAULT_CONFIG = {
         'fastapi_url': 'http://localhost:8888',
         'backend': 'pipeline',
-        'timeout': 300,
+        'timeout': 30000,
         'pipeline_config': {
             'parse_method': 'auto',
             'lang': 'ch',
@@ -38,11 +46,41 @@ class AdapterConfig:
         Args:
             config_file: 配置文件路径（可选）
         """
-        self._config = self.DEFAULT_CONFIG.copy()
+        # 1. 先从KnowFlow统一配置系统加载
+        if KNOWFLOW_CONFIG_AVAILABLE:
+            self._config = self._load_from_knowflow_config()
+        else:
+            self._config = self.DEFAULT_CONFIG.copy()
+        
+        # 2. 再从环境变量加载（优先级更高）
         self._load_from_env()
         
+        # 3. 最后从指定的配置文件加载（优先级最高）
         if config_file and os.path.exists(config_file):
             self._load_from_file(config_file)
+    
+    def _load_from_knowflow_config(self) -> Dict[str, Any]:
+        """从KnowFlow统一配置系统加载配置"""
+        try:
+            config = {
+                'fastapi_url': MINERU_CONFIG.fastapi.url,
+                'backend': MINERU_CONFIG.default_backend,
+                'timeout': MINERU_CONFIG.fastapi.timeout,
+                'pipeline_config': {
+                    'parse_method': MINERU_CONFIG.pipeline.parse_method,
+                    'lang': MINERU_CONFIG.pipeline.lang,
+                    'formula_enable': MINERU_CONFIG.pipeline.formula_enable,
+                    'table_enable': MINERU_CONFIG.pipeline.table_enable
+                },
+                'vlm_config': {
+                    'server_url': MINERU_CONFIG.vlm.sglang.server_url
+                }
+            }
+            print("✅ 已从KnowFlow统一配置系统加载MinerU配置")
+            return config
+        except Exception as e:
+            print(f"⚠️  从KnowFlow配置系统加载失败，使用默认配置: {e}")
+            return self.DEFAULT_CONFIG.copy()
     
     def _load_from_env(self):
         """从环境变量加载配置"""
@@ -54,7 +92,8 @@ class AdapterConfig:
             'MINERU_LANG': 'pipeline_config.lang',
             'MINERU_FORMULA_ENABLE': 'pipeline_config.formula_enable',
             'MINERU_TABLE_ENABLE': 'pipeline_config.table_enable',
-            'MINERU_VLM_SERVER_URL': 'vlm_config.server_url'
+            'MINERU_VLM_SERVER_URL': 'vlm_config.server_url',
+            'SGLANG_SERVER_URL': 'vlm_config.server_url',  # 兼容旧环境变量
         }
         
         for env_key, config_key in env_mappings.items():
@@ -161,7 +200,7 @@ class AdapterConfig:
             'pipeline_config.lang': 'MINERU_LANG',
             'pipeline_config.formula_enable': 'MINERU_FORMULA_ENABLE',
             'pipeline_config.table_enable': 'MINERU_TABLE_ENABLE',
-            'vlm_config.server_url': 'MINERU_VLM_SERVER_URL'
+            'vlm_config.server_url': 'MINERU_VLM_SERVER_URL',
         }
         
         for config_key, env_key in env_mappings.items():
@@ -172,6 +211,7 @@ class AdapterConfig:
     def print_config(self):
         """打印当前配置"""
         print("=== MinerU FastAPI 适配器配置 ===")
+        print(f"配置来源: {'KnowFlow统一配置' if KNOWFLOW_CONFIG_AVAILABLE else '环境变量/默认值'}")
         print(f"FastAPI URL: {self.get('fastapi_url')}")
         print(f"默认后端: {self.get('backend')}")
         print(f"超时时间: {self.get('timeout')}秒")
@@ -185,6 +225,7 @@ class AdapterConfig:
         vlm_config = self.get('vlm_config', {})
         for key, value in vlm_config.items():
             print(f"  {key}: {value}")
+        
         print("=" * 35)
 
 
@@ -197,12 +238,6 @@ def get_config() -> AdapterConfig:
     if _global_config is None:
         config_file = os.environ.get('MINERU_CONFIG_FILE')
         _global_config = AdapterConfig(config_file)
-    return _global_config
-
-def reload_config(config_file: str = None):
-    """重新加载配置"""
-    global _global_config
-    _global_config = AdapterConfig(config_file)
     return _global_config
 
 
@@ -233,5 +268,6 @@ def get_current_config() -> Dict[str, Any]:
         'mode': 'FastAPI',
         'url': config.get('fastapi_url'),
         'backend': config.get('backend'),
-        'timeout': config.get('timeout')
+        'timeout': config.get('timeout'),
+        'config_source': 'KnowFlow统一配置' if KNOWFLOW_CONFIG_AVAILABLE else '环境变量/默认值'
     } 

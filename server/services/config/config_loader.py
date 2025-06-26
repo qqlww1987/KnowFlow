@@ -58,30 +58,92 @@ def _load_env_vars() -> Dict[str, Any]:
             
     return env_config
 
+def _load_mineru_env_vars() -> Dict[str, Any]:
+    """从环境变量加载MinerU相关配置"""
+    mineru_env_config = {}
+    
+    # MinerU环境变量映射（仅客户端相关）
+    env_mappings = {
+        'MINERU_FASTAPI_URL': 'fastapi.url',
+        'MINERU_FASTAPI_TIMEOUT': 'fastapi.timeout',
+        'MINERU_FASTAPI_BACKEND': 'default_backend',
+        'MINERU_PARSE_METHOD': 'pipeline.parse_method',
+        'MINERU_LANG': 'pipeline.lang',
+        'MINERU_FORMULA_ENABLE': 'pipeline.formula_enable',
+        'MINERU_TABLE_ENABLE': 'pipeline.table_enable',
+        'MINERU_VLM_SERVER_URL': 'vlm.sglang.server_url',
+        'SGLANG_SERVER_URL': 'vlm.sglang.server_url',  # 兼容旧变量
+    }
+    
+    for env_key, config_path in env_mappings.items():
+        env_value = os.environ.get(env_key)
+        if env_value is not None:
+            # 类型转换
+            if env_value.lower() in ["true", "false"]:
+                processed_value = env_value.lower() == "true"
+            elif env_value.isdigit():
+                processed_value = int(env_value)
+            else:
+                try:
+                    processed_value = float(env_value)
+                except (ValueError, TypeError):
+                    processed_value = env_value
+            
+            # 设置嵌套配置
+            parts = config_path.split('.')
+            d = mineru_env_config
+            for part in parts[:-1]:
+                d = d.setdefault(part, {})
+            d[parts[-1]] = processed_value
+    
+    if mineru_env_config:
+        return {'mineru': mineru_env_config}
+    return {}
+
 def load_configuration() -> RootConfig:
     """
     加载、合并和验证配置
-    加载顺序: 默认YAML -> 环境变量
+    加载顺序: 默认YAML -> 环境变量 -> MinerU环境变量
     """
     # 1. 从默认YAML文件加载
     config_data = _load_config_from_yaml(DEFAULT_CONFIG_PATH)
 
-    # 2. 从环境变量加载并覆盖
+    # 2. 从KNOWFLOW_环境变量加载并覆盖
     env_data = _load_env_vars()
     if env_data:
         config_data = _recursive_update(config_data, env_data)
+    
+    # 3. 从MinerU环境变量加载并覆盖
+    mineru_env_data = _load_mineru_env_vars()
+    if mineru_env_data:
+        config_data = _recursive_update(config_data, mineru_env_data)
 
-    # 3. 使用Pydantic模型进行验证
+    # 4. 使用Pydantic模型进行验证
     try:
         return RootConfig.model_validate(config_data)
     except Exception as e:
         logger.error(f"配置验证失败: {e}")
         raise
 
+def get_mineru_env_mapping() -> Dict[str, str]:
+    """获取MinerU环境变量到配置路径的映射"""
+    return {
+        'MINERU_FASTAPI_URL': 'mineru.fastapi.url',
+        'MINERU_FASTAPI_TIMEOUT': 'mineru.fastapi.timeout',
+        'MINERU_FASTAPI_BACKEND': 'mineru.default_backend',
+        'MINERU_PARSE_METHOD': 'mineru.pipeline.parse_method',
+        'MINERU_LANG': 'mineru.pipeline.lang',
+        'MINERU_FORMULA_ENABLE': 'mineru.pipeline.formula_enable',
+        'MINERU_TABLE_ENABLE': 'mineru.pipeline.table_enable',
+        'MINERU_VLM_SERVER_URL': 'mineru.vlm.sglang.server_url',
+        'SGLANG_SERVER_URL': 'mineru.vlm.sglang.server_url',
+    }
+
 # 创建全局配置实例
 CONFIG = load_configuration()
 APP_CONFIG = CONFIG.app
 EXCEL_CONFIG = CONFIG.excel
+MINERU_CONFIG = CONFIG.mineru
 
 # 打印加载的配置（在开发模式下）
 if APP_CONFIG.dev_mode:

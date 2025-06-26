@@ -1,4 +1,6 @@
 from pydantic import BaseModel, Field
+from typing import List, Dict, Any, Optional
+from dataclasses import dataclass, field
 
 
 class AppConfig(BaseModel):
@@ -27,8 +29,46 @@ class ChunkingConfig(BaseModel):
     strict_regex_split: bool = Field(False, description="严格按正则表达式分块，忽略token限制")
 
 
+# =======================================================
+# MinerU 配置模型类
+# =======================================================
+
+@dataclass
+class MinerUFastAPIConfig:
+    """MinerU FastAPI 客户端配置"""
+    url: str = "http://localhost:8888"
+    timeout: int = 300
+
+@dataclass
+class MinerUPipelineConfig:
+    """MinerU Pipeline 后端配置"""
+    parse_method: str = "auto"
+    lang: str = "ch"
+    formula_enable: bool = True
+    table_enable: bool = True
+
+@dataclass
+class MinerUSGLangConfig:
+    """MinerU SGLang 配置"""
+    server_url: str = "http://localhost:30000"
+
+@dataclass
+class MinerUVLMConfig:
+    """MinerU VLM 配置"""
+    sglang: MinerUSGLangConfig = field(default_factory=MinerUSGLangConfig)
+
+@dataclass
+class MinerUConfig:
+    """MinerU 客户端配置"""
+    fastapi: MinerUFastAPIConfig = field(default_factory=MinerUFastAPIConfig)
+    default_backend: str = "pipeline"
+    pipeline: MinerUPipelineConfig = field(default_factory=MinerUPipelineConfig)
+    vlm: MinerUVLMConfig = field(default_factory=MinerUVLMConfig)
+
+
 class RootConfig(BaseModel):
-    """配置根模型"""
+    """根配置类"""
     app: AppConfig = Field(default_factory=AppConfig)
     excel: ExcelConfig = Field(default_factory=ExcelConfig)
-    chunking: ChunkingConfig = Field(default_factory=ChunkingConfig) 
+    chunking: ChunkingConfig = Field(default_factory=ChunkingConfig)
+    mineru: MinerUConfig = Field(default_factory=MinerUConfig) 

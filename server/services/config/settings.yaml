@@ -57,3 +57,39 @@ excel:
 
   # 是否在HTML分块中尽量保持表格结构
   preserve_table_structure: true
+
+# =======================================================
+# MinerU 文档解析配置 (客户端配置)
+# =======================================================
+mineru:
+  # FastAPI 客户端配置
+  fastapi:
+    # FastAPI 服务地址
+    url: "http://localhost:8888"
+    
+    # HTTP 请求超时时间（秒）
+    timeout: 300
+  
+  # 默认使用的后端类型
+  # 选项: pipeline, vlm-transformers, vlm-sglang-engine, vlm-sglang-client
+  default_backend: "pipeline"
+  
+  # Pipeline 后端请求参数
+  pipeline:
+    # 解析方法: auto, txt, ocr
+    parse_method: "auto"
+    
+    # 文档语言（提升OCR准确率）
+    lang: "ch"
+    
+    # 是否启用公式解析
+    formula_enable: true
+    
+    # 是否启用表格解析
+    table_enable: true
+  
+  # VLM 后端配置
+  vlm:
+    sglang:
+      # SGLang 服务器地址（vlm-sglang-client 后端需要）
+      server_url: "http://localhost:30000"
