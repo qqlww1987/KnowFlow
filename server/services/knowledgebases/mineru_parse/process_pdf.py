@@ -125,7 +125,8 @@ def process_pdf_entry(doc_id, pdf_path, kb_id, update_progress):
         return result
     except Exception as e:
         print(f"FastAPI 处理失败: {e}")
-        return 0
+        # 抛出异常让调用方知道处理失败，而不是返回0
+        raise Exception(f"MinerU 文档解析失败: {str(e)}")
 
 
 def process_pdf_with_custom_backend(doc_id, pdf_path, kb_id, update_progress, backend='pipeline', **kwargs):
@@ -192,7 +193,8 @@ def process_pdf_with_custom_backend(doc_id, pdf_path, kb_id, update_progress, ba
         
     except Exception as e:
         print(f"FastAPI 处理失败 (后端: {backend}): {e}")
-        return 0
+        # 抛出异常让调用方知道处理失败，而不是返回0
+        raise Exception(f"MinerU 文档解析失败 (后端: {backend}): {str(e)}")
 
 
 # 配置函数
