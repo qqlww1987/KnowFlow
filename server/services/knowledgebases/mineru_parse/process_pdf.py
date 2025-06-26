@@ -52,15 +52,12 @@ def _process_pdf_with_fastapi(pdf_path, update_progress):
     if update_progress:
         update_progress(0.05, "使用 FastAPI 模式处理文档")
     
-    # 获取配置
-    backend = os.environ.get('MINERU_FASTAPI_BACKEND', 'pipeline')
-    
-    # 使用适配器处理，确保返回位置信息和图片
+    # 使用全局适配器处理，让适配器自己决定使用哪个backend
+    # 不再从环境变量直接获取，避免绕过配置系统
     adapter = get_global_adapter()
     result = adapter.process_file(
         file_path=pdf_path,
         update_progress=update_progress,
-        backend=backend,
         return_info=True,    # 确保返回 middle_json 信息
         return_images=True   # 获取原始图片数据
     )
@@ -127,74 +124,6 @@ def process_pdf_entry(doc_id, pdf_path, kb_id, update_progress):
         print(f"FastAPI 处理失败: {e}")
         # 抛出异常让调用方知道处理失败，而不是返回0
         raise Exception(f"MinerU 文档解析失败: {str(e)}")
-
-
-def process_pdf_with_custom_backend(doc_id, pdf_path, kb_id, update_progress, backend='pipeline', **kwargs):
-    """
-    使用指定后端处理 PDF 的接口
-    
-    Args:
-        doc_id (str): 文档ID
-        pdf_path (str): PDF文件路径  
-        kb_id (str): 知识库ID
-        update_progress (function): 进度回调
-        backend (str): 指定后端类型
-        **kwargs: 传递给 FastAPI 的额外参数
-    Returns:
-        dict: 处理结果
-    """
-    try:
-        if update_progress:
-            update_progress(0.01, f"PDF 处理模式: FastAPI ({backend})")
-            
-        # 使用适配器处理，确保返回位置信息和图片
-        adapter = get_global_adapter()
-        result = adapter.process_file(
-            file_path=pdf_path,
-            update_progress=update_progress,
-            backend=backend,
-            return_info=True,    # 确保返回位置信息
-            return_images=True,  # 获取原始图片数据
-            **kwargs
-        )
-        
-        # 保存结果
-        if 'md_content' in result:
-            temp_dir = tempfile.mkdtemp()
-            
-            # 保存 Markdown 文件
-            md_file_path = os.path.join(temp_dir, "result.md")
-            with open(md_file_path, 'w', encoding='utf-8') as f:
-                f.write(result['md_content'])
-                
-            # 保存 middle_json 数据
-            if 'info' in result and result['info']:
-                middle_json_path = os.path.join(temp_dir, "result_middle.json")
-                with open(middle_json_path, 'w', encoding='utf-8') as f:
-                    json.dump(result['info'], f, ensure_ascii=False, indent=2)
-                print(f"[INFO] 已保存位置信息文件: {middle_json_path}")
-            else:
-                print(f"[WARNING] FastAPI 未返回位置信息数据 (info 字段)")
-                
-            # 创建并保存图片到临时目录
-            images_dir = os.path.join(temp_dir, 'images')
-            _save_images_from_result(result, images_dir)
-        else:
-            raise ValueError("FastAPI 未返回 md_content")
-            
-        # 创建 RAGFlow 资源
-        ragflow_result = _safe_create_ragflow(doc_id, kb_id, md_file_path, images_dir, update_progress)
-        
-        # 合并结果信息
-        ragflow_result['fastapi_result'] = result
-        ragflow_result['backend_used'] = backend
-        
-        return ragflow_result
-        
-    except Exception as e:
-        print(f"FastAPI 处理失败 (后端: {backend}): {e}")
-        # 抛出异常让调用方知道处理失败，而不是返回0
-        raise Exception(f"MinerU 文档解析失败 (后端: {backend}): {str(e)}")
 
 
 # 配置函数
