@@ -64,15 +64,25 @@ def _load_mineru_env_vars() -> Dict[str, Any]:
     
     # MinerU环境变量映射（仅客户端相关）
     env_mappings = {
+        # FastAPI客户端配置
         'MINERU_FASTAPI_URL': 'fastapi.url',
         'MINERU_FASTAPI_TIMEOUT': 'fastapi.timeout',
         'MINERU_FASTAPI_BACKEND': 'default_backend',
+        
+        # Pipeline后端配置
         'MINERU_PARSE_METHOD': 'pipeline.parse_method',
         'MINERU_LANG': 'pipeline.lang',
         'MINERU_FORMULA_ENABLE': 'pipeline.formula_enable',
         'MINERU_TABLE_ENABLE': 'pipeline.table_enable',
+        
+        # VLM后端配置
         'MINERU_VLM_SERVER_URL': 'vlm.sglang.server_url',
         'SGLANG_SERVER_URL': 'vlm.sglang.server_url',  # 兼容旧变量
+        
+        # 额外的MinerU服务端配置（用于web_api目录）
+        'MINERU_MODEL_SOURCE': 'model.source',
+        'MINERU_DEVICE_MODE': 'model.device_mode',
+        'MINERU_MODEL_CACHE_DIR': 'model.cache_dir',
     }
     
     for env_key, config_path in env_mappings.items():

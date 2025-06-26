@@ -12,6 +12,18 @@ import json
 from typing import Optional, Callable, Dict, Any
 from loguru import logger
 
+# 导入统一配置系统
+try:
+    from ...config.config_loader import MINERU_CONFIG
+    CONFIG_AVAILABLE = True
+except ImportError:
+    try:
+        from services.config.config_loader import MINERU_CONFIG
+        CONFIG_AVAILABLE = True
+    except ImportError:
+        CONFIG_AVAILABLE = False
+        logger.warning("无法导入统一配置系统，将使用环境变量作为备用")
+
 
 class MinerUFastAPIAdapter:
     """MinerU FastAPI 适配器"""
@@ -170,15 +182,25 @@ def get_global_adapter() -> MinerUFastAPIAdapter:
     """获取全局适配器实例"""
     global _global_adapter
     if _global_adapter is None:
-        fastapi_url = os.environ.get('MINERU_FASTAPI_URL', 'http://localhost:8888')
-        backend = os.environ.get('MINERU_FASTAPI_BACKEND', 'pipeline')
-        timeout = int(os.environ.get('MINERU_FASTAPI_TIMEOUT', '300'))
+        # 优先从统一配置系统读取
+        if CONFIG_AVAILABLE:
+            fastapi_url = MINERU_CONFIG.fastapi.url
+            backend = MINERU_CONFIG.default_backend
+            timeout = MINERU_CONFIG.fastapi.timeout
+            logger.info("从统一配置系统加载MinerU FastAPI配置")
+        else:
+            # 备用：从环境变量读取
+            fastapi_url = os.environ.get('MINERU_FASTAPI_URL', 'http://localhost:8888')
+            backend = os.environ.get('MINERU_FASTAPI_BACKEND', 'pipeline')
+            timeout = int(os.environ.get('MINERU_FASTAPI_TIMEOUT', '30'))
+            logger.warning("统一配置系统不可用，从环境变量加载MinerU配置")
         
         _global_adapter = MinerUFastAPIAdapter(
             base_url=fastapi_url,
             backend=backend,
             timeout=timeout
         )
+        logger.info(f"MinerU FastAPI适配器已初始化: URL={fastapi_url}, Backend={backend}, Timeout={timeout}s")
     return _global_adapter
 
 
@@ -188,9 +210,16 @@ def configure_adapter(base_url: str = None,
     """配置全局适配器"""
     global _global_adapter
     
-    current_url = os.environ.get('MINERU_FASTAPI_URL', 'http://localhost:8888')
-    current_backend = os.environ.get('MINERU_FASTAPI_BACKEND', 'pipeline')
-    current_timeout = int(os.environ.get('MINERU_FASTAPI_TIMEOUT', '300'))
+    # 优先从统一配置系统获取默认值
+    if CONFIG_AVAILABLE:
+        current_url = MINERU_CONFIG.fastapi.url
+        current_backend = MINERU_CONFIG.default_backend
+        current_timeout = MINERU_CONFIG.fastapi.timeout
+    else:
+        # 备用：从环境变量获取默认值
+        current_url = os.environ.get('MINERU_FASTAPI_URL', 'http://localhost:8888')
+        current_backend = os.environ.get('MINERU_FASTAPI_BACKEND', 'pipeline')
+        current_timeout = int(os.environ.get('MINERU_FASTAPI_TIMEOUT', '30'))
     
     _global_adapter = MinerUFastAPIAdapter(
         base_url=base_url or current_url,
@@ -198,7 +227,7 @@ def configure_adapter(base_url: str = None,
         timeout=timeout or current_timeout
     )
     
-    logger.info(f"FastAPI 适配器已配置: {_global_adapter.base_url}, 后端: {_global_adapter.backend}")
+    logger.info(f"FastAPI 适配器已配置: {_global_adapter.base_url}, 后端: {_global_adapter.backend}, 超时: {_global_adapter.timeout}s")
 
 
 def test_adapter_connection(base_url: str = None) -> Dict[str, Any]:

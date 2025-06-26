@@ -13,11 +13,17 @@ from typing import Dict, Any, Optional
 from pathlib import Path
 
 # 尝试导入KnowFlow的配置系统
+# 尝试导入KnowFlow的配置系统
 try:
-    from server.services.config.config_loader import MINERU_CONFIG
+    from ...config.config_loader import MINERU_CONFIG
     KNOWFLOW_CONFIG_AVAILABLE = True
 except ImportError:
-    KNOWFLOW_CONFIG_AVAILABLE = False
+    try:
+        # 备用导入路径
+        from services.config.config_loader import MINERU_CONFIG
+        KNOWFLOW_CONFIG_AVAILABLE = True
+    except ImportError:
+        KNOWFLOW_CONFIG_AVAILABLE = False
 
 
 class AdapterConfig:

@@ -37,7 +37,7 @@ class ChunkingConfig(BaseModel):
 class MinerUFastAPIConfig:
     """MinerU FastAPI 客户端配置"""
     url: str = "http://localhost:8888"
-    timeout: int = 300
+    timeout: int = 30
 
 @dataclass
 class MinerUPipelineConfig:
@@ -58,12 +58,20 @@ class MinerUVLMConfig:
     sglang: MinerUSGLangConfig = field(default_factory=MinerUSGLangConfig)
 
 @dataclass
+class MinerUModelConfig:
+    """MinerU 模型配置"""
+    source: str = "modelscope"
+    device_mode: str = "auto"
+    cache_dir: str = ""
+
+@dataclass
 class MinerUConfig:
     """MinerU 客户端配置"""
     fastapi: MinerUFastAPIConfig = field(default_factory=MinerUFastAPIConfig)
     default_backend: str = "pipeline"
     pipeline: MinerUPipelineConfig = field(default_factory=MinerUPipelineConfig)
     vlm: MinerUVLMConfig = field(default_factory=MinerUVLMConfig)
+    model: MinerUModelConfig = field(default_factory=MinerUModelConfig)
 
 
 class RootConfig(BaseModel):
