@@ -102,7 +102,7 @@ mineru:
      --shm-size=32g \
      -p 8888:8888 -p 30000:30000 \
      --name mineru-api \
-     zxwei/mineru-api-full
+     zxwei/mineru-api-full:v1.0.0
    ```
 
    **基础版 - 仅包含基础功能**
@@ -111,7 +111,7 @@ mineru:
      --shm-size=32g \
      -p 8888:8888 \
      --name mineru-api \
-     zxwei/mineru-api
+     zxwei/mineru-api:v1.0.0
    ```
 
    > 💡 **镜像说明：**
