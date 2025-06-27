@@ -117,6 +117,7 @@ mineru:
    > 💡 **镜像说明：**
    > - `zxwei/mineru-api-full`：包含完整的 VLM 功能，支持所有后端类型
    > - `zxwei/mineru-api`：基础版本，主要支持 pipeline 后端
+   > - `server/services/config/settings.yaml` 可以配置选择 MinerU 模式
    > - 如需 GPU 加速，请确保已安装 nvidia-container-toolkit
 
 

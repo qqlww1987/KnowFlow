@@ -69,14 +69,14 @@ mineru:
     # Docker部署: http://host.docker.internal:8888 (Docker Desktop)
     #           或 http://宿主机IP:8888 (Linux Docker)
     #           或 http://mineru-api:8888 (Docker Compose网络)
-    url: "http://tw-07.access.glows.ai:25879"
+    url: "http://host.docker.internal:8888"
     
     # HTTP 请求超时时间（秒）
     timeout: 30000
   
   # 默认使用的后端类型
-  # 选项: pipeline, vlm-transformers, vlm-sglang-engine, vlm-sglang-client
-  default_backend: "vlm-sglang-client"
+  # 选项: pipeline, vlm-transformers,  vlm-sglang-client
+  default_backend: "pipeline"
   
   # Pipeline 后端请求参数
   pipeline:
@@ -97,4 +97,4 @@ mineru:
     sglang:
       # SGLang 服务器地址（vlm-sglang-client 后端需要）
       # Docker部署时同样需要使用宿主机IP或容器网络地址
-      server_url: "http://tw-07.access.glows.ai:25495"
+      server_url: "http://host.docker.internal:30000"
