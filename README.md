@@ -53,6 +53,43 @@ KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的�
 
 ## 使用方式
 
+### 0. MinerU 本地调试（开发环境）
+
+如果您需要在本地环境进行开发调试，可以直接运行 MinerU 服务：
+
+```bash
+# 1. 安装 Python 依赖（注意：zsh 需要用引号包围方括号）
+pip install "mineru[core]" fastapi uvicorn python-multipart
+
+# 2. 设置环境变量
+export MINERU_DEVICE_MODE=cpu
+export MINERU_MODEL_SOURCE=modelscope
+
+# 3. 进入项目目录
+cd web_api
+
+# 4. 启动本地服务
+python app.py
+```
+
+**配置 settings.yaml：**
+
+使用本地 MinerU 服务时，需要修改 `server/services/config/settings.yaml` 中的服务地址：
+
+```yaml
+mineru:
+  fastapi:
+    # 本地开发服务地址
+    url: "http://localhost:8888"
+  
+  vlm:
+    sglang:
+      # 本地SGLang服务地址（如果使用vlm-sglang-client后端）
+      server_url: "http://localhost:30000"
+```
+
+> 💡 **提示：** 本地调试模式适合开发环境，生产环境建议使用Docker方式部署
+
 ### 1. 使用 Docker Compose 运行
 
 1. 启动 MinerU 服务
@@ -81,6 +118,7 @@ KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的�
    > - `zxwei/mineru-api-full`：包含完整的 VLM 功能，支持所有后端类型
    > - `zxwei/mineru-api`：基础版本，主要支持 pipeline 后端
    > - 如需 GPU 加速，请确保已安装 nvidia-container-toolkit
+
 
 2. 执行安装脚本，自动生成配置
 
@@ -166,7 +204,7 @@ KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的�
 
 ---
 
-### RAGFlow UI
+### RAGFlow UI（无 RAGFlow UI 更新需要可忽略）
 
 将开源的 `dist` 目录复制到 docker 内的 /ragflow/web/dist 目录下，覆盖原有的 dist 即可
 
@@ -174,7 +212,7 @@ KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的�
 docker cp -r dist {ragflow_container_name}:/ragflow/web/
 ```
 
-## 编译 Docker
+## 编译 Docker（无编译需要可忽略）
 
 ```bash
 docker buildx build --platform linux/amd64 --target backend -t zxwei/knowflow-server:v0.3.0 --push .
