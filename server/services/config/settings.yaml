@@ -65,14 +65,18 @@ mineru:
   # FastAPI 客户端配置
   fastapi:
     # FastAPI 服务地址
-    url: "http://localhost:8888"
+    # 本地开发: http://localhost:8888
+    # Docker部署: http://host.docker.internal:8888 (Docker Desktop)
+    #           或 http://宿主机IP:8888 (Linux Docker)
+    #           或 http://mineru-api:8888 (Docker Compose网络)
+    url: "http://tw-07.access.glows.ai:25879"
     
     # HTTP 请求超时时间（秒）
-    timeout: 30
+    timeout: 30000
   
   # 默认使用的后端类型
   # 选项: pipeline, vlm-transformers, vlm-sglang-engine, vlm-sglang-client
-  default_backend: "pipeline"
+  default_backend: "vlm-sglang-client"
   
   # Pipeline 后端请求参数
   pipeline:
@@ -92,4 +96,5 @@ mineru:
   vlm:
     sglang:
       # SGLang 服务器地址（vlm-sglang-client 后端需要）
-      server_url: "http://localhost:30000"
+      # Docker部署时同样需要使用宿主机IP或容器网络地址
+      server_url: "http://tw-07.access.glows.ai:25495"

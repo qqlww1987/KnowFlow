@@ -55,44 +55,57 @@ KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的�
 
 ### 1. 使用 Docker Compose 运行
 
-1. 在宿主机器上下载 MinerU 模型文件
+1. 启动 MinerU 服务
 
-   支持两种下载方式，任选其一：
+   选择以下两种镜像之一：
 
-   **方式一：使用 ModelScope（推荐，国内用户速度更快）**
+   **完整版（推荐）- 包含所有功能**
    ```bash
-   pip install modelscope
-   wget https://gcore.jsdelivr.net/gh/opendatalab/MinerU@master/scripts/download_models.py -O download_models.py
-   python3 download_models.py
+   docker run --rm -d --gpus=all \
+     --shm-size=32g \
+     -p 8888:8888 -p 30000:30000 \
+     --name mineru-api \
+     zxwei/mineru-api-full
    ```
 
-   **方式二：使用 HuggingFace**
+   **基础版 - 仅包含基础功能**
    ```bash
-   pip install huggingface_hub
-   wget https://gcore.jsdelivr.net/gh/opendatalab/MinerU@master/scripts/download_models_hf.py -O download_models_hf.py
-   python3 download_models_hf.py
+   docker run --rm -d --gpus=all \
+     --shm-size=32g \
+     -p 8888:8888 \
+     --name mineru-api \
+     zxwei/mineru-api
    ```
 
-   **智能检测说明：**
-   - 安装脚本会自动检测您系统中的模型缓存路径
-   - 优先使用 ModelScope 路径（如果存在且包含模型文件）
-   - 自动选择模型文件较多或目录较大的路径
-   - 支持的路径：`~/.cache/modelscope/hub` 和 `~/.cache/huggingface/hub`
+   > 💡 **镜像说明：**
+   > - `zxwei/mineru-api-full`：包含完整的 VLM 功能，支持所有后端类型
+   > - `zxwei/mineru-api`：基础版本，主要支持 pipeline 后端
+   > - 如需 GPU 加速，请确保已安装 nvidia-container-toolkit
 
-2. 在项目根目录下新建 `.env` 文件，添加如下内容
-
-   ```bash
-   #  从 RAGFlow API 页面后台获取 (必须)
-   RAGFLOW_API_KEY=
-   # 注意不支持 127.0.0.1、localhost，需要把 127.0.0.1 或 localhost 替换成部署机器的 IP 地址
-   RAGFLOW_BASE_URL=
-   ```
-
-3. 执行安装脚本，在 .env 里追加环境变量
+2. 执行安装脚本，自动生成配置
 
    ```bash
    ./scripts/install.sh
    ```
+
+   > 💡 **自动配置功能：**
+   > - 脚本会自动检测本机IP地址
+   > - 自动创建 `.env` 配置文件（如果不存在）
+   > - 如果 `.env` 文件已存在，会提供选项：保留现有配置或重新生成
+
+3. 完善 `.env` 文件配置
+
+   安装脚本会自动创建 `.env` 文件模板，您只需要填写两个必要信息：
+
+   ```bash
+   # 从 RAGFlow API 页面后台获取 (必须手动填写)
+   RAGFLOW_API_KEY=你的实际API密钥
+
+   # 确认端口号并替换 (通常RAGFlow默认端口是80或8080)
+   RAGFLOW_BASE_URL=http://检测到的IP:实际端口号
+   ```
+
+   > 💡 **提示：** 其他配置项（如HOST_IP、ES_HOST等）已由脚本自动填写
 
 4. 启动容器，开始愉快之旅
 
@@ -104,7 +117,7 @@ KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的�
 
 ### 2. 源码运行
 
-参照 Docker Compose 使用方式的前面 1、2、3 步骤，这是前提。
+参照 Docker Compose 使用方式的前面步骤，确保 MinerU 服务已启动。
 
 **启动后端：**
 
@@ -198,7 +211,19 @@ docker buildx build --platform linux/amd64 --target frontend -t zxwei/knowflow-w
 
 ## 常见问题
 
-### 1. 如何给 MinerU 进行 GPU 加速
+### 1. 如何选择 MinerU 镜像版本
+
+**zxwei/mineru-api-full（推荐）：**
+- 包含完整的 VLM 功能
+- 支持所有后端类型：pipeline, vlm-transformers, vlm-sglang-engine, vlm-sglang-client
+- 镜像较大，但功能最全
+
+**zxwei/mineru-api：**
+- 基础版本，镜像较小
+- 主要支持 pipeline 后端
+- 适合基础文档解析需求
+
+### 2. 如何给 MinerU 进行 GPU 加速
 
 1）安装 nvidia-container-toolkit
 
@@ -217,26 +242,34 @@ sudo apt-get install -y nvidia-container-toolkit
 sudo systemctl restart docker
 ```
 
-2）修改 `magic-pdf.json`，把 `device-mode` 从 `cpu` 为 `cuda`：
+2）启动 MinerU 容器时确保包含 `--gpus=all` 参数（如上面的示例命令）
 
-```json
-"device-mode": "cuda"
+3）在 settings.yaml 中配置使用 GPU 后端：
+
+```yaml
+mineru:
+  default_backend: "vlm-sglang-client"  # 使用 VLM 后端
 ```
 
-> 💡 `magic-pdf.json` <br>
-> magic-pdf.json 文件在 MinerU 模型下载完成后会自动生成，路径可以在 .env 的 MINERU_MAGIC_PDF_JSON_PATH 查询。
+### 3. 容器网络配置
 
-### 2. 文件解析过程中出现 MinerU 模型文件路径找不到
+如果 KnowFlow server 也运行在容器中，需要正确配置网络地址：
 
-1）确认 MinerU 模型是否正常下载
+- **Docker Desktop**：使用 `http://host.docker.internal:8888`
+- **Linux Docker**：使用宿主机IP，如 `http://192.168.1.100:8888`
+- **Docker Compose**：使用服务名，如 `http://mineru-api:8888`
 
-2）确认 .env 中的模型路径是否真实存在
+详细配置参考 `DOCKER_NETWORK_GUIDE.md`
 
-3）尝试手动配置 `MINERU_MODLES_DIR`，比如：
+### 4. 常见错误处理
 
-```bash
-/Users/用户名称/.cache/modelscope/hub/models/opendatalab/PDF-Extract-Kit-1___0/models:/Users/用户名称/.cache/modelscope/hub/models/opendatalab/PDF-Extract-Kit-1___0/models
-```
+1）**端口冲突**：确保端口 8888 和 30000 未被占用
+
+2）**内存不足**：增加 Docker 内存限制或调整 `--shm-size` 参数
+
+3）**GPU 不可用**：检查 nvidia-container-toolkit 安装和 GPU 驱动
+
+4）**网络连接问题**：检查防火墙设置和容器网络配置
 
 
 
