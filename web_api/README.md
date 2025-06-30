@@ -36,7 +36,7 @@ docker build --build-arg INSTALL_TYPE=core -t mineru-api .
 
 ### 完整版本（支持所有后端，包括 sglang，**推荐**）
 ```bash
-docker build --build-arg INSTALL_TYPE=all -t mineru-api-full .
+docker build -f Dockerfile.sglang -t mineru-api-full .
 ```
 
 或者使用代理：
@@ -66,7 +66,7 @@ docker run --rm -it --gpus=all \
 ### 高性能部署（适合生产环境）
 ```bash
 docker run --rm -d --gpus=all \
-           --memory=16g --shm-size=8g \
+           --shm-size=32g \
            -p 8888:8888 -p 30000:30000 \
            --name mineru-api \
            mineru-api-full

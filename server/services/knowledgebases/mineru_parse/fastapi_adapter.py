@@ -26,24 +26,50 @@ except ImportError:
 
 
 class MinerUFastAPIAdapter:
-    """MinerU FastAPI 适配器"""
+    """MinerU FastAPI 适配器 - 统一配置管理版本"""
     
     def __init__(self, 
                  base_url: str = "http://localhost:8888",
                  backend: str = "pipeline",
-                 timeout: int = 300):
+                 timeout: int = 30000,
+                 # VLM 配置参数
+                 server_url: Optional[str] = None,
+                 # Pipeline 配置参数
+                 parse_method: str = "auto",
+                 lang: str = "ch",
+                 formula_enable: bool = True,
+                 table_enable: bool = True):
         """
-        初始化适配器
+        初始化适配器 - 统一配置管理
         
         Args:
             base_url: FastAPI 服务地址
-            backend: 默认后端类型 (pipeline, vlm-transformers, vlm-sglang-engine, vlm-sglang-client)
+            backend: 默认后端类型
             timeout: 请求超时时间（秒）
+            server_url: SGLang 服务器地址（vlm-sglang-client 后端）
+            parse_method: 解析方法（pipeline 后端）
+            lang: 语言设置（pipeline 后端）
+            formula_enable: 公式解析开关（pipeline 后端）
+            table_enable: 表格解析开关（pipeline 后端）
         """
         self.base_url = base_url.rstrip('/')
         self.backend = backend
         self.timeout = timeout
+        
+        # VLM 配置
+        self.server_url = server_url
+        
+        # Pipeline 配置
+        self.parse_method = parse_method
+        self.lang = lang
+        self.formula_enable = formula_enable
+        self.table_enable = table_enable
+        
         self.session = requests.Session()
+        
+        logger.info(f"MinerU FastAPI适配器已初始化: URL={self.base_url}, Backend={self.backend}")
+        logger.info(f"VLM配置: server_url={self.server_url}")
+        logger.info(f"Pipeline配置: parse_method={self.parse_method}, lang={self.lang}, formula_enable={self.formula_enable}, table_enable={self.table_enable}")
         
     def _check_server_health(self) -> bool:
         """检查 FastAPI 服务器是否可访问"""
@@ -56,13 +82,13 @@ class MinerUFastAPIAdapter:
     
     def _prepare_request_data(self, 
                              backend: str = None,
-                             parse_method: str = "auto",
-                             lang: str = "ch", 
-                             formula_enable: bool = True,
-                             table_enable: bool = True,
+                             parse_method: str = None,
+                             lang: str = None, 
+                             formula_enable: bool = None,
+                             table_enable: bool = None,
                              server_url: Optional[str] = None,
                              **kwargs) -> Dict[str, Any]:
-        """准备请求数据"""
+        """准备请求数据 - 使用适配器配置作为默认值"""
         backend = backend or self.backend
         
         data = {
@@ -75,20 +101,23 @@ class MinerUFastAPIAdapter:
             'output_dir': 'output'  # 临时输出目录
         }
         
-        # 添加特定后端参数
+        # 添加特定后端参数，优先使用传入参数，否则使用适配器配置
         if backend == 'vlm-sglang-client':
-            if server_url:
-                data['server_url'] = server_url
+            final_server_url = server_url or self.server_url
+            if final_server_url:
+                data['server_url'] = final_server_url
+                logger.info(f"使用 server_url: {final_server_url}")
             else:
-                logger.warning("vlm-sglang-client 后端需要 server_url 参数")
+                logger.warning("vlm-sglang-client 后端需要 server_url 参数，但未配置")
                 
         elif backend == 'pipeline':
             data.update({
-                'parse_method': parse_method,
-                'lang': lang,
-                'formula_enable': formula_enable,
-                'table_enable': table_enable
+                'parse_method': parse_method or self.parse_method,
+                'lang': lang or self.lang,
+                'formula_enable': formula_enable if formula_enable is not None else self.formula_enable,
+                'table_enable': table_enable if table_enable is not None else self.table_enable
             })
+            logger.info(f"使用 Pipeline 配置: parse_method={data['parse_method']}, lang={data['lang']}, formula_enable={data['formula_enable']}, table_enable={data['table_enable']}")
         
         # 合并额外参数，允许用户覆盖默认设置
         data.update(kwargs)
@@ -100,13 +129,13 @@ class MinerUFastAPIAdapter:
                     backend: str = None,
                     **kwargs) -> Dict[str, Any]:
         """
-        处理文件的主要接口
+        处理文件的主要接口 - 简化版本，自动使用适配器配置
         
         Args:
             file_path: PDF文件路径
             update_progress: 进度回调函数
-            backend: 指定后端类型
-            **kwargs: 其他参数
+            backend: 指定后端类型（可选，覆盖适配器默认值）
+            **kwargs: 其他参数（可选，覆盖适配器配置）
             
         Returns:
             Dict: 处理结果
@@ -125,7 +154,7 @@ class MinerUFastAPIAdapter:
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"文件不存在: {file_path}")
             
-        # 准备请求数据
+        # 准备请求数据（自动使用适配器配置）
         data = self._prepare_request_data(backend=backend, **kwargs)
         
         if update_progress:
@@ -152,8 +181,8 @@ class MinerUFastAPIAdapter:
                 result['_adapter_info'] = {
                     'backend_used': result.get('backend', data['backend']),
                     'file_processed': os.path.basename(file_path),
-                    'adapter_version': '2.0.0',
-                    'processing_mode': 'fastapi_only'
+                    'adapter_version': '2.1.0',  # 更新版本号
+                    'processing_mode': 'fastapi_unified_config'
                 }
                 
                 if update_progress:
@@ -179,55 +208,104 @@ class MinerUFastAPIAdapter:
 _global_adapter = None
 
 def get_global_adapter() -> MinerUFastAPIAdapter:
-    """获取全局适配器实例"""
+    """获取全局适配器实例 - 统一配置管理版本"""
     global _global_adapter
     if _global_adapter is None:
-        # 优先从统一配置系统读取
+        # 统一配置获取逻辑
         if CONFIG_AVAILABLE:
+            # 从统一配置系统读取
             fastapi_url = MINERU_CONFIG.fastapi.url
             backend = MINERU_CONFIG.default_backend
             timeout = MINERU_CONFIG.fastapi.timeout
-            logger.info("从统一配置系统加载MinerU FastAPI配置")
+            
+            # VLM 配置
+            server_url = MINERU_CONFIG.vlm.sglang.server_url
+            
+            # Pipeline 配置
+            parse_method = MINERU_CONFIG.pipeline.parse_method
+            lang = MINERU_CONFIG.pipeline.lang
+            formula_enable = MINERU_CONFIG.pipeline.formula_enable
+            table_enable = MINERU_CONFIG.pipeline.table_enable
+            
+            logger.info("从统一配置系统加载MinerU完整配置")
         else:
-            # 备用：从环境变量读取
+            # 环境变量备用方案
             fastapi_url = os.environ.get('MINERU_FASTAPI_URL', 'http://localhost:8888')
             backend = os.environ.get('MINERU_FASTAPI_BACKEND', 'pipeline')
             timeout = int(os.environ.get('MINERU_FASTAPI_TIMEOUT', '30'))
+            
+            # VLM 配置环境变量
+            server_url = os.environ.get('MINERU_VLM_SERVER_URL', 
+                                       os.environ.get('SGLANG_SERVER_URL'))
+            
+            # Pipeline 配置环境变量
+            parse_method = os.environ.get('MINERU_PARSE_METHOD', 'auto')
+            lang = os.environ.get('MINERU_LANG', 'ch')
+            formula_enable = os.environ.get('MINERU_FORMULA_ENABLE', 'true').lower() == 'true'
+            table_enable = os.environ.get('MINERU_TABLE_ENABLE', 'true').lower() == 'true'
+            
             logger.warning("统一配置系统不可用，从环境变量加载MinerU配置")
         
         _global_adapter = MinerUFastAPIAdapter(
             base_url=fastapi_url,
             backend=backend,
-            timeout=timeout
+            timeout=timeout,
+            server_url=server_url,
+            parse_method=parse_method,
+            lang=lang,
+            formula_enable=formula_enable,
+            table_enable=table_enable
         )
-        logger.info(f"MinerU FastAPI适配器已初始化: URL={fastapi_url}, Backend={backend}, Timeout={timeout}s")
+        
+        logger.info("MinerU FastAPI适配器统一配置加载完成")
     return _global_adapter
 
 
 def configure_adapter(base_url: str = None, 
                      backend: str = None, 
-                     timeout: int = None):
-    """配置全局适配器"""
+                     timeout: int = None,
+                     server_url: str = None,
+                     parse_method: str = None,
+                     lang: str = None,
+                     formula_enable: bool = None,
+                     table_enable: bool = None):
+    """配置全局适配器 - 扩展版本，支持所有配置项"""
     global _global_adapter
     
-    # 优先从统一配置系统获取默认值
+    # 获取当前配置作为默认值
     if CONFIG_AVAILABLE:
         current_url = MINERU_CONFIG.fastapi.url
         current_backend = MINERU_CONFIG.default_backend
         current_timeout = MINERU_CONFIG.fastapi.timeout
+        current_server_url = MINERU_CONFIG.vlm.sglang.server_url
+        current_parse_method = MINERU_CONFIG.pipeline.parse_method
+        current_lang = MINERU_CONFIG.pipeline.lang
+        current_formula_enable = MINERU_CONFIG.pipeline.formula_enable
+        current_table_enable = MINERU_CONFIG.pipeline.table_enable
     else:
-        # 备用：从环境变量获取默认值
+        # 环境变量备用
         current_url = os.environ.get('MINERU_FASTAPI_URL', 'http://localhost:8888')
         current_backend = os.environ.get('MINERU_FASTAPI_BACKEND', 'pipeline')
         current_timeout = int(os.environ.get('MINERU_FASTAPI_TIMEOUT', '30'))
+        current_server_url = os.environ.get('MINERU_VLM_SERVER_URL', 
+                                           os.environ.get('SGLANG_SERVER_URL'))
+        current_parse_method = os.environ.get('MINERU_PARSE_METHOD', 'auto')
+        current_lang = os.environ.get('MINERU_LANG', 'ch')
+        current_formula_enable = os.environ.get('MINERU_FORMULA_ENABLE', 'true').lower() == 'true'
+        current_table_enable = os.environ.get('MINERU_TABLE_ENABLE', 'true').lower() == 'true'
     
     _global_adapter = MinerUFastAPIAdapter(
         base_url=base_url or current_url,
         backend=backend or current_backend,
-        timeout=timeout or current_timeout
+        timeout=timeout or current_timeout,
+        server_url=server_url or current_server_url,
+        parse_method=parse_method or current_parse_method,
+        lang=lang or current_lang,
+        formula_enable=formula_enable if formula_enable is not None else current_formula_enable,
+        table_enable=table_enable if table_enable is not None else current_table_enable
     )
     
-    logger.info(f"FastAPI 适配器已配置: {_global_adapter.base_url}, 后端: {_global_adapter.backend}, 超时: {_global_adapter.timeout}s")
+    logger.info(f"FastAPI 适配器配置已更新 - 统一配置管理")
 
 
 def test_adapter_connection(base_url: str = None) -> Dict[str, Any]:
@@ -253,4 +331,26 @@ def test_adapter_connection(base_url: str = None) -> Dict[str, Any]:
             'status': 'error',
             'url': test_url,
             'message': f'连接失败: {str(e)}'
-        } 
+        }
+
+
+def get_adapter_config_info() -> Dict[str, Any]:
+    """获取当前适配器配置信息 - 新增调试函数"""
+    adapter = get_global_adapter()
+    return {
+        'fastapi_config': {
+            'base_url': adapter.base_url,
+            'backend': adapter.backend,
+            'timeout': adapter.timeout
+        },
+        'vlm_config': {
+            'server_url': adapter.server_url
+        },
+        'pipeline_config': {
+            'parse_method': adapter.parse_method,
+            'lang': adapter.lang,
+            'formula_enable': adapter.formula_enable,
+            'table_enable': adapter.table_enable
+        },
+        'config_source': 'unified_config_system' if CONFIG_AVAILABLE else 'environment_variables'
+    } 

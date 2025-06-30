@@ -98,3 +98,6 @@ mineru:
       # SGLang 服务器地址（vlm-sglang-client 后端需要）
       # Docker部署时同样需要使用宿主机IP或容器网络地址
       server_url: "http://host.docker.internal:30000"
+
+
+
