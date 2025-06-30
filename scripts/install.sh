@@ -149,7 +149,7 @@ if [ -f "$ENV_FILE" ]; then
     echo "  docker compose up -d"
     echo
     echo "🌐 访问地址："
-    echo "  http://$LOCAL_IP:8888"
+    echo "  http://$LOCAL_IP:8081"
 else
     echo "⚠️  请手动创建 .env 文件，参考以下模板："
     echo

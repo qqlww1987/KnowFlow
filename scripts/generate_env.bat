@@ -109,7 +109,7 @@ echo.
 call :log_info "配置已更新: %ENV_FILE%"
 echo 接下来您可以：
 echo 1. 运行 'docker compose up -d' 启动服务
-echo 2. 访问 http://%HOST_IP%:8888 进入管理界面
+echo 2. 访问 http://%HOST_IP%:8081 进入管理界面
 
 goto :eof
 
