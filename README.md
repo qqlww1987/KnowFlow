@@ -11,7 +11,7 @@ KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的�
 
 ### 适配 RAGFlow 全新 UI
 
-基于 RAGFlow v0.18.0 二次开发全新 UI 页面。
+基于 RAGFlow v0.18.0 二次开发全新 UI 页面，目前已适配 v0.19.0。
 
 <div align="center">
   <img src="assets/ui_1.png" alt="KnowFlow 企业知识库">
@@ -117,7 +117,7 @@ mineru:
    > 💡 **镜像说明：**
    > - `zxwei/mineru-api-full`：包含完整的 VLM 功能，支持所有后端类型
    > - `zxwei/mineru-api`：基础版本，主要支持 pipeline 后端
-   > - `server/services/config/settings.yaml` 可以配置选择 MinerU 模式
+   > - `server/services/config/settings.yaml` 可以配置选择 MinerU 模式、配置服务地址
    > - 如需 GPU 加速，请确保已安装 nvidia-container-toolkit
 
 
@@ -207,11 +207,8 @@ mineru:
 
 ### RAGFlow UI（无 RAGFlow UI 更新需要可忽略）
 
-将开源的 `dist` 目录复制到 docker 内的 /ragflow/web/dist 目录下，覆盖原有的 dist 即可
+参照 `ragflow-ui/README.md`
 
-```bash
-docker cp -r dist {ragflow_container_name}:/ragflow/web/
-```
 
 ## 编译 Docker（无编译需要可忽略）
 
@@ -226,8 +223,8 @@ docker buildx build --platform linux/amd64 --target frontend -t zxwei/knowflow-w
 - [x] 支持更多文档格式的 MinerU 解析
 - [x] 增强 MarkDown 文件的分块规则
 - [x] 优化 Excel 文件分块
-- [ ] MinerU 2.0 接入
-- [ ] RAGFlow 前端 UI 源码开源
+- [x] MinerU 2.0 接入
+- [x] RAGFlow 前端 UI 源码开源
 
 
 ## 交流群
