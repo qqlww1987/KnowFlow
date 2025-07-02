@@ -238,32 +238,46 @@ print(f"后端类型: {info['backend']}")
 
 ### 从原生 Python API 迁移
 
-**原有代码：**
+**已弃用的旧代码：**
 ```python
+# ⚠️ 此代码已弃用，请勿使用
 from server.services.knowledgebases.mineru_parse.mineru_test import process_pdf_with_minerU
 
+# 此函数会抛出 DeprecationWarning
 result = process_pdf_with_minerU(pdf_path, update_progress)
 ```
 
-**新代码：**
+**推荐的新代码：**
 ```python
 from server.services.knowledgebases.mineru_parse.process_pdf import process_pdf_entry
 
+# 统一使用 FastAPI 模式处理文档
 result = process_pdf_entry(doc_id, pdf_path, kb_id, update_progress)
+```
+
+**文档转换功能：**
+现在支持自动转换 Office 文档、URL 等格式：
+```python
+# 支持 PDF、Word、Excel、PowerPoint、URL 等
+result = process_pdf_entry("doc_001", "document.docx", "kb_001", callback)
+result = process_pdf_entry("doc_002", "https://example.com/file.pdf", "kb_001", callback)
 ```
 
 ### 配置迁移
 
 **原有环境变量：**
 ```bash
+# 已弃用的配置
 MINERU_USE_FASTAPI=true
 MINERU_DEFAULT_BACKEND=pipeline
 ```
 
 **新环境变量：**
 ```bash
+# 推荐的配置
 MINERU_FASTAPI_URL=http://localhost:8888
 MINERU_FASTAPI_BACKEND=pipeline
+MINERU_FASTAPI_TIMEOUT=300
 ```
 
 ## 🐛 故障排除

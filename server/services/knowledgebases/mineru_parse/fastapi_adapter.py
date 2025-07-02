@@ -7,10 +7,14 @@ MinerU FastAPI 适配器
 """
 
 import os
+import tempfile
 import requests
 import json
 from typing import Optional, Callable, Dict, Any
 from loguru import logger
+
+# 导入文档转换功能
+from .file_converter import ensure_pdf
 
 # 导入统一配置系统
 try:
@@ -132,7 +136,7 @@ class MinerUFastAPIAdapter:
         处理文件的主要接口 - 简化版本，自动使用适配器配置
         
         Args:
-            file_path: PDF文件路径
+            file_path: 文件路径（支持PDF、Office文档、URL等）
             update_progress: 进度回调函数
             backend: 指定后端类型（可选，覆盖适配器默认值）
             **kwargs: 其他参数（可选，覆盖适配器配置）
@@ -148,21 +152,45 @@ class MinerUFastAPIAdapter:
             raise Exception(f"FastAPI 服务器不可访问: {self.base_url}")
             
         if update_progress:
-            update_progress(0.2, "准备文件上传")
+            update_progress(0.15, "检查文件格式")
             
-        # 检查文件是否存在
-        if not os.path.exists(file_path):
+        # 检查文件是否存在（对于本地文件）
+        if not file_path.startswith(("http://", "https://")) and not os.path.exists(file_path):
             raise FileNotFoundError(f"文件不存在: {file_path}")
-            
-        # 准备请求数据（自动使用适配器配置）
-        data = self._prepare_request_data(backend=backend, **kwargs)
         
-        if update_progress:
-            update_progress(0.3, f"开始 {data['backend']} 后端处理")
-            
+        # 创建临时目录用于文档转换
+        temp_dir = tempfile.mkdtemp(prefix="fastapi_adapter_")
+        pdf_to_process = None
+        temp_pdf_to_delete = None
+        
         try:
+            if update_progress:
+                update_progress(0.2, "准备文档转换")
+            
+            # 调用 ensure_pdf 进行文档转换（如果需要）
+            logger.info(f"检查文档格式并转换: {file_path}")
+            pdf_to_process, temp_pdf_to_delete = ensure_pdf(file_path, temp_dir)
+            
+            if not pdf_to_process:
+                raise Exception(f"无法处理文件: {file_path}，转换为PDF失败")
+            
+            if temp_pdf_to_delete:
+                logger.info(f"文档已转换为PDF: {pdf_to_process}")
+                if update_progress:
+                    update_progress(0.25, "文档转换完成")
+            else:
+                logger.info(f"文档已是PDF格式: {pdf_to_process}")
+                if update_progress:
+                    update_progress(0.25, "PDF文件检查完成")
+            
+            # 准备请求数据（自动使用适配器配置）
+            data = self._prepare_request_data(backend=backend, **kwargs)
+            
+            if update_progress:
+                update_progress(0.3, f"开始 {data['backend']} 后端处理")
+                
             # 发送请求
-            with open(file_path, 'rb') as f:
+            with open(pdf_to_process, 'rb') as f:
                 files = {'file': f}
                 response = self.session.post(
                     f"{self.base_url}/file_parse",
@@ -181,8 +209,9 @@ class MinerUFastAPIAdapter:
                 result['_adapter_info'] = {
                     'backend_used': result.get('backend', data['backend']),
                     'file_processed': os.path.basename(file_path),
-                    'adapter_version': '2.1.0',  # 更新版本号
-                    'processing_mode': 'fastapi_unified_config'
+                    'converted_from': os.path.basename(file_path) if temp_pdf_to_delete else None,
+                    'adapter_version': '2.2.0',  # 更新版本号
+                    'processing_mode': 'fastapi_with_document_conversion'
                 }
                 
                 if update_progress:
@@ -202,6 +231,23 @@ class MinerUFastAPIAdapter:
             error_msg = f"FastAPI 请求失败: {str(e)}"
             logger.error(error_msg)
             raise Exception(error_msg)
+        finally:
+            # 清理临时文件
+            if temp_pdf_to_delete and os.path.exists(temp_pdf_to_delete):
+                try:
+                    os.remove(temp_pdf_to_delete)
+                    logger.info(f"已清理临时PDF文件: {temp_pdf_to_delete}")
+                except OSError as e:
+                    logger.warning(f"清理临时PDF文件失败: {temp_pdf_to_delete}, 错误: {e}")
+            
+            # 清理临时目录
+            try:
+                import shutil
+                if os.path.exists(temp_dir):
+                    shutil.rmtree(temp_dir)
+                    logger.debug(f"已清理临时目录: {temp_dir}")
+            except OSError as e:
+                logger.warning(f"清理临时目录失败: {temp_dir}, 错误: {e}")
 
 
 # 全局适配器实例
