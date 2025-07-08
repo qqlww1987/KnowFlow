@@ -39,7 +39,7 @@ def _upload_images(kb_id, image_dir, update_progress):
     upload_directory_to_minio(kb_id, image_dir)
 
 def get_ragflow_doc(doc_id, kb_id):
-    """获取RAGFlow文档对象"""
+    """获取RAGFlow文档对象和dataset对象"""
     api_key, base_url = _validate_environment()
     rag_object = RAGFlow(api_key=api_key, base_url=base_url)
     datasets = rag_object.list_datasets(id=kb_id)
@@ -49,7 +49,7 @@ def get_ragflow_doc(doc_id, kb_id):
     docs = dataset.list_documents(id=doc_id)
     if not docs:
         raise Exception(f"未找到文档 {doc_id}")
-    return docs[0]
+    return docs[0], dataset  # 返回doc和dataset元组
 
 def _get_document_chunking_config(doc_id):
     """从数据库获取文档的分块配置"""
@@ -265,7 +265,7 @@ def add_chunks_to_doc(doc, chunks, update_progress, config=None):
     
     return successful_count
 
-def _update_chunks_position(doc, md_file_path, chunk_content_to_index, config=None, update_progress=None):
+def _update_chunks_position(doc, md_file_path, chunk_content_to_index, dataset, config=None, update_progress=None):
     start_time = time.time()
     
     # 合并配置参数
@@ -276,8 +276,16 @@ def _update_chunks_position(doc, md_file_path, chunk_content_to_index, config=No
     es_client = get_es_client()
     print(f"文档: id: {doc.id})")
     chunk_count = 0
-    tenant_id = doc.created_by
+    
+    # 🔧 直接使用传入的dataset对象获取tenant_id，避免重复API调用
+    tenant_id = dataset.tenant_id
+    print(f"[DEBUG] 🔧 使用复用的dataset对象获取tenant_id:")
+    print(f"  - doc.dataset_id: {doc.dataset_id}")
+    print(f"  - doc.created_by: {doc.created_by}")
+    print(f"  - dataset.tenant_id: {tenant_id}")
+    
     index_name = f"ragflow_{tenant_id}"
+    print(f"  - ✅ 正确的ES索引名: {index_name}")
     
     # 收集所有批量更新操作
     bulk_operations = []
@@ -464,7 +472,7 @@ def create_ragflow_resources(doc_id, kb_id, md_file_path, image_dir, update_prog
     使用增强文本创建RAGFlow知识库和聊天助手
     """
     try:
-        doc = get_ragflow_doc(doc_id, kb_id)
+        doc, dataset = get_ragflow_doc(doc_id, kb_id)
 
         _upload_images(kb_id, image_dir, update_progress)
 
@@ -487,7 +495,7 @@ def create_ragflow_resources(doc_id, kb_id, md_file_path, image_dir, update_prog
         chunk_content_to_index = {chunk: i for i, chunk in enumerate(chunks)}
 
         add_chunks_to_doc(doc, chunks, update_progress)
-        chunk_count = _update_chunks_position(doc, md_file_path, chunk_content_to_index, update_progress=update_progress)
+        chunk_count = _update_chunks_position(doc, md_file_path, chunk_content_to_index, dataset, update_progress=update_progress)
         # 根据环境变量决定是否清理临时文件
         _cleanup_temp_files(md_file_path)
 

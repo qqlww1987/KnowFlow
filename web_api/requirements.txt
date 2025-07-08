@@ -1,4 +1,4 @@
-mineru[pipeline]
+mineru[pipeline]==2.1.0
 
 fastapi
 uvicorn

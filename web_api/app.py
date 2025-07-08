@@ -5,6 +5,8 @@ from urllib.parse import urlparse
 from base64 import b64encode
 from glob import glob
 from typing import Tuple, Union, Optional
+import gc
+import copy
 
 import uvicorn
 from fastapi import FastAPI, UploadFile
@@ -23,6 +25,7 @@ from mineru.backend.vlm.vlm_analyze import doc_analyze as vlm_doc_analyze
 from mineru.backend.vlm.vlm_middle_json_mkcontent import union_make as vlm_union_make
 from mineru.utils.enum_class import MakeMode
 from mineru.utils.draw_bbox import draw_layout_bbox, draw_span_bbox
+from mineru.utils.language import remove_invalid_surrogates
 
 app = FastAPI()
 
@@ -45,6 +48,22 @@ def validate_server_url(url: str) -> bool:
         return all([result.scheme, result.netloc])
     except Exception:
         return False
+
+def clean_data_for_json(data):
+    """
+    递归清理数据中的所有字符串，移除无效的UTF-16代理字符
+    防止JSON序列化时出现UTF-8编码错误
+    """
+    if isinstance(data, str):
+        return remove_invalid_surrogates(data)
+    elif isinstance(data, dict):
+        return {key: clean_data_for_json(value) for key, value in data.items()}
+    elif isinstance(data, list):
+        return [clean_data_for_json(item) for item in data]
+    elif isinstance(data, tuple):
+        return tuple(clean_data_for_json(item) for item in data)
+    else:
+        return data
 
 
 def check_sglang_server_health(server_url: str, timeout: int = 10) -> Tuple[bool, str]:
@@ -171,7 +190,8 @@ def process_file_pipeline(
     _lang = lang_list[0]
     _ocr_enable = ocr_enabled_list[0]
 
-    model_json = json.loads(json.dumps(model_list)) # deepcopy
+    # 优化深拷贝方式，避免JSON序列化的内存浪费
+    model_json = copy.deepcopy(model_list)
     
     middle_json = pipeline_result_to_middle_json(model_list, images_list, pdf_doc, image_writer, _lang, _ocr_enable, formula_enable)
     
@@ -440,11 +460,17 @@ def file_parse(
         data["md_content"] = md_content  # md_content is always returned
         data["backend"] = backend  # 返回使用的后端信息
 
-        return JSONResponse(data, status_code=200)
+        cleaned_data = clean_data_for_json(data)        
+        return JSONResponse(cleaned_data, status_code=200)
+
 
     except Exception as e:
-        logger.exception(e)
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        # 也需要清理错误信息中的无效字符
+        error_message = clean_data_for_json(str(e))
+        return JSONResponse(content={"error": error_message}, status_code=500)
+    finally:
+        # 统一在请求结束后进行垃圾回收，释放内存
+        gc.collect()
 
 
 if __name__ == "__main__":

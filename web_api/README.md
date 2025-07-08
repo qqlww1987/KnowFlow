@@ -95,6 +95,7 @@ curl -X POST "http://localhost:8888/file_parse" \
 
 ### 使用 VLM-Transformers 模式（高精度）
 ```bash
+
 curl -X POST "http://localhost:8888/file_parse" \
   -F "file=@document.pdf" \
   -F "backend=vlm-transformers"
