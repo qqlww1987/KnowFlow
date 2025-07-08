@@ -177,8 +177,8 @@ def perform_parse(doc_id, doc_info, file_info, embedding_config):
                 print(f"[Parser-INFO] 开发模式已启用：跳过 MinerU 处理，直接使用现有 markdown 文件")
                 
                 # 使用现有的 markdown 文件路径
-                output_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'output')
-                md_file_path = os.path.join(output_dir, '1ee7fd764d1411f0944266fc51ac58df.md')
+                output_dir = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'output')
+                md_file_path = os.path.join(output_dir, 'd0dbb95e4cc011f0adde66fc51ac58df.md')
                 
                 if os.path.exists(md_file_path):
                     print(f"[Parser-INFO] 找到测试 markdown 文件: {md_file_path}")

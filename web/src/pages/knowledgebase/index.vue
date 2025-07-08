@@ -19,6 +19,7 @@ import {
   setSystemEmbeddingConfigApi,
   addDocumentToKnowledgeBaseApi
 } from "@@/apis/kbs/knowledgebase"
+import { getTableDataApi } from "@@/apis/tables"
 import { usePagination } from "@@/composables/usePagination"
 import { CaretRight, Delete, Loading, Plus, Refresh, Search, Setting, View } from "@element-plus/icons-vue"
 import axios from "axios"
@@ -97,7 +98,8 @@ const knowledgeBaseForm = reactive({
   name: "",
   description: "",
   language: "Chinese",
-  permission: "me"
+  permission: "me",
+  creator_id: ""
 })
 
 // 定义API返回数据的接口
@@ -125,6 +127,9 @@ const knowledgeBaseFormRules = {
   ],
   description: [
     { max: 200, message: "描述不能超过200个字符", trigger: "blur" }
+  ],
+  creator_id: [
+    { required: true, message: "请选择创建人", trigger: "change" }
   ]
 }
 
@@ -175,6 +180,31 @@ function resetSearch() {
 // 打开新建知识库对话框
 function handleCreate() {
   createDialogVisible.value = true
+  getUserList() // 获取用户列表
+}
+
+// 获取用户列表
+function getUserList() {
+  userLoading.value = true
+  // 复用用户管理页面的API
+  getTableDataApi({
+    currentPage: 1,
+    size: 1000, // 获取足够多的用户
+    username: "",
+    email: "",
+    sort_by: "create_date",
+    sort_order: "desc"
+  }).then(({ data }) => {
+    userList.value = data.list.map((user: any) => ({
+      id: user.id,
+      username: user.username
+    }))
+  }).catch(() => {
+    userList.value = []
+    ElMessage.error("获取用户列表失败")
+  }).finally(() => {
+    userLoading.value = false
+  })
 }
 
 // 提交新建知识库
@@ -910,6 +940,11 @@ function isLoadingStatus(status: string) {
 function shouldShowProgressCount(status: string) {
   return !["starting", "not_found"].includes(status)
 }
+
+// 用户列表相关状态
+const userList = ref<{ id: number, username: string }[]>([])
+const userLoading = ref(false)
+
 </script>
 
 <template>
@@ -1197,6 +1232,22 @@ function shouldShowProgressCount(status: string) {
             <el-select v-model="knowledgeBaseForm.language" placeholder="请选择语言">
               <el-option label="中文" value="Chinese" />
               <el-option label="英文" value="English" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="创建人" prop="creator_id">
+            <el-select
+              v-model="knowledgeBaseForm.creator_id"
+              placeholder="请选择创建人"
+              style="width: 100%"
+              filterable
+              :loading="userLoading"
+            >
+              <el-option
+                v-for="user in userList"
+                :key="user.id"
+                :label="user.username"
+                :value="user.id"
+              />
             </el-select>
           </el-form-item>
           <el-form-item label="权限" prop="permission">
