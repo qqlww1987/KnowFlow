@@ -1,7 +1,7 @@
 services:
   frontend:
     container_name: knowflow-frontend
-    image: zxwei/knowflow-web:v0.6.0
+    image: zxwei/knowflow-web:v0.7.0
     build:
       context: .
       dockerfile: Dockerfile
