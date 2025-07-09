@@ -6,8 +6,6 @@ COPY web /app/frontend
 RUN npm install -g pnpm
 # 设置环境变量禁用交互式提示
 ENV CI=true
-# 设置 API 基础路径
-ENV VITE_BASE_URL=/api
 # 安装依赖并构建
 RUN pnpm i && pnpm build
 
