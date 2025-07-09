@@ -14,6 +14,10 @@ export interface TableRequestData {
   username?: string
   /** 查询参数：邮箱 */
   email?: string
+  /** 排序字段 */
+  sort_by?: string
+  /** 排序顺序 */
+  sort_order?: "asc" | "desc"
 }
 
 export interface TableData {

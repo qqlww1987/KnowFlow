@@ -16,6 +16,10 @@ export interface TableRequestData {
   email?: string
   /** 查询参数：团队名称 */
   name?: string // 添加 name 属性
+  /** 排序字段 */
+  sort_by?: string
+  /** 排序顺序 */
+  sort_order?: "asc" | "desc"
 }
 
 export interface TableData {

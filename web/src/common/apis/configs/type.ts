@@ -12,6 +12,10 @@ export interface TableRequestData {
   size: number
   /** 查询参数：用户名 */
   username?: string
+  /** 排序字段 */
+  sort_by?: string
+  /** 排序顺序 */
+  sort_order?: "asc" | "desc"
 }
 
 export interface TableData {
