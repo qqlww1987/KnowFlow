@@ -399,5 +399,9 @@ mineru:
 
 
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=weizxfree/KnowFlow&type=Date)](https://www.star-history.com/#weizxfree/KnowFlow&Date)
+
 
 
