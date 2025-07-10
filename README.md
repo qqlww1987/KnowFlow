@@ -311,6 +311,92 @@ mineru:
 
 4）**网络连接问题**：检查防火墙设置和容器网络配置
 
+5）**通过 RAGFlow 网络连接（推荐）**：
+
+   如果您已经部署了 RAGFlow 服务，可以通过连接 RAGFlow 的 Docker 网络来实现更稳定的网络连接（适用于不方便开公网端口权限用户）。
+
+   **配置步骤：**
+
+   1. **修改 docker-compose.yml 文件**：
+   
+   ```yaml
+   services:
+     frontend:
+       container_name: knowflow-frontend
+       image: zxwei/knowflow-web:v0.7.0
+       ports:
+         - "8081:80"
+       depends_on:
+         - backend
+       environment:
+         - API_BASE_URL=/api
+       networks:
+         - management_network
+         - ragflow_ragflow  # 连接到 RAGFlow 网络
+
+     backend:
+       container_name: knowflow-backend
+       image: zxwei/knowflow-server:v1.1.3
+       ports:
+         - "5000:5000"
+       environment:
+         - RAGFLOW_API_KEY=${RAGFLOW_API_KEY}
+         - RAGFLOW_BASE_URL=${RAGFLOW_BASE_URL}
+         - DB_HOST=${DB_HOST}
+         - MYSQL_PORT=3306  # 注意是 3306 端口
+         - MINIO_HOST=${MINIO_HOST}
+         - ES_HOST=${ES_HOST}
+         - ES_PORT=${ES_PORT}
+         # ... 其他环境变量
+       volumes:
+         - ./server/services/config:/app/services/config:ro
+       extra_hosts:
+         - "host.docker.internal:host-gateway"
+       networks:
+         - management_network
+         - ragflow_ragflow  # 连接到 RAGFlow 网络
+
+     gotenberg:
+       image: gotenberg/gotenberg:8
+       ports:
+         - "3000:3000"
+       networks:
+         - management_network
+         - ragflow_ragflow  # 连接到 RAGFlow 网络
+
+   networks:
+     management_network:
+       driver: bridge
+     ragflow_ragflow:
+       external: true  # 使用外部的 RAGFlow 网络
+   ```
+
+   2. **配置 .env 文件**：
+   
+   ```bash
+   # RAGFlow API 配置
+   RAGFLOW_API_KEY=ragflow-JmZjZlOGU2NWM4ZjExZjBhNGZmY2U4MD
+   RAGFLOW_BASE_URL=http://8.134.177.47:15002
+
+   # 通过 RAGFlow 网络连接的服务地址
+   ES_HOST=ragflow-es-01
+   ES_PORT=9200
+   DB_HOST=ragflow-mysql
+   MINIO_HOST=ragflow-minio
+   REDIS_HOST=ragflow-redis
+   ```
+
+   **优势：**
+   - 避免网络地址配置问题
+   - 直接使用 RAGFlow 的服务容器名进行通信
+   - 更稳定的容器间网络连接
+   - 减少端口暴露和安全风险
+
+   **注意事项：**
+   - 确保 RAGFlow 服务已正常运行
+   - RAGFlow 网络名称可能不同，请根据实际情况调整（通常为 `ragflow_ragflow` 或 `ragflow_default`）
+   - 可通过 `docker network ls` 查看可用的网络
+
 
 
 
