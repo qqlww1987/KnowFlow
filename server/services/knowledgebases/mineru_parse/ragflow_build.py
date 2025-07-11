@@ -102,6 +102,9 @@ def _log_performance_stats(operation_name, start_time, end_time, item_count, add
         print(f"[性能警告] {operation_name} 处理时间过长: {duration:.2f}s")
 
 def add_chunks_to_doc(doc, chunks, update_progress, config=None):
+    """
+    优化版 add_chunks_to_doc - 直接调用批量接口
+    """
     start_time = time.time()
     
     # 合并配置参数
@@ -109,161 +112,136 @@ def add_chunks_to_doc(doc, chunks, update_progress, config=None):
     if config:
         effective_config.update(config)
     
-    print(f"总共接收到 {len(chunks)} 个 chunks 准备添加。")
+    print(f"🚀 批量添加: 总共接收到 {len(chunks)} 个 chunks 准备批量添加")
     
-    # 配置并发参数
-    max_workers = min(effective_config['max_concurrent_workers'], len(chunks))
-    chunk_results = [None] * len(chunks)  # 保持顺序的结果数组
-    failed_chunks = []
-    lock = threading.Lock()
-    completed_count = 0
-    
-    def add_single_chunk(index, chunk):
-        """添加单个chunk的函数"""
-        nonlocal completed_count
-        chunk_start_time = time.time()
-        try:
-            chunk_preview = chunk.strip()[:50].replace('\n', ' ')
-            print(f"正在处理 Chunk {index}: \"{chunk_preview}...\"")
-            
-            if chunk and chunk.strip():
-                doc.add_chunk(content=chunk)
-                
-                # 更新进度
-                with lock:
-                    completed_count += 1
-                    progress = 0.8 + (completed_count / len(chunks)) * 0.15  # 0.8-0.95范围
-                    update_progress(progress, f"添加chunks进度: {completed_count}/{len(chunks)}")
-                
-                chunk_duration = time.time() - chunk_start_time
-                if chunk_duration > 5:  # 单个chunk处理超过5秒
-                    print(f"[性能警告] Chunk {index} 处理时间较长: {chunk_duration:.2f}s")
-                
-                return index, True, None
-            else:
-                with lock:
-                    completed_count += 1
-                    progress = 0.8 + (completed_count / len(chunks)) * 0.15
-                    update_progress(progress, f"添加chunks进度: {completed_count}/{len(chunks)}")
-                return index, False, "chunk内容为空"
-        except Exception as e:
-            print(f"添加 chunk {index} 失败: {e}")
-            with lock:
-                completed_count += 1
-                progress = 0.8 + (completed_count / len(chunks)) * 0.15
-                update_progress(progress, f"添加chunks进度: {completed_count}/{len(chunks)}")
-            return index, False, str(e)
+    if not chunks:
+        print("⚠️ 没有chunks需要添加")
+        update_progress(0.95, "没有chunks需要添加")
+        return 0
     
     # 初始进度更新
-    update_progress(0.8, "开始添加chunks到文档...")
-    
-    # 根据配置决定是否使用并发处理
-    use_concurrent = (
-        effective_config['enable_concurrent_chunk_add'] and 
-        len(chunks) > 1 and 
-        max_workers > 1
-    )
-    
-    processing_start_time = time.time()
+    update_progress(0.8, "开始批量添加chunks到文档...")
     
     try:
-        if use_concurrent:
-            print(f"使用 {max_workers} 个线程并发添加chunks...")
+        # 准备批量数据
+        batch_chunks = []
+        for i, chunk in enumerate(chunks):
+            if chunk and chunk.strip():
+                batch_chunks.append({
+                    "content": chunk.strip(),
+                    "important_keywords": [],  # 可以根据需要添加关键词提取
+                    "questions": []  # 可以根据需要添加问题生成
+                })
+        
+        if not batch_chunks:
+            print("⚠️ 过滤后没有有效的chunks")
+            update_progress(0.95, "没有有效的chunks")
+            return 0
+        
+        print(f"📦 准备批量添加 {len(batch_chunks)} 个有效chunks")
+        
+        # 配置批量大小 - 根据chunk数量动态调整
+        if len(batch_chunks) <= 10:
+            batch_size = 5
+        elif len(batch_chunks) <= 50:
+            batch_size = 10
+        else:
+            batch_size = 20
+        
+        # 分批处理，避免单次请求过大
+        total_added = 0
+        total_failed = 0
+        batch_count = (len(batch_chunks) + batch_size - 1) // batch_size
+        
+        for batch_idx in range(0, len(batch_chunks), batch_size):
+            batch_end = min(batch_idx + batch_size, len(batch_chunks))
+            current_batch = batch_chunks[batch_idx:batch_end]
+            
+            current_batch_num = batch_idx // batch_size + 1
+            print(f"🔄 处理批次 {current_batch_num}/{batch_count} ({len(current_batch)} chunks)")
             
             try:
-                with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-                    # 提交所有任务，保持索引映射
-                    future_to_index = {
-                        executor.submit(add_single_chunk, i, chunk): i 
-                        for i, chunk in enumerate(chunks)
+                # 直接调用批量接口
+                response = doc.rag.post(
+                    f'/datasets/{doc.dataset_id}/documents/{doc.id}/chunks/batch',
+                    {
+                        "chunks": current_batch,
+                        "batch_size": min(batch_size, len(current_batch))
                     }
-                    
-                    # 收集结果，保持原始顺序
-                    try:
-                        for future in concurrent.futures.as_completed(future_to_index, timeout=effective_config['chunk_add_timeout']):
-                            index, success, error = future.result()
-                            
-                            with lock:
-                                chunk_results[index] = success
-                                if not success:
-                                    failed_chunks.append((index, error))
-                    except concurrent.futures.TimeoutError:
-                        print(f"[异常处理] 并发处理超时 ({effective_config['chunk_add_timeout']}s)，取消剩余任务...")
-                        # 取消未完成的任务
-                        for future in future_to_index:
-                            if not future.done():
-                                future.cancel()
-                        
-                        # 收集已完成的结果
-                        for future in future_to_index:
-                            if future.done() and not future.cancelled():
-                                try:
-                                    index, success, error = future.result()
-                                    with lock:
-                                        chunk_results[index] = success
-                                        if not success:
-                                            failed_chunks.append((index, error))
-                                except Exception as e:
-                                    print(f"[异常处理] 获取超时任务结果失败: {e}")
-                        
-                        # 将未完成的chunks标记为失败
-                        for future, index in future_to_index.items():
-                            if future.cancelled() or not future.done():
-                                chunk_results[index] = False
-                                failed_chunks.append((index, "任务超时被取消"))
-                        
-                        print(f"[异常处理] 超时处理完成，已处理的chunks: {completed_count}/{len(chunks)}")
-                        
-            except Exception as concurrent_e:
-                print(f"[异常处理] 并发执行出现异常: {concurrent_e}")
-                # 回退到单线程模式
-                print("[异常处理] 回退到单线程模式...")
-                use_concurrent = False  # 标记为非并发模式，用于后续统计
+                )
                 
-        if not use_concurrent:
-            # 单线程处理
-            print("使用单线程模式添加chunks...")
-            for i, chunk in enumerate(chunks):
-                try:
-                    index, success, error = add_single_chunk(i, chunk)
-                    chunk_results[index] = success
-                    if not success:
-                        failed_chunks.append((index, error))
-                except Exception as e:
-                    print(f"[异常处理] 单线程处理Chunk {i}失败: {e}")
-                    chunk_results[i] = False
-                    failed_chunks.append((i, f"单线程处理异常: {str(e)}"))
+                result = response.json()
+                
+                if result.get("code") == 0:
+                    # 批量添加成功
+                    data = result.get("data", {})
+                    added = data.get("total_added", 0)
+                    failed = data.get("total_failed", 0)
+                    
+                    total_added += added
+                    total_failed += failed
+                    
+                    # 更新进度
+                    progress = 0.8 + (batch_end / len(batch_chunks)) * 0.15  # 0.8-0.95范围
+                    update_progress(progress, f"批量添加进度: {batch_end}/{len(batch_chunks)} chunks")
+                    
+                    print(f"✅ 批次 {current_batch_num} 成功: +{added} chunks (失败: {failed})")
+                    
+                    # 显示处理统计
+                    stats = data.get("processing_stats", {})
+                    if stats:
+                        print(f"   📊 分片处理: {stats.get('batches_processed', 0)} 个分片")
+                        print(f"   ⏱️  处理时间: {stats.get('processing_time', 0):.2f}s")
+                
+                else:
+                    # 批量添加失败
+                    error_msg = result.get("message", "Unknown error")
+                    print(f"❌ 批次 {current_batch_num} 失败: {error_msg}")
+                    total_failed += len(current_batch)
+                    
+                    # 更新进度
+                    progress = 0.8 + (batch_end / len(batch_chunks)) * 0.15
+                    update_progress(progress, f"批量添加进度: {batch_end}/{len(batch_chunks)} chunks (部分失败)")
+                
+            except Exception as e:
+                print(f"❌ 批次 {current_batch_num} 网络请求异常: {e}")
+                total_failed += len(current_batch)
+                
+                # 更新进度
+                progress = 0.8 + (batch_end / len(batch_chunks)) * 0.15
+                update_progress(progress, f"批量添加进度: {batch_end}/{len(batch_chunks)} chunks (网络异常)")
         
-    except Exception as overall_e:
-        print(f"[异常处理] 整体处理出现异常: {overall_e}")
-        # 确保有基础的结果数组
-        if not chunk_results or all(x is None for x in chunk_results):
-            chunk_results = [False] * len(chunks)
-            failed_chunks = [(i, f"整体处理异常: {str(overall_e)}") for i in range(len(chunks))]
-    
-    finally:
-        # 确保进度更新到0.95，无论是否发生异常
-        processing_end_time = time.time()
+        # 最终统计
+        success_rate = (total_added / len(batch_chunks) * 100) if len(batch_chunks) > 0 else 0
         
-        # 统计结果
-        successful_count = sum(1 for result in chunk_results if result)
-        update_progress(0.95, f"Chunks添加完成: 成功 {successful_count}/{len(chunks)}")
-        print(f"Chunks添加完成: 成功 {successful_count}/{len(chunks)}")
+        print(f"📊 批量添加完成:")
+        print(f"   ✅ 成功: {total_added}/{len(batch_chunks)} chunks")
+        print(f"   ❌ 失败: {total_failed} chunks") 
+        print(f"   📈 成功率: {success_rate:.1f}%")
         
-        if failed_chunks:
-            print(f"失败的chunks索引: {[idx for idx, _ in failed_chunks]}")
-            for idx, error in failed_chunks[:5]:  # 只显示前5个错误
-                print(f"  Chunk {idx} 失败原因: {error}")
-            if len(failed_chunks) > 5:
-                print(f"  ... 还有 {len(failed_chunks) - 5} 个失败的chunks")
+        # 最终进度更新
+        if total_failed == 0:
+            update_progress(0.95, f"批量添加完成: 成功 {total_added}/{len(batch_chunks)} chunks")
+        else:
+            update_progress(0.95, f"批量添加完成: 成功 {total_added}, 失败 {total_failed} chunks")
         
         # 记录性能统计
         end_time = time.time()
-        mode = "并发模式" if use_concurrent else "单线程模式"
-        additional_info = f"{mode}, 工作线程数: {max_workers if use_concurrent else 1}, 成功率: {successful_count/len(chunks)*100:.1f}%"
-        _log_performance_stats("添加Chunks", processing_start_time, processing_end_time, len(chunks), additional_info)
-    
-    return successful_count
+        processing_time = end_time - start_time
+        additional_info = f"批量模式, 批次数: {batch_count}, 成功率: {success_rate:.1f}%, 性能提升: ~{len(batch_chunks)}x"
+        _log_performance_stats("批量添加Chunks", start_time, end_time, len(batch_chunks), additional_info)
+        
+        return total_added
+        
+    except Exception as e:
+        print(f"❌ 批量添加过程中出现异常: {e}")
+        update_progress(0.95, f"批量添加异常: {str(e)}")
+        
+        # 记录异常统计
+        end_time = time.time()
+        _log_performance_stats("批量添加Chunks(异常)", start_time, end_time, len(chunks), f"异常: {str(e)}")
+        
+        return 0
 
 def _update_chunks_position(doc, md_file_path, chunk_content_to_index, dataset, config=None, update_progress=None):
     start_time = time.time()
