@@ -1139,6 +1139,53 @@ def add_chunk(tenant_id, dataset_id, document_id):
     # return get_result(data={"chunk_id": chunk_id})
 
 
+def _add_positions_to_chunk_data(d, positions):
+    """
+    Add position information to chunk data based on RAGFlow's _add_positions logic.
+    Args:
+        d: chunk data dictionary
+        positions: list of [page_num, left, right, top, bottom] tuples
+    """
+    try:
+        print(f"🔧 KnowFlow: 处理位置信息开始，输入positions: {positions}")
+        
+        if not positions:
+            print(f"⚠️ KnowFlow: 位置信息为空，跳过处理")
+            return
+        
+        page_num_int = []
+        position_int = []
+        top_int = []
+        
+        for i, pos in enumerate(positions):
+            print(f"🔧 KnowFlow: 处理位置 {i}: {pos}")
+            if len(pos) != 5:
+                print(f"⚠️ KnowFlow: 位置 {i} 格式错误，长度: {len(pos)}")
+                continue  # Skip invalid positions
+                
+            pn, left, right, top, bottom = pos
+            page_num_int.append(int(pn))
+            top_int.append(int(top))
+            position_int.append((int(pn), int(left), int(right), int(top), int(bottom)))
+            print(f"✅ KnowFlow: 位置 {i} 处理成功: page={pn}, coords=({left},{right},{top},{bottom})")
+        
+        if page_num_int:  # Only add if we have valid positions
+            d["page_num_int"] = page_num_int
+            d["position_int"] = position_int
+            d["top_int"] = top_int
+            print(f"✅ KnowFlow: 位置信息已添加到chunk数据:")
+            print(f"   - page_num_int: {page_num_int}")
+            print(f"   - position_int: {position_int}")
+            print(f"   - top_int: {top_int}")
+        else:
+            print(f"⚠️ KnowFlow: 没有有效的位置信息")
+            
+    except Exception as e:
+        print(f"❌ KnowFlow: 处理位置信息失败: {e}")
+        import traceback
+        traceback.print_exc()
+
+
 @manager.route(  # noqa: F821
     "/datasets/<dataset_id>/documents/<document_id>/chunks/batch", methods=["POST"]
 )
@@ -1188,6 +1235,18 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
                     items:
                       type: string
                     description: Questions related to the chunk.
+                  positions:
+                    type: array
+                    items:
+                      type: array
+                      items:
+                        type: integer
+                      minItems: 5
+                      maxItems: 5
+                    description: Position information as list of [page_num, left, right, top, bottom].
+                  top_int:
+                    type: integer
+                    description: Top coordinate index for chunk positioning (alternative to positions).
               required: true
               description: Array of chunks to add.
             batch_size:
@@ -1223,6 +1282,18 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
                     items:
                       type: string
                     description: Important keywords.
+                  positions:
+                    type: array
+                    items:
+                      type: array
+                      items:
+                        type: integer
+                    description: Position information.
+                  top_positions:
+                    type: array
+                    items:
+                      type: integer
+                    description: Top coordinate positions for each chunk.
             total_added:
               type: integer
               description: Total number of chunks successfully added.
@@ -1233,29 +1304,31 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
               type: object
               description: Processing statistics and performance metrics.
     """
-    # 配置参数
+    # 批量处理配置参数
     MAX_CHUNKS_PER_REQUEST = 100  # 单次请求最大 chunk 数量
     DEFAULT_BATCH_SIZE = 5        # 默认分片大小
     MAX_BATCH_SIZE = 20          # 最大分片大小
     MAX_CONTENT_LENGTH = 1000    # 单个 chunk 内容最大长度
+    DB_BULK_SIZE = 4  # ES分批插入大小
     
+    # ===== 1. 权限和基础验证 =====
     if not KnowledgebaseService.accessible(kb_id=dataset_id, user_id=tenant_id):
         return get_error_data_result(message=f"You don't own the dataset {dataset_id}.")
     
     doc = DocumentService.query(id=document_id, kb_id=dataset_id)
     if not doc:
-        return get_error_data_result(
-            message=f"You don't own the document {document_id}."
-        )
+        return get_error_data_result(message=f"You don't own the document {document_id}.")
     doc = doc[0]
     
+    # ===== 2. 请求数据解析和验证 =====
     req = request.json
-    if not req.get("chunks") or not isinstance(req["chunks"], list):
+    chunks_data = req.get("chunks", [])
+    batch_size = min(req.get("batch_size", DEFAULT_BATCH_SIZE), MAX_BATCH_SIZE)
+    
+    # 基础数据验证
+    if not chunks_data or not isinstance(chunks_data, list):
         return get_error_data_result(message="`chunks` is required and must be a list")
     
-    chunks_data = req["chunks"]
-    
-    # 检查总数量限制
     if len(chunks_data) == 0:
         return get_error_data_result(message="No chunks provided")
     
@@ -1264,17 +1337,15 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
             message=f"Too many chunks. Maximum allowed: {MAX_CHUNKS_PER_REQUEST}, received: {len(chunks_data)}"
         )
     
-    # 获取批量处理大小
-    batch_size = min(req.get("batch_size", DEFAULT_BATCH_SIZE), MAX_BATCH_SIZE)
-    
     print(f"🚀 KnowFlow: 开始批量处理 {len(chunks_data)} 个chunks，分片大小: {batch_size}")
     
-    # 验证每个chunk的格式和大小
+    # ===== 3. 详细的数据验证 =====
     validated_chunks = []
     validation_errors = []
     
     for i, chunk_req in enumerate(chunks_data):
         try:
+            # 内容验证
             content = str(chunk_req.get("content", "")).strip()
             if not content:
                 validation_errors.append(f"Chunk {i}: content is required")
@@ -1283,15 +1354,44 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
             if len(content) > MAX_CONTENT_LENGTH:
                 validation_errors.append(f"Chunk {i}: content too long ({len(content)} chars, max {MAX_CONTENT_LENGTH})")
                 continue
-                
-            if "important_keywords" in chunk_req:
-                if not isinstance(chunk_req["important_keywords"], list):
-                    validation_errors.append(f"Chunk {i}: important_keywords must be a list")
-                    continue
+            
+            # 关键词验证    
+            if "important_keywords" in chunk_req and not isinstance(chunk_req["important_keywords"], list):
+                validation_errors.append(f"Chunk {i}: important_keywords must be a list")
+                continue
                     
-            if "questions" in chunk_req:
-                if not isinstance(chunk_req["questions"], list):
-                    validation_errors.append(f"Chunk {i}: questions must be a list")
+            # 问题验证
+            if "questions" in chunk_req and not isinstance(chunk_req["questions"], list):
+                validation_errors.append(f"Chunk {i}: questions must be a list")
+                continue
+            
+            # 位置信息验证（完整位置）
+            if "positions" in chunk_req:
+                positions = chunk_req["positions"]
+                if not isinstance(positions, list):
+                    validation_errors.append(f"Chunk {i}: positions must be a list")
+                    continue
+                
+                for j, pos in enumerate(positions):
+                    if not isinstance(pos, list) or len(pos) != 5:
+                        validation_errors.append(f"Chunk {i}: positions[{j}] must be a list of 5 integers [page_num, left, right, top, bottom]")
+                        break
+                    
+                    try:
+                        [int(x) for x in pos]  # 验证所有元素都可以转为整数
+                    except (ValueError, TypeError):
+                        validation_errors.append(f"Chunk {i}: positions[{j}] must contain only integers")
+                        break
+                
+                if validation_errors and validation_errors[-1].startswith(f"Chunk {i}:"):
+                    continue  # 跳过这个chunk
+            
+            # top_int验证（单独的位置坐标）
+            if "top_int" in chunk_req:
+                try:
+                    int(chunk_req["top_int"])
+                except (ValueError, TypeError):
+                    validation_errors.append(f"Chunk {i}: top_int must be an integer")
                     continue
             
             validated_chunks.append((i, chunk_req))
@@ -1299,23 +1399,21 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
         except Exception as e:
             validation_errors.append(f"Chunk {i}: validation error - {str(e)}")
     
+    # 验证错误处理
     if validation_errors:
-        if len(validation_errors) > 10:  # 只显示前10个错误
-            error_msg = "; ".join(validation_errors[:10]) + f" ... and {len(validation_errors)-10} more errors"
-        else:
-            error_msg = "; ".join(validation_errors)
+        error_msg = "; ".join(validation_errors[:10])  # 只显示前10个错误
+        if len(validation_errors) > 10:
+            error_msg += f" ... and {len(validation_errors)-10} more errors"
         return get_error_data_result(message=f"Validation errors: {error_msg}")
     
-    # 获取 embedding 模型
+    # ===== 4. 初始化 embedding 模型 =====
     try:
         embd_id = DocumentService.get_embd_id(document_id)
-        embd_mdl = TenantLLMService.model_instance(
-            tenant_id, LLMType.EMBEDDING.value, embd_id
-        )
+        embd_mdl = TenantLLMService.model_instance(tenant_id, LLMType.EMBEDDING.value, embd_id)
     except Exception as e:
         return get_error_data_result(message=f"Failed to initialize embedding model: {str(e)}")
     
-    # 分片处理
+    # ===== 5. 分片批量处理 =====
     all_processed_chunks = []
     total_cost = 0
     processing_errors = []
@@ -1326,11 +1424,10 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
         batch_end = min(batch_start + batch_size, len(validated_chunks))
         batch_chunks = validated_chunks[batch_start:batch_end]
         
-        print(f"🔄 KnowFlow: 处理分片 {batch_start//batch_size + 1}/{(len(validated_chunks)-1)//batch_size + 1} " +
-              f"({len(batch_chunks)} chunks)")
+        print(f"🔄 KnowFlow: 处理分片 {batch_start//batch_size + 1}/{(len(validated_chunks)-1)//batch_size + 1} ({len(batch_chunks)} chunks)")
         
         try:
-            # 处理当前分片
+            # ===== 5.1 构建chunk文档数据 =====
             processed_chunks = []
             embedding_texts = []
             
@@ -1338,33 +1435,49 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
                 content = chunk_req["content"]
                 chunk_id = xxhash.xxh64((content + document_id + str(original_index)).encode("utf-8")).hexdigest()
                 
+                # 基础chunk数据结构
                 d = {
                     "id": chunk_id,
                     "content_ltks": rag_tokenizer.tokenize(content),
                     "content_with_weight": content,
+                    "content_sm_ltks": rag_tokenizer.fine_grained_tokenize(rag_tokenizer.tokenize(content)),
+                    "important_kwd": chunk_req.get("important_keywords", []),
+                    "important_tks": rag_tokenizer.tokenize(" ".join(chunk_req.get("important_keywords", []))),
+                    "question_kwd": [str(q).strip() for q in chunk_req.get("questions", []) if str(q).strip()],
+                    "question_tks": rag_tokenizer.tokenize("\n".join(chunk_req.get("questions", []))),
+                    "create_time": current_time,
+                    "create_timestamp_flt": current_timestamp,
+                    "kb_id": dataset_id,
+                    "docnm_kwd": doc.name,
+                    "doc_id": document_id
                 }
-                d["content_sm_ltks"] = rag_tokenizer.fine_grained_tokenize(d["content_ltks"])
-                d["important_kwd"] = chunk_req.get("important_keywords", [])
-                d["important_tks"] = rag_tokenizer.tokenize(
-                    " ".join(chunk_req.get("important_keywords", []))
-                )
-                d["question_kwd"] = [str(q).strip() for q in chunk_req.get("questions", []) if str(q).strip()]
-                d["question_tks"] = rag_tokenizer.tokenize(
-                    "\n".join(chunk_req.get("questions", []))
-                )
-                d["create_time"] = current_time
-                d["create_timestamp_flt"] = current_timestamp
-                d["kb_id"] = dataset_id
-                d["docnm_kwd"] = doc.name
-                d["doc_id"] = document_id
                 
-                # 为批量embedding准备文本
+                # ===== 5.2 位置信息处理 =====
+                has_position_info = False
+                
+                # 处理完整位置信息（优先级高）
+                if "positions" in chunk_req:
+                    print(f"🔧 KnowFlow: chunk {original_index} 包含完整位置信息: {chunk_req['positions']}")
+                    _add_positions_to_chunk_data(d, chunk_req["positions"])
+                    has_position_info = True
+                    print(f"🔧 KnowFlow: chunk {original_index} 完整位置处理完成: {[k for k in d.keys() if 'position' in k or 'page' in k or 'top' in k]}")
+                
+                # 处理单独的top_int参数（当没有完整位置信息时）
+                elif "top_int" in chunk_req:
+                    top_value = int(chunk_req["top_int"])
+                    d["top_int"] = [top_value]  # 保持数组格式一致性
+                    has_position_info = True
+                    print(f"🔧 KnowFlow: chunk {original_index} 包含 top_int: {top_value}")
+                
+                if not has_position_info:
+                    print(f"🔧 KnowFlow: chunk {original_index} 不包含位置信息")
+                
+                # 准备embedding文本
                 text_for_embedding = content if not d["question_kwd"] else "\n".join(d["question_kwd"])
                 embedding_texts.append([doc.name, text_for_embedding])
-                
                 processed_chunks.append(d)
             
-            # 批量执行embedding
+            # ===== 5.3 批量执行embedding =====
             all_texts_for_embedding = []
             for doc_name, content_text in embedding_texts:
                 all_texts_for_embedding.extend([doc_name, content_text])
@@ -1372,27 +1485,29 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
             batch_vectors, batch_cost = embd_mdl.encode(all_texts_for_embedding)
             total_cost += batch_cost
             
-            # 为每个chunk添加向量
+            # 添加向量到chunks
             for i, d in enumerate(processed_chunks):
                 doc_name_vector = batch_vectors[i * 2]
                 content_vector = batch_vectors[i * 2 + 1]
                 v = 0.1 * doc_name_vector + 0.9 * content_vector
                 d["q_%d_vec" % len(v)] = v.tolist()
             
-            # 分批插入到向量数据库 - 借鉴 RAGFlow 的分批插入策略
-            db_bulk_size = 4  # 借鉴 RAGFlow 的 es_bulk_size 设置
-            for b in range(0, len(processed_chunks), db_bulk_size):
-                batch_for_db = processed_chunks[b:b + db_bulk_size]
+            # ===== 5.4 分批插入数据库 =====
+            for b in range(0, len(processed_chunks), DB_BULK_SIZE):
+                batch_for_db = processed_chunks[b:b + DB_BULK_SIZE]
+                
+                # 统计位置信息
+                chunks_with_positions = [i for i, chunk in enumerate(batch_for_db) if 'position_int' in chunk or 'top_int' in chunk]
+                print(f"🔄 KnowFlow: 数据库分批插入 {b//DB_BULK_SIZE + 1}/{(len(processed_chunks)-1)//DB_BULK_SIZE + 1} " +
+                      f"({len(batch_for_db)} chunks)，其中 {len(chunks_with_positions)} 个包含位置信息")
+                
                 try:
                     settings.docStoreConn.insert(batch_for_db, search.index_name(tenant_id), dataset_id)
-                    print(f"🔄 KnowFlow: 数据库分批插入 {b//db_bulk_size + 1}/{(len(processed_chunks)-1)//db_bulk_size + 1} " +
-                          f"({len(batch_for_db)} chunks)")
                 except Exception as db_error:
-                    print(f"❌ KnowFlow: 数据库插入失败 batch {b//db_bulk_size + 1}: {db_error}")
+                    print(f"❌ KnowFlow: 数据库插入失败 batch {b//DB_BULK_SIZE + 1}: {db_error}")
                     raise db_error
             
             all_processed_chunks.extend(processed_chunks)
-            
             print(f"✅ KnowFlow: 分片 {batch_start//batch_size + 1} 处理完成 ({len(processed_chunks)} chunks)")
             
         except Exception as e:
@@ -1401,17 +1516,17 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
             print(f"❌ KnowFlow: {error_msg}")
             continue
     
-    # 更新文档的chunk计数
+    # ===== 6. 更新文档统计 =====
     if all_processed_chunks:
         try:
             DocumentService.increment_chunk_num(doc.id, doc.kb_id, total_cost, len(all_processed_chunks), 0)
         except Exception as e:
             print(f"⚠️ KnowFlow: 更新文档计数失败: {e}")
     
-    # 准备返回数据
+    # ===== 7. 格式化响应数据 =====
     key_mapping = {
         "id": "id",
-        "content_with_weight": "content",
+        "content_with_weight": "content", 
         "doc_id": "document_id",
         "important_kwd": "important_keywords",
         "question_kwd": "questions",
@@ -1419,6 +1534,9 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
         "create_timestamp_flt": "create_timestamp",
         "create_time": "create_time",
         "document_keyword": "document",
+        "page_num_int": "page_numbers",
+        "position_int": "positions", 
+        "top_int": "top_positions",
     }
     
     renamed_chunks = []
@@ -1426,15 +1544,27 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
         renamed_chunk = {}
         for key, value in d.items():
             if key in key_mapping:
-                new_key = key_mapping.get(key, key)
+                new_key = key_mapping[key]
                 renamed_chunk[new_key] = value
+        
+        # 格式化positions字段为标准格式
+        if "positions" in renamed_chunk and renamed_chunk["positions"]:
+            renamed_chunk["positions"] = [
+                [pos[0], pos[1], pos[2], pos[3], pos[4]] for pos in renamed_chunk["positions"]
+            ]
+        
+        # 验证最终chunk数据格式
         try:
-            _ = Chunk(**renamed_chunk)  # validate the chunk
+            _ = Chunk(**renamed_chunk)  # 验证数据结构
             renamed_chunks.append(renamed_chunk)
         except Exception as e:
             print(f"⚠️ KnowFlow: Chunk validation failed: {e}")
+            # 使用基本chunk信息作为fallback
+            basic_chunk = {k: v for k, v in renamed_chunk.items() 
+                          if k in ["id", "content", "document_id", "important_keywords", "questions"]}
+            renamed_chunks.append(basic_chunk)
     
-    # 计算处理统计
+    # ===== 8. 构建返回结果 =====
     total_requested = len(chunks_data)
     total_added = len(renamed_chunks)
     total_failed = total_requested - total_added
@@ -1451,18 +1581,17 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
             "batches_processed": (len(validated_chunks) - 1) // batch_size + 1,
             "embedding_cost": total_cost,
             "processing_errors": processing_errors if processing_errors else None,
-            "performance_mode": "batch_optimized"
+            "performance_mode": "batch_optimized_with_positions"
         }
     }
     
+    # 返回结果
     if processing_errors:
-        # 如果有部分失败，返回部分成功的结果
         return get_result(
             data=result_data,
             message=f"Partial success: {total_added} chunks added, {total_failed} failed. Check processing_stats for details."
         )
     else:
-        # 完全成功
         return get_result(data=result_data)
 
 

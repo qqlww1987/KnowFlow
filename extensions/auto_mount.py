@@ -15,7 +15,7 @@ from typing import Dict, List, Optional, Tuple
 class DockerComposeManager:
     def __init__(self):
         self.current_dir = Path.cwd()
-        self.extensions_dir = self.current_dir / "knowflow_extensions"
+        self.extensions_dir = self.current_dir / "extensions"
         self.compose_file = None
         
     def find_ragflow_containers(self) -> List[Dict]:
@@ -107,7 +107,7 @@ class DockerComposeManager:
                         print(f"   发现的服务: {service_name}")
                         
                         # 检查是否是依赖服务，如果是，尝试找到主要服务
-                        dependency_services = ['mysql', 'redis', 'elasticsearch', 'es-01', 'minio', 'postgres']
+                        dependency_services = ['mysql', 'redis', 'elasticsearch', 'es-01', 'es01', 'es_01', 'minio', 'postgres', 'postgres_01', 'postgres-01']
                         
                         if any(dep in service_name.lower() for dep in dependency_services):
                             print(f"   ⚠️ {service_name} 是依赖服务，查找主要 RAGFlow 服务...")
@@ -123,9 +123,12 @@ class DockerComposeManager:
                                     return compose_file, main_service
                                 else:
                                     print(f"   ❌ 未在 compose 文件中找到主要 RAGFlow 服务")
+                                    # 返回 None 而不是依赖服务名
+                                    return None
                                     
                             except Exception as e:
                                 print(f"   ❌ 读取 compose 文件失败: {e}")
+                                return None
                         else:
                             # 直接返回发现的服务（可能就是主要服务）
                             return compose_file, service_name
@@ -162,7 +165,7 @@ class DockerComposeManager:
             for priority_name in priority_names:
                 if priority_name in service_lower:
                     # 确保不是依赖服务
-                    dependency_services = ['mysql', 'redis', 'elasticsearch', 'es', 'minio', 'postgres']
+                    dependency_services = ['mysql', 'redis', 'elasticsearch', 'es-01', 'es01', 'es_01', 'minio', 'postgres', 'postgres_01', 'postgres-01']
                     if not any(dep in service_lower for dep in dependency_services):
                         print(f"   🎯 模糊匹配到服务: {service_name}")
                         return service_name
@@ -172,7 +175,7 @@ class DockerComposeManager:
             image = service_config.get('image', '').lower()
             if 'ragflow' in image:
                 service_lower = service_name.lower()
-                dependency_services = ['mysql', 'redis', 'elasticsearch', 'es', 'minio', 'postgres']
+                dependency_services = ['mysql', 'redis', 'elasticsearch', 'es-01', 'es01', 'es_01', 'minio', 'postgres', 'postgres_01', 'postgres-01']
                 if not any(dep in service_lower for dep in dependency_services):
                     print(f"   🎯 通过镜像名匹配到服务: {service_name}")
                     return service_name
@@ -276,6 +279,14 @@ class DockerComposeManager:
     
     def add_knowflow_mounts(self, config: Dict, service_name: str) -> Dict:
         """在现有配置中添加 KnowFlow 挂载"""
+        # 检查服务是否存在
+        if 'services' not in config:
+            raise ValueError("Docker compose 配置中没有 'services' 部分")
+        
+        if service_name not in config['services']:
+            available_services = list(config['services'].keys())
+            raise ValueError(f"服务 '{service_name}' 在 compose 配置中不存在。可用服务: {available_services}")
+        
         service_config = config['services'][service_name]
         
         # 获取现有 volumes
@@ -347,12 +358,12 @@ class DockerComposeManager:
             print("🔄 重启 Docker Compose 服务...")
             
             # 停止服务
-            subprocess.run(["docker-compose", "-f", str(compose_file), "down"], 
-                         check=True, cwd=self.current_dir)
-            
+            subprocess.run(["docker", "compose", "-f", str(compose_file), "down"], 
+                    check=True, cwd=self.current_dir)
+
             # 启动服务
-            subprocess.run(["docker-compose", "-f", str(compose_file), "up", "-d"], 
-                         check=True, cwd=self.current_dir)
+            subprocess.run(["docker", "compose", "-f", str(compose_file), "up", "-d"], 
+                        check=True, cwd=self.current_dir)
             
             print("✅ 服务重启完成，KnowFlow 扩展已加载!")
             
@@ -410,7 +421,15 @@ class DockerComposeManager:
         
         # 添加 KnowFlow 挂载
         print("🔧 添加 KnowFlow 挂载配置...")
-        updated_config = self.add_knowflow_mounts(config, service_name)
+        try:
+            updated_config = self.add_knowflow_mounts(config, service_name)
+        except ValueError as e:
+            print(f"❌ 挂载配置失败: {e}")
+            print("💡 可能的解决方案:")
+            print("  1. 检查 compose 文件中的服务名称是否正确")
+            print("  2. 确保 compose 文件格式正确")
+            print("  3. 手动指定正确的服务名称")
+            return False
         
         # 保存配置
         self.save_compose_config(updated_config, compose_file)
@@ -423,8 +442,8 @@ class DockerComposeManager:
                 print(f"💡 如果重启失败，可以手动恢复: cp {backup_file} {compose_file}")
         else:
             print("💡 手动重启命令:")
-            print(f"   docker-compose -f {compose_file.name} down")
-            print(f"   docker-compose -f {compose_file.name} up -d")
+            print(f"   docker compose -f {compose_file.name} down")
+            print(f"   docker compose -f {compose_file.name} up -d")
         
         return True
 
@@ -434,11 +453,16 @@ def main():
     print("=" * 60)
     
     # 检查工具依赖
-    for tool in ["docker", "docker-compose"]:
+    TOOLS = [
+        ["docker", "--version"],
+        ["docker", "compose", "version"],
+    ]
+
+    for tool_cmd in TOOLS:
         try:
-            subprocess.run([tool, "--version"], capture_output=True, check=True)
+            subprocess.run(tool_cmd, capture_output=True, check=True)
         except (subprocess.CalledProcessError, FileNotFoundError):
-            print(f"❌ {tool} 未安装或不可用")
+            print(f"❌ {' '.join(tool_cmd)} 未安装或不可用")
             sys.exit(1)
     
     manager = DockerComposeManager()

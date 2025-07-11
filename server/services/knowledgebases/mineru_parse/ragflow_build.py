@@ -7,9 +7,7 @@ from dotenv import load_dotenv
 from .minio_server import upload_directory_to_minio
 from .mineru_test import update_markdown_image_urls
 from .utils import split_markdown_to_chunks_configured, get_bbox_for_chunk, update_document_progress, should_cleanup_temp_files
-from database import get_es_client, get_db_connection
-import concurrent.futures
-import threading
+from database import get_db_connection
 from datetime import datetime
 
 # 性能优化配置参数
@@ -101,9 +99,10 @@ def _log_performance_stats(operation_name, start_time, end_time, item_count, add
     if duration > 60:  # 超过1分钟
         print(f"[性能警告] {operation_name} 处理时间过长: {duration:.2f}s")
 
-def add_chunks_to_doc(doc, chunks, update_progress, config=None):
+def add_chunks_with_positions(doc, chunks, md_file_path, chunk_content_to_index, update_progress, config=None):
     """
-    优化版 add_chunks_to_doc - 直接调用批量接口
+    合并版 add_chunks_to_doc + _update_chunks_position
+    直接调用 batch_add_chunk 接口，一步完成chunk添加和位置信息设置
     """
     start_time = time.time()
     
@@ -112,33 +111,64 @@ def add_chunks_to_doc(doc, chunks, update_progress, config=None):
     if config:
         effective_config.update(config)
     
-    print(f"🚀 批量添加: 总共接收到 {len(chunks)} 个 chunks 准备批量添加")
+    print(f"🚀 合并批量添加: 总共接收到 {len(chunks)} 个 chunks 准备批量添加（包含位置信息）")
     
     if not chunks:
         print("⚠️ 没有chunks需要添加")
-        update_progress(0.95, "没有chunks需要添加")
+        update_progress(0.8, "没有chunks需要添加")
         return 0
     
     # 初始进度更新
-    update_progress(0.8, "开始批量添加chunks到文档...")
+    update_progress(0.8, "开始批量添加chunks到文档（包含位置信息）...")
     
     try:
-        # 准备批量数据
+        # 准备批量数据，包含位置信息
         batch_chunks = []
         for i, chunk in enumerate(chunks):
             if chunk and chunk.strip():
-                batch_chunks.append({
+                chunk_data = {
                     "content": chunk.strip(),
                     "important_keywords": [],  # 可以根据需要添加关键词提取
                     "questions": []  # 可以根据需要添加问题生成
-                })
+                }
+                
+                # 获取位置信息
+                try:
+                    position_int_temp = get_bbox_for_chunk(md_file_path, chunk.strip())
+                    if position_int_temp is not None:
+                        # 有完整位置信息，使用positions参数
+                        chunk_data["positions"] = position_int_temp
+                        print(f"🔧 chunk {i}: 获取到完整位置信息: {len(position_int_temp)} 个位置")
+                    else:
+                        # 没有完整位置信息，使用top_int参数
+                        original_index = chunk_content_to_index.get(chunk.strip())
+                        if original_index is not None:
+                            chunk_data["top_int"] = original_index
+                            print(f"🔧 chunk {i}: 使用top_int: {original_index}")
+                        else:
+                            print(f"⚠️ chunk {i}: 无法获取位置信息")
+                except Exception as pos_e:
+                    print(f"⚠️ chunk {i}: 获取位置信息失败: {pos_e}")
+                    # 即使位置信息获取失败，也继续添加chunk
+                
+                batch_chunks.append(chunk_data)
         
         if not batch_chunks:
             print("⚠️ 过滤后没有有效的chunks")
             update_progress(0.95, "没有有效的chunks")
             return 0
         
-        print(f"📦 准备批量添加 {len(batch_chunks)} 个有效chunks")
+        print(f"📦 准备批量添加 {len(batch_chunks)} 个有效chunks（包含位置信息）")
+        
+        # 统计位置信息类型
+        chunks_with_positions = [c for c in batch_chunks if "positions" in c]
+        chunks_with_top_int = [c for c in batch_chunks if "top_int" in c]
+        chunks_without_position = len(batch_chunks) - len(chunks_with_positions) - len(chunks_with_top_int)
+        
+        print(f"📍 位置信息统计:")
+        print(f"   - 完整位置信息: {len(chunks_with_positions)} chunks")
+        print(f"   - 单独top_int: {len(chunks_with_top_int)} chunks")
+        print(f"   - 无位置信息: {chunks_without_position} chunks")
         
         # 配置批量大小 - 根据chunk数量动态调整
         if len(batch_chunks) <= 10:
@@ -191,7 +221,13 @@ def add_chunks_to_doc(doc, chunks, update_progress, config=None):
                     stats = data.get("processing_stats", {})
                     if stats:
                         print(f"   📊 分片处理: {stats.get('batches_processed', 0)} 个分片")
-                        print(f"   ⏱️  处理时间: {stats.get('processing_time', 0):.2f}s")
+                        print(f"   💰 嵌入成本: {stats.get('embedding_cost', 0)}")
+                    
+                    # 检查返回的chunks是否包含位置信息
+                    returned_chunks = data.get("chunks", [])
+                    if returned_chunks:
+                        chunks_with_pos = [c for c in returned_chunks if c.get('positions') or c.get('top_positions')]
+                        print(f"   📍 位置信息: {len(chunks_with_pos)}/{len(returned_chunks)} chunks包含位置")
                 
                 else:
                     # 批量添加失败
@@ -214,223 +250,35 @@ def add_chunks_to_doc(doc, chunks, update_progress, config=None):
         # 最终统计
         success_rate = (total_added / len(batch_chunks) * 100) if len(batch_chunks) > 0 else 0
         
-        print(f"📊 批量添加完成:")
+        print(f"📊 合并批量添加完成:")
         print(f"   ✅ 成功: {total_added}/{len(batch_chunks)} chunks")
         print(f"   ❌ 失败: {total_failed} chunks") 
         print(f"   📈 成功率: {success_rate:.1f}%")
+        print(f"   📍 位置信息: {len(chunks_with_positions)} 完整位置, {len(chunks_with_top_int)} top_int")
         
         # 最终进度更新
         if total_failed == 0:
-            update_progress(0.95, f"批量添加完成: 成功 {total_added}/{len(batch_chunks)} chunks")
+            update_progress(0.95, f"批量添加完成: 成功 {total_added}/{len(batch_chunks)} chunks（包含位置信息）")
         else:
             update_progress(0.95, f"批量添加完成: 成功 {total_added}, 失败 {total_failed} chunks")
         
         # 记录性能统计
         end_time = time.time()
         processing_time = end_time - start_time
-        additional_info = f"批量模式, 批次数: {batch_count}, 成功率: {success_rate:.1f}%, 性能提升: ~{len(batch_chunks)}x"
-        _log_performance_stats("批量添加Chunks", start_time, end_time, len(batch_chunks), additional_info)
+        additional_info = f"合并模式, 批次数: {batch_count}, 成功率: {success_rate:.1f}%, 位置信息: {len(chunks_with_positions)}+{len(chunks_with_top_int)}"
+        _log_performance_stats("合并批量添加Chunks", start_time, end_time, len(batch_chunks), additional_info)
         
         return total_added
         
     except Exception as e:
-        print(f"❌ 批量添加过程中出现异常: {e}")
+        print(f"❌ 合并批量添加过程中出现异常: {e}")
         update_progress(0.95, f"批量添加异常: {str(e)}")
         
         # 记录异常统计
         end_time = time.time()
-        _log_performance_stats("批量添加Chunks(异常)", start_time, end_time, len(chunks), f"异常: {str(e)}")
+        _log_performance_stats("合并批量添加Chunks(异常)", start_time, end_time, len(chunks), f"异常: {str(e)}")
         
         return 0
-
-def _update_chunks_position(doc, md_file_path, chunk_content_to_index, dataset, config=None, update_progress=None):
-    start_time = time.time()
-    
-    # 合并配置参数
-    effective_config = CHUNK_PROCESSING_CONFIG.copy()
-    if config:
-        effective_config.update(config)
-        
-    es_client = get_es_client()
-    print(f"文档: id: {doc.id})")
-    chunk_count = 0
-    
-    # 🔧 直接使用传入的dataset对象获取tenant_id，避免重复API调用
-    tenant_id = dataset.tenant_id
-    print(f"[DEBUG] 🔧 使用复用的dataset对象获取tenant_id:")
-    print(f"  - doc.dataset_id: {doc.dataset_id}")
-    print(f"  - doc.created_by: {doc.created_by}")
-    print(f"  - dataset.tenant_id: {tenant_id}")
-    
-    index_name = f"ragflow_{tenant_id}"
-    print(f"  - ✅ 正确的ES索引名: {index_name}")
-    
-    # 收集所有批量更新操作
-    bulk_operations = []
-    batch_size = effective_config['es_bulk_batch_size']
-    processed_count = 0
-    batch_count = 0
-    
-    try:
-        # 获取总chunk数量用于进度计算
-        all_chunks = list(doc.list_chunks(keywords=None, page=1, page_size=10000))
-        total_chunks = len(all_chunks)
-        print(f"准备更新 {total_chunks} 个chunks的位置信息...")
-        
-        if update_progress:
-            update_progress(0.96, "开始更新chunk位置信息...")
-        
-        position_fetch_time = 0
-        
-        for chunk in all_chunks:
-            try:
-                original_index = chunk_content_to_index.get(chunk.content)
-                if original_index is None:
-                    print(f"警告: 无法为块 id={chunk.id} 的内容找到原始索引，将跳过此块。")
-                    processed_count += 1
-                    continue
-                
-                # 构建更新操作 - 使用正确的ES bulk格式
-                doc_update = {
-                    "top_int": original_index
-                }
-                
-                # 尝试获取位置信息，如果成功则添加到更新中
-                position_start = time.time()
-                try:
-                    position_int_temp = get_bbox_for_chunk(md_file_path, chunk.content)
-                    if position_int_temp is not None:
-                        doc_fields = {}
-                        _add_positions(doc_fields, position_int_temp)
-                        doc_update["position_int"] = doc_fields.get("position_int")
-                except Exception as e:
-                    print(f"获取chunk位置异常: {e}")
-                position_fetch_time += time.time() - position_start
-                
-                # ES bulk格式：action行 + document行
-                bulk_operations.extend([
-                    {"update": {"_index": index_name, "_id": chunk.id}},
-                    {"doc": doc_update}
-                ])
-                chunk_count += 1
-                processed_count += 1
-                
-                # 分批处理，避免单次请求过大
-                if len(bulk_operations) >= batch_size:
-                    try:
-                        batch_start = time.time()
-                        _execute_bulk_update(es_client, bulk_operations, effective_config)
-                        batch_duration = time.time() - batch_start
-                        batch_count += 1
-                        
-                        print(f"[批次 {batch_count}] 更新 {len(bulk_operations)} 个chunks, 耗时 {batch_duration:.2f}s")
-                        bulk_operations = []
-                        
-                        # 更新进度
-                        if update_progress:
-                            progress = 0.96 + (processed_count / total_chunks) * 0.03  # 0.96-0.99范围
-                            update_progress(progress, f"更新位置进度: {processed_count}/{total_chunks}")
-                    except Exception as batch_e:
-                        print(f"[异常处理] 批次更新失败: {batch_e}")
-                        # 批次失败时，清空当前批次继续处理
-                        bulk_operations = []
-                        
-            except Exception as chunk_e:
-                print(f"[异常处理] 处理chunk {chunk.id} 失败: {chunk_e}")
-                processed_count += 1
-                continue
-        
-        # 处理剩余的操作
-        if bulk_operations:
-            try:
-                batch_start = time.time()
-                _execute_bulk_update(es_client, bulk_operations, effective_config)
-                batch_duration = time.time() - batch_start
-                batch_count += 1
-                print(f"[最终批次 {batch_count}] 更新 {len(bulk_operations)} 个chunks, 耗时 {batch_duration:.2f}s")
-            except Exception as final_batch_e:
-                print(f"[异常处理] 最终批次更新失败: {final_batch_e}")
-        
-    except Exception as overall_e:
-        print(f"[异常处理] 位置更新整体处理出现异常: {overall_e}")
-        
-    finally:
-        # 确保进度更新到0.99，无论是否发生异常
-        if update_progress:
-            update_progress(0.99, f"位置更新完成: {chunk_count} 个chunks")
-        
-        end_time = time.time()
-        
-        # 记录性能统计
-        additional_info = f"批次数: {batch_count}, 批次大小: {batch_size}, 位置获取耗时: {position_fetch_time:.2f}s"
-        _log_performance_stats("更新Chunk位置", start_time, end_time, chunk_count, additional_info)
-        
-        print(f"位置更新完成: {chunk_count} 个chunks")
-    
-    return chunk_count
-
-def _execute_bulk_update(es_client, bulk_operations, config):
-    """执行ES批量更新的辅助函数"""
-    if not bulk_operations:
-        return
-        
-    operation_start = time.time()
-    
-    try:
-        print(f"开始批量更新 {len(bulk_operations)} 个chunks...")
-        response = es_client.bulk(
-            body=bulk_operations, 
-            refresh=True,
-            timeout=f"{config['es_bulk_timeout']}s"
-        )
-        
-        operation_duration = time.time() - operation_start
-        
-        # 检查批量操作结果
-        if response.get('errors'):
-            failed_count = 0
-            for item in response.get('items', []):
-                if 'update' in item and item['update'].get('status') >= 400:
-                    print(f"ES批量更新失败 - ID: {item['update'].get('_id')}, Error: {item['update'].get('error')}")
-                    failed_count += 1
-            
-            if failed_count > 0:
-                print(f"批量更新完成，但有 {failed_count} 个操作失败, 耗时 {operation_duration:.2f}s")
-            else:
-                print(f"批量更新成功完成 {len(bulk_operations) // 2} 个chunks, 耗时 {operation_duration:.2f}s")
-        else:
-            throughput = (len(bulk_operations) // 2) / operation_duration if operation_duration > 0 else 0
-            print(f"批量更新成功完成 {len(bulk_operations) // 2} 个chunks, 耗时 {operation_duration:.2f}s, 吞吐量 {throughput:.1f} chunks/秒")
-            
-    except Exception as es_e:
-        operation_duration = time.time() - operation_start
-        print(f"ES批量更新异常: {es_e}, 耗时 {operation_duration:.2f}s")
-        # 如果批量更新失败，回退到单个更新模式
-        print("回退到单个更新模式...")
-        fallback_start = time.time()
-        success_count = 0
-        
-        # 处理新的两行格式：每两个元素构成一个操作
-        for i in range(0, len(bulk_operations), 2):
-            if i + 1 < len(bulk_operations):
-                try:
-                    action = bulk_operations[i]
-                    doc_data = bulk_operations[i + 1]
-                    
-                    if "update" in action:
-                        es_client.update(
-                            index=action["update"]["_index"], 
-                            id=action["update"]["_id"], 
-                            body=doc_data, 
-                            refresh=True
-                        )
-                        success_count += 1
-                except Exception as single_e:
-                    print(f"单个更新也失败 - ID: {action.get('update', {}).get('_id', 'unknown')}, Error: {single_e}")
-        
-        fallback_duration = time.time() - fallback_start
-        expected_operations = len(bulk_operations) // 2
-        print(f"回退模式完成: 成功 {success_count}/{expected_operations} 个chunks, 耗时 {fallback_duration:.2f}s")
 
 def _cleanup_temp_files(md_file_path):
     """清理临时文件"""
@@ -472,8 +320,7 @@ def create_ragflow_resources(doc_id, kb_id, md_file_path, image_dir, update_prog
         
         chunk_content_to_index = {chunk: i for i, chunk in enumerate(chunks)}
 
-        add_chunks_to_doc(doc, chunks, update_progress)
-        chunk_count = _update_chunks_position(doc, md_file_path, chunk_content_to_index, dataset, update_progress=update_progress)
+        chunk_count = add_chunks_with_positions(doc, chunks, md_file_path, chunk_content_to_index, update_progress)
         # 根据环境变量决定是否清理临时文件
         _cleanup_temp_files(md_file_path)
 
@@ -496,20 +343,3 @@ def create_ragflow_resources(doc_id, kb_id, md_file_path, image_dir, update_prog
             print(f"[异常处理] 更新进度时也发生异常: {progress_e}")
         
         raise
-
-def _add_positions(d, poss):
-    try:
-        if not poss:
-            return
-        page_num_int = []
-        position_int = []
-        top_int = []
-        for pn, left, right, top, bottom in poss:
-            page_num_int.append(int(pn + 1))
-            top_int.append(int(top))
-            position_int.append((int(pn + 1), int(left), int(right), int(top), int(bottom)))
-        d["page_num_int"] = page_num_int
-        d["position_int"] = position_int
-        d["top_int"] = top_int
-    except Exception as e:
-        print(f"add_positions异常: {e}")
