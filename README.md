@@ -134,13 +134,10 @@ mineru:
 
 3. 完善 `.env` 文件配置
 
-   安装脚本会自动创建 `.env` 文件模板，您只需要填写两个必要信息：
+   安装脚本会自动创建 `.env` 文件模板，您只需要填写必要信息：
 
    ```bash
-   # 从 RAGFlow API 页面后台获取 (必须手动填写)
-   RAGFLOW_API_KEY=你的实际API密钥
-
-   # 确认端口号并替换 (通常RAGFlow默认端口是80或8080)
+   # RAGFlow 服务地址 (必须手动填写)
    RAGFLOW_BASE_URL=http://检测到的IP:实际端口号
    ```
 
@@ -340,7 +337,6 @@ mineru:
        ports:
          - "5000:5000"
        environment:
-         - RAGFLOW_API_KEY=${RAGFLOW_API_KEY}
          - RAGFLOW_BASE_URL=${RAGFLOW_BASE_URL}
          - DB_HOST=${DB_HOST}
          - MYSQL_PORT=3306  # 注意是 3306 端口
@@ -375,7 +371,6 @@ mineru:
    
    ```bash
    # RAGFlow API 配置
-   RAGFLOW_API_KEY=ragflow-JmZjZlOGU2NWM4ZjExZjBhNGZmY2U4MD
    RAGFLOW_BASE_URL=http://8.134.177.47:15002
 
    # 通过 RAGFlow 网络连接的服务地址

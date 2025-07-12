@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from .minio_server import upload_directory_to_minio
 from .mineru_test import update_markdown_image_urls
 from .utils import split_markdown_to_chunks_configured, get_bbox_for_chunk, update_document_progress, should_cleanup_temp_files
+from ..utils import _get_kb_tenant_id, _get_tenant_api_key, _validate_base_url
 from database import get_db_connection
 from datetime import datetime
 
@@ -20,17 +21,6 @@ CHUNK_PROCESSING_CONFIG = {
     'enable_performance_stats': True,     # 是否启用性能统计
 }
 
-def _validate_environment():
-    """验证环境变量配置"""
-    load_dotenv()
-    api_key = os.getenv('RAGFLOW_API_KEY')
-    base_url = os.getenv('RAGFLOW_BASE_URL')
-    if not api_key:
-        raise ValueError("错误：请在.env文件中设置RAGFLOW_API_KEY或使用--api_key参数指定。")
-    if not base_url:
-        raise ValueError("错误：请在.env文件中设置RAGFLOW_BASE_URL或使用--server_ip参数指定。")
-    return api_key, base_url
-
 def _upload_images(kb_id, image_dir, update_progress):
     update_progress(0.7, "上传图片到MinIO...")
     print(f"第4步：上传图片到MinIO...")
@@ -38,7 +28,17 @@ def _upload_images(kb_id, image_dir, update_progress):
 
 def get_ragflow_doc(doc_id, kb_id):
     """获取RAGFlow文档对象和dataset对象"""
-    api_key, base_url = _validate_environment()
+    # 首先获取知识库的tenant_id
+    tenant_id = _get_kb_tenant_id(kb_id)
+    if not tenant_id:
+        raise Exception(f"无法获取知识库 {kb_id} 的tenant_id")
+    
+    # 根据tenant_id获取对应的API key
+    api_key = _get_tenant_api_key(tenant_id)
+    if not api_key:
+        raise Exception(f"无法获取tenant {tenant_id} 的API key")
+    
+    base_url = _validate_base_url()
     rag_object = RAGFlow(api_key=api_key, base_url=base_url)
     datasets = rag_object.list_datasets(id=kb_id)
     if not datasets:

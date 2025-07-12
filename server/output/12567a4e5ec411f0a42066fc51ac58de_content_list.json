@@ -1,0 +1,151 @@
+[
+    {
+        "type": "text",
+        "text": "ATLASpix3: A high voltage CMOS sensor chip designed for ATLAS Inner Tracker ",
+        "text_level": 1,
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "Mridula Prathapan\\*b, Rudolf Schimassekb, Mathieu Benoitf, Raimon Casanovae, Felix Ehrlerb,Annie Menesesc, Patrick Pangaud\", D M S Sultanf, Eva Vilella², Alena Weberc,b,Winnie Wongf, Hui Zhangʰ, Ivan Pericb ",
+        "text_level": 1,
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "@ Aix-Marseille University, CNRS/IN2P3, CPPM, Marseille, France   \nb ASIC and Detector Laboratory Karlsruhe Institute ofTechnology Germany   \nC Physikalisches Institut, University Heidelberg, Germany   \ne IFAE Institute for High Energy Physics, Barcelona, Spain   \n$f$ Department of nuclear physics, University of Geneva, Switzerland   \n8 Department of Physics, University of Liverpool, UK   \nE-mail: mridula.prathapan@kit.edu， rudolf.schimassek@kit.edu,   \nivan.peric@kit.edu ",
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "ATLASpix3 is a $2 \\times 2 \\ \\mathrm { c m } ^ { 2 }$ high voltage CMOS sensor chip designed to meet the specifications of outer layers of ATLAS inner tracker. It is compatible with the hybrid pixel sensor ASIC RD53A in terms of electronic interface and geometry. ATLASpix3 is a depleted monolithic CMOS pixel detector which allows the construction of quad modules of the same size as that of hybrid sensors. The readout scheme can be externally configured as triggered or triggerless column drain readout. The hit information is transmitted through a 1.28 Gbit/s serial link. The interface is based on a single command input that is used for providing clock, trigger and configuration commands. This contribution summarizes the detector architecture with focus on the design of its readout circuitry. In addition, simulation results obtained using ReadOut Modelling Environment (ROME), that led to the design of the readout system are discussed. ",
+        "page_idx": 0
+    },
+    {
+        "type": "image",
+        "img_path": "images/08b5c0a19807374d12dc1291d4aab00ef0553189ed3ca2ea40cd2331442c0487.jpg",
+        "image_caption": [
+            "Figure 1: ATLASpix3 top layout showing triggered and triggerless readout data path "
+        ],
+        "image_footnote": [],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "1. ATLASpix design overview ",
+        "text_level": 1,
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "Three generations of High Voltage CMOS (HVCMOS） monolithic sensor chips [1] have been designed in AMS/TSI $1 8 0 ~ \\mathrm { n m }$ process to meet the requirements of ATLAS Inner Tracker (ITk) layer 4. The first generation ATLASpix prototype has proven high radiation tolerance of $1 \\times 1 0 ^ { 1 5 } ~ \\mathrm { { n } } _ { \\mathrm { { e q } } } / \\mathrm { { c m } } ^ { 2 }$ with $9 9 . 4 \\%$ detection efficiency in a test beam study [2]. The design of ATLASpix sensors follows the large charge collection electrode topology. ATLASpix1_Simple has a triggerless column drain readout [3], whereas ATLASpix1_M2 employs a novel triggered readout scheme [4]. ATLASpix2 introduced sorting of hits in chronological manner. ATLASpix3 is the first full reticle size HVCMOS sensor. It is designed for the construction of CMOS quad modules. It adopts some of the silicon-proven design blocks from its predecessors while ensuring compatibility with RD53A readout and configuration protocol. The maximum trigger latency supported is $2 5 ~ { \\mu \\mathrm { s } }$ (equal to 1000 time stamps). ",
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "2. ATLASpix3 architecture ",
+        "text_level": 1,
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "ATLASpix3 is a $2 \\times 2 \\mathrm { c m } ^ { 2 }$ chip suitable for HVCMOS quad module construction. The readout periphery located at the chip bottom occupies $10 \\%$ of the total area which is acceptable for ATLAS. ATLASpix3 supports triggered readout. As a test feature, triggerless readout is also implemented. Figure 1 shows the overall chip architecture with its layout. ATLASpix3 has the following major blocks: the pixel matrix and the periphery. The matrix is composed of 132 columns. Every column has 372 pixels,and a digital front-end that contains hit buffers (one per pixel), $2 \\times 4 0$ Content Addressable Buffers (CAB)and data multiplexers called End of Columns (EoCs). The pixel size is $5 0 ~ { \\mu \\mathrm { m } } \\times 1 5 0 ~ { \\mu \\mathrm { m } }$ (height $\\times$ width). The hit and trigger buffers occupy an area which is 1O times smaller than the active area and are placed at the botom. A pixel contains sensor diode, Charge Sensitive Amplifier(CSA), comparator, threshold tune DAC, 4 bit RAM,and an output driver. The output of the pixels are transmited to the hit buffers via long routing lines. When a pixel fires, the corresponding hit buffer stores the global time stamp (TS) from the Readout Control Unit (RCU) and generates a hit word. The hit data contains row address (9 bit), column address (8 bit), leading edge time stamp (10 bit)and time over threshold (7 bit). The time stamps are stored in the dynamic RAM of hit buffers.The data path from here onwards depends on the selected readout scheme. In case of triggered readout, hit data is transfered to the Content Addressable Buffers (CAB) where hits are filtered based on a trigger signal. The architecture of CAB is explained in [4]. In case of triggerless readout, hit data is transferred from the hit buffers to the EoC for untriggered readout. ATLASpix3 has two Readout Control Units (RCUs): The main RCU for triggered readout and the auxiliary RCU for triggerless readout. The main RCU includes a command decoder with clock data recovery, Aurora $6 4 \\mathrm { b } / 6 6 \\mathrm { b }$ encoder and serial data link at 1.28 Gbps. The auxiliary RCU that supports triggerless readout, is adapted from ATLASpix1. ",
+        "page_idx": 1
+    },
+    {
+        "type": "image",
+        "img_path": "images/4eeba9320793d6ba2663cec1051ce39b30345a090032beeae5dbbdff432ef7a6.jpg",
+        "image_caption": [
+            "Figure 2: ATLASpix3 readout periphery (simplified block diagram): Hit buffers and CAB buffers are laid out in double column. Data transfer during triggered readout is denoted by arrows. "
+        ],
+        "image_footnote": [],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "",
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "3. The readout periphery ",
+        "text_level": 1,
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "The readout periphery contains synthesized digital logic calld Readout Control Unit (RCU). RCU communicates with digital front-end as shown in figure 2. RCU has the following blocks: readout controller, command decoder, 64b/66b Aurora encoder, data packaging unit and serializer. ",
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "The readout controller has two state machines: a pixel state machine that transfers the hit words from hit buffers to CAB buffers and a scheduler state machine that is responsible for reading out the triggered hits from CAB buffers. It also contains a FIFO, where the L1 trigger entries (TS and ID)are stored.The triggered hits are sent out sorted byL1 event TS using 32 bit words. These hit words are divided into data words and control words. The former contain pixel information, the later -among other information - the L1 TS. The input of the command decoder is a command bitstream at 160 Mbps, which is used to recover $1 6 0 ~ \\mathrm { M H z }$ clock, L1 triggering with trigger tag, configuration bits and readback. Figure 3 shows how the clock and trigger signals are recovered from command words. The clock generator block generates a $4 0 \\ \\mathrm { M H z }$ clock and a trigger signal in-phase with the command words. The trigger signal can be phase shifted in steps of one-fourth of the bunch crossing (BX) frequency, to compensate for analog delays. Alternatively, external triggering is also possible. Triple modular redundant (TMR) registers are used for SEU tolerance as shown in figure 3. The data generated by the readout controller is encoded according to Aurora 64b/66b protocol and serialized. The serial link works at 1.28 Gbps Double Data Rate (DDR). ",
+        "page_idx": 2
+    },
+    {
+        "type": "image",
+        "img_path": "images/bf3797489d7b7754585e95e9acf50e2ffeea4a175355510dc2746026460f6be1.jpg",
+        "image_caption": [
+            "Figure 3: Simplified block diagram of command decoder and data packaging unit "
+        ],
+        "image_footnote": [],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "",
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "4. Design Verification ",
+        "text_level": 1,
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "Large designs such as ATLASpix3 requires careful verification. Pixels have been simulated using an analog simulator. A simplified matrix with RCU has been verified through mixed mode simulations. Finally,a full-chip digital simulation has been carried out using post-routed netlist of the RCU to verify timing. Since some parts of the chip,such as the buffers and EoC multiplexers, are ful-custom,their behavioral models had to be generated and integrated into the verification environment. ",
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "Digital simulations alone are not sufcient for optimizing the architecture; for example, the number of buffers needed. For this purpose, the ReadOut Modelling Environment (ROME) [5] is used to assess and optimize the overall architecture of ATLASpix3 to meet the requirements of ATLAS ITk layer 4. The readout architecture of the chip has been emulated in the ROME framework. The data from ATLAS ITk physics simulations is used as an input to evaluate the performance of ATLASpix3. According to the simulation results,the overall readout architecture has been optimized. The optimized design features include the buffer size,FIFO depth and length of the data words.The buffer sizes and their interplay with the system form a major part of the study. The fill-states of trigger FIFO (figure 4a) and Aurora encoder FIFO were tracked to find bottenecks in the design. To prevent data loss,the data word size was reduced from 64 bit to 32 bit.To enable this,the L1 time stamp was included in the control word.32 bit data words are beneficial when compared to 64 bit, because two data words can be processed per Aurora encoder cycle, thereby doubling the output rate.In combination with further state machine optimizations,it is shown that the readout efficiency for high occupancies can be increased well beyond the planned trigger rate of $2 \\mathrm { M H z }$ .The particle detection efciency denotes the fraction of charge clusters of which at least one pixel hit was read out. It is chosen to generate a measure comparable to efciencies from beam test measurements. ROME simulations show that the particle detection eficiency stays high for the optimized system (with 32 bit data words) at higher trigger rates (figure 4b). ",
+        "page_idx": 3
+    },
+    {
+        "type": "image",
+        "img_path": "images/33e05b3341219828ac4bbde4b28b674af2e0703ebf35c9464de02f42b5eabb3b.jpg",
+        "image_caption": [
+            "Figure 4: Trigger FIFO occupancy and readout effciency from ROME simulations. For $3 \\ \\mathrm { M H z }$ trigger rate and 32 bit data words,the trigger FIFO fillstate is plotted over simulated time in (a) and the comparison of readout efciency of 32 bit (unoptimized system) with 64 bit data words (optimized system) is shown in (b) "
+        ],
+        "image_footnote": [],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "",
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "5. Outlook and Conclusion ",
+        "text_level": 1,
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "This paper describes the design details of the first reticle-size HVCMOS chip in $1 8 0 ~ \\mathrm { n m }$ ATLASpix3 is a $2 \\times 2 ~ \\mathrm { c m } ^ { 2 }$ sensor chip suitable for CMOS quad module construction for ATLAS ITk layer 4. It has a configurable readout scheme that supports triggered readout and has a debug mode without trigger. Hit words and command protocol are compatible with RD53A. ROME was developed at KIT to assess the eligibility of different readout architectures for ATLAS ITk. Laboratory measurements and test beam studies on ATLASpix3 started in $Q 4 ~ 2 0 1 9 ~ $ within the HVCMOS collaboration. The tested features, including triggerless readout are functional. ",
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "References ",
+        "text_level": 1,
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "[1] I. Peric,\"A novel monolithic pixel detector implemented in high-voltage cmos technology” in 2007 IEEE Nuclear Science Symposium Conference Record, vol.2, pp. 1033-1039, Oct 2007.   \n[2] M. Kiehn et al.,“Performance of the ATLASPix1 pixel sensor prototype in ams aH18 CMOS technology for the ATLAS ITk upgrade” Journal of Instrumentation, vol. 14, pp. C08013-C08013, aug 2019.   \n[3] I. Peric et al.,\"A high-voltage pixel sensor for the ATLAS upgrade,”Nucl. Instrum. Meth. vol. A924, pp. 99-103,2019.   \n[4] M. Prathapan et al.,“Design of a HVCMOS pixel sensor ASIC with on-chip readout electronics for ATLAS ITk Upgrade” PoS, vol. TWEPP2018, p. 074, 2019.   \n[5] R. Schimassek,“ReadOut Modelling Environment (ROME).\" https://git.scc.kit.edu/jll038/Readout_Simulation,2019. ",
+        "page_idx": 4
+    }
+]
