@@ -57,14 +57,11 @@ def _get_document_chunking_config(doc_id):
             parser_config = json.loads(result[0])
             chunking_config = parser_config.get('chunking_config')
             if chunking_config:
-                print(f"🔧 [DEBUG] 从数据库获取到分块配置: {chunking_config}")
                 return chunking_config
         
-        print(f"📄 [DEBUG] 文档 {doc_id} 没有自定义分块配置，使用默认配置")
         return None
         
     except Exception as e:
-        print(f"⚠️ [WARNING] 获取文档分块配置失败: {e}")
         return None
     finally:
         if cursor:
@@ -106,10 +103,7 @@ def add_chunks_with_positions(doc, chunks, md_file_path, chunk_content_to_index,
     if config:
         effective_config.update(config)
     
-    print(f"🚀 合并批量添加: 总共接收到 {len(chunks)} 个 chunks 准备批量添加（包含位置信息）")
-    
     if not chunks:
-        print("⚠️ 没有chunks需要添加")
         update_progress(0.8, "没有chunks需要添加")
         return 0
     
@@ -133,23 +127,17 @@ def add_chunks_with_positions(doc, chunks, md_file_path, chunk_content_to_index,
                     if position_int_temp is not None:
                         # 有完整位置信息，使用positions参数
                         chunk_data["positions"] = position_int_temp
-                        print(f"🔧 chunk {i}: 获取到完整位置信息: {len(position_int_temp)} 个位置")
                     else:
                         # 没有完整位置信息，使用top_int参数
                         original_index = chunk_content_to_index.get(chunk.strip())
                         if original_index is not None:
                             chunk_data["top_int"] = original_index
-                            print(f"🔧 chunk {i}: 使用top_int: {original_index}")
-                        else:
-                            print(f"⚠️ chunk {i}: 无法获取位置信息")
                 except Exception as pos_e:
-                    print(f"⚠️ chunk {i}: 获取位置信息失败: {pos_e}")
                     # 即使位置信息获取失败，也继续添加chunk
                 
                 batch_chunks.append(chunk_data)
         
         if not batch_chunks:
-            print("⚠️ 过滤后没有有效的chunks")
             update_progress(0.95, "没有有效的chunks")
             return 0
         
@@ -159,11 +147,6 @@ def add_chunks_with_positions(doc, chunks, md_file_path, chunk_content_to_index,
         chunks_with_positions = [c for c in batch_chunks if "positions" in c]
         chunks_with_top_int = [c for c in batch_chunks if "top_int" in c]
         chunks_without_position = len(batch_chunks) - len(chunks_with_positions) - len(chunks_with_top_int)
-        
-        print(f"📍 位置信息统计:")
-        print(f"   - 完整位置信息: {len(chunks_with_positions)} chunks")
-        print(f"   - 单独top_int: {len(chunks_with_top_int)} chunks")
-        print(f"   - 无位置信息: {chunks_without_position} chunks")
         
         # 配置批量大小 - 根据chunk数量动态调整
         if len(batch_chunks) <= 10:
@@ -210,24 +193,19 @@ def add_chunks_with_positions(doc, chunks, md_file_path, chunk_content_to_index,
                     progress = 0.8 + (batch_end / len(batch_chunks)) * 0.15  # 0.8-0.95范围
                     update_progress(progress, f"批量添加进度: {batch_end}/{len(batch_chunks)} chunks")
                     
-                    print(f"✅ 批次 {current_batch_num} 成功: +{added} chunks (失败: {failed})")
-                    
                     # 显示处理统计
                     stats = data.get("processing_stats", {})
                     if stats:
-                        print(f"   📊 分片处理: {stats.get('batches_processed', 0)} 个分片")
-                        print(f"   💰 嵌入成本: {stats.get('embedding_cost', 0)}")
+                        pass # Removed redundant print statements
                     
                     # 检查返回的chunks是否包含位置信息
                     returned_chunks = data.get("chunks", [])
                     if returned_chunks:
-                        chunks_with_pos = [c for c in returned_chunks if c.get('positions') or c.get('top_positions')]
-                        print(f"   📍 位置信息: {len(chunks_with_pos)}/{len(returned_chunks)} chunks包含位置")
+                        pass # Removed redundant print statements
                 
                 else:
                     # 批量添加失败
                     error_msg = result.get("message", "Unknown error")
-                    print(f"❌ 批次 {current_batch_num} 失败: {error_msg}")
                     total_failed += len(current_batch)
                     
                     # 更新进度
@@ -235,7 +213,6 @@ def add_chunks_with_positions(doc, chunks, md_file_path, chunk_content_to_index,
                     update_progress(progress, f"批量添加进度: {batch_end}/{len(batch_chunks)} chunks (部分失败)")
                 
             except Exception as e:
-                print(f"❌ 批次 {current_batch_num} 网络请求异常: {e}")
                 total_failed += len(current_batch)
                 
                 # 更新进度
@@ -266,7 +243,6 @@ def add_chunks_with_positions(doc, chunks, md_file_path, chunk_content_to_index,
         return total_added
         
     except Exception as e:
-        print(f"❌ 合并批量添加过程中出现异常: {e}")
         update_progress(0.95, f"批量添加异常: {str(e)}")
         
         # 记录异常统计
@@ -278,15 +254,13 @@ def add_chunks_with_positions(doc, chunks, md_file_path, chunk_content_to_index,
 def _cleanup_temp_files(md_file_path):
     """清理临时文件"""
     if not should_cleanup_temp_files():
-        print(f"[INFO] 配置为保留临时文件，路径: {os.path.dirname(os.path.abspath(md_file_path))}")
         return
     
     try:
         temp_dir = os.path.dirname(os.path.abspath(md_file_path))
         shutil.rmtree(temp_dir)
-        print(f"[INFO] 已清理临时文件目录: {temp_dir}")
     except Exception as e:
-        print(f"[WARNING] 清理临时文件异常: {e}")
+        pass
 
 def create_ragflow_resources(doc_id, kb_id, md_file_path, image_dir, update_progress):
     """
@@ -321,20 +295,15 @@ def create_ragflow_resources(doc_id, kb_id, md_file_path, image_dir, update_prog
 
         # 确保进度更新到100%
         update_progress(1.0, f"处理完成！成功处理 {chunk_count} 个chunks")
-        print(f"✅ 所有处理步骤完成，共处理 {chunk_count} 个chunks")
-
         return chunk_count
 
     except Exception as e:
-        print(f"create_ragflow_resources 处理出错: {str(e)}")
         import traceback
         traceback.print_exc()
-        
-        # 即使发生异常，也要确保进度更新到100%，避免前端界面卡住
+
         try:
             update_progress(1.0, f"处理过程中发生异常: {str(e)}")
-            print(f"❌ 处理过程中发生异常，但进度已更新完成")
         except Exception as progress_e:
-            print(f"[异常处理] 更新进度时也发生异常: {progress_e}")
+            pass
         
         raise
