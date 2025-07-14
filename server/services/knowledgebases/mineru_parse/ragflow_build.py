@@ -13,12 +13,7 @@ from datetime import datetime
 
 # 性能优化配置参数
 CHUNK_PROCESSING_CONFIG = {
-    'max_concurrent_workers': 8,           # 最大并发线程数
-    'es_bulk_batch_size': 100,           # ES批量操作批次大小
-    'enable_concurrent_chunk_add': True,   # 是否启用并发添加chunks
-    'chunk_add_timeout': 30,              # 单个chunk添加超时时间（秒）
-    'es_bulk_timeout': 60,                # ES批量操作超时时间（秒）
-    'enable_performance_stats': True,     # 是否启用性能统计
+    'enable_performance_stats': False,     # 是否启用性能统计
 }
 
 def _upload_images(kb_id, image_dir, update_progress):
