@@ -7,6 +7,24 @@
 KnowFlow 是一个基于 RAGFlow 的开源项目，持续兼容 RAGFlow 官方版本，同时会将社区里做的比较好的最佳实践整合进来。
 KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的最后一公里服务。
 
+---
+
+### 🚀 项目亮点
+
+<div align="center">
+
+| 🌟 | **KnowFlow 优势** |
+|----|-------------------|
+| 🔌 | **插件化架构**：无缝兼容 RAGFlow 任意版本，所有增强均可热插拔，升级无忧 |
+| 🛡️ | **零入侵增强**：通过 Plugin & Patch 机制，增强 RAGFlow 而不破坏原生代码 |
+| 🧩 | **分块策略丰富**：支持多种分块算法，检索更精准，适配多场景文档 |
+| 🏢 | **企业级特性**：MinerU2.x OCR 引擎、团队/用户/权限管理、企业微信、LDAP/SSO（开发中） |
+| 📈 | **最佳实践集成**：持续吸收社区优质方案，助力企业高效落地 |
+| 🔄 | **持续兼容**：紧跟 RAGFlow 官方版本，升级平滑 |
+
+</div>
+
+
 ## 功能介绍
 
 ### 适配 RAGFlow 全新 UI
@@ -355,7 +373,7 @@ mineru:
        environment:
          - RAGFLOW_BASE_URL=${RAGFLOW_BASE_URL}
          - DB_HOST=${DB_HOST}
-         - MYSQL_PORT=3306  # 注意是 3306 端口
+         - MYSQL_PORT=3306 
          - MINIO_HOST=${MINIO_HOST}
          - ES_HOST=${ES_HOST}
          - ES_PORT=${ES_PORT}
