@@ -133,6 +133,7 @@ def add_chunks_with_positions(doc, chunks, md_file_path, chunk_content_to_index,
                         if original_index is not None:
                             chunk_data["top_int"] = original_index
                 except Exception as pos_e:
+                    pass
                     # 即使位置信息获取失败，也继续添加chunk
                 
                 batch_chunks.append(chunk_data)
