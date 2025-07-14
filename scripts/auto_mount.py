@@ -32,11 +32,13 @@ if not check_dependencies():
 class DockerComposeManager:
     def __init__(self):
         self.current_dir = Path.cwd()
-        # 更新路径：从项目根目录指向extensions目录
+        # 更新路径：从项目根目录指向 patches 目录
         if self.current_dir.name == "server":
-            self.extensions_dir = self.current_dir.parent / "extensions"
+            self.patches_dir = self.current_dir.parent / "patches"
+            self.plugins_dir = self.current_dir / "plugins"
         else:
-            self.extensions_dir = self.current_dir / "extensions"
+            self.patches_dir = self.current_dir / "patches"
+            self.plugins_dir = self.current_dir / "server" / "plugins"
         
     def find_ragflow_containers(self) -> List[Dict]:
         """发现运行中的 RAGFlow 容器"""
@@ -249,22 +251,15 @@ class DockerComposeManager:
         """添加 KnowFlow 挂载配置 - 支持插件系统和传统扩展"""
         if service_name not in config['services']:
             raise ValueError(f"服务 {service_name} 不存在")
-        
         service_config = config['services'][service_name]
         existing_volumes = service_config.get('volumes', [])
-        
-        # 准备插件系统挂载路径
-        current_dir = Path.cwd()
-        knowflow_plugins_dir = current_dir / "knowflow_plugins"
-        # 批量收集 knowflow_plugins 下所有 *_app.py
-        plugin_app_files = list(knowflow_plugins_dir.glob("*_app.py")) if knowflow_plugins_dir.exists() else []
-        
-        # 检查是否存在插件系统
+
+        # 新插件系统路径
+        plugin_dir = self.plugins_dir
+        plugin_app_files = list(plugin_dir.glob("*_app.py")) if plugin_dir.exists() else []
         use_plugin_system = len(plugin_app_files) > 0
-        
-        # 准备挂载配置
+
         knowflow_mounts = []
-        
         if use_plugin_system:
             # 批量挂载所有 *_app.py 到 /ragflow/api/apps/sdk/
             for plugin_file in plugin_app_files:
@@ -275,37 +270,31 @@ class DockerComposeManager:
                 print(f"✅ 检测到插件文件: {abs_plugin_file} -> /ragflow/api/apps/sdk/{target_name}")
         else:
             # 使用传统的扩展文件挂载
-            abs_extensions_dir = self.extensions_dir.absolute()
+            abs_patches_dir = self.patches_dir.absolute()
             knowflow_mounts = [
-                f"{abs_extensions_dir}/enhanced_doc.py:/ragflow/api/apps/sdk/doc.py:ro",
+                f"{abs_patches_dir}/enhanced_doc.py:/ragflow/api/apps/sdk/doc.py:ro",
             ]
             print(f"✅ 未检测到插件系统，使用传统扩展挂载模式")
-            print(f"   扩展目录: {abs_extensions_dir}")
-        
+            print(f"   扩展目录: {abs_patches_dir}")
+
         # 合并挂载点，避免重复
         all_volumes = []
         existing_targets = set()
-        
-        # 首先添加现有的非KnowFlow挂载
         for volume in existing_volumes:
             if ':' in volume:
                 target = volume.split(':')[1]
-                # 跳过已存在的KnowFlow相关挂载（插件和扩展）
                 kf_targets = [f"/ragflow/api/apps/sdk/{f.name}" for f in plugin_app_files]
                 if not any(kf_target in target for kf_target in kf_targets):
                     all_volumes.append(volume)
                     existing_targets.add(target)
             else:
                 all_volumes.append(volume)
-        
-        # 然后添加KnowFlow挂载（去重）
         for mount in knowflow_mounts:
             mount_target = mount.split(':')[1]
             if mount_target not in existing_targets:
                 all_volumes.append(mount)
                 existing_targets.add(mount_target)
                 print(f"   添加挂载: {mount}")
-        
         service_config['volumes'] = all_volumes
         return config
     
@@ -320,14 +309,11 @@ class DockerComposeManager:
     
     def create_extension_files(self):
         """创建必要的扩展文件"""
-        # 检查插件系统
-        current_dir = Path.cwd()
-        knowflow_plugins_dir = current_dir / "knowflow_plugins"
-        # 批量收集 knowflow_plugins 下所有 *_app.py
-        plugin_app_files = list(knowflow_plugins_dir.glob("*_app.py")) if knowflow_plugins_dir.exists() else []
+        plugin_dir = self.plugins_dir
+        plugin_app_files = list(plugin_dir.glob("*_app.py")) if plugin_dir.exists() else []
         use_plugin_system = len(plugin_app_files) > 0
         if use_plugin_system:
-            print(f"✅ KnowFlow 插件目录已就绪: {knowflow_plugins_dir}")
+            print(f"✅ 插件目录已就绪: {plugin_dir}")
             for plugin_file in plugin_app_files:
                 print(f"   - {plugin_file.name}: 插件 (自动挂载)")
             print(f"")
@@ -335,9 +321,8 @@ class DockerComposeManager:
             for plugin_file in plugin_app_files:
                 print(f"   POST /api/v1/{plugin_file.stem.replace('_app','')}/...")
         else:
-            # 传统扩展模式
-            self.extensions_dir.mkdir(exist_ok=True)
-            print(f"✅ enhanced_doc.py 已存在: {self.extensions_dir}")
+            self.patches_dir.mkdir(exist_ok=True)
+            print(f"✅ enhanced_doc.py 已存在: {self.patches_dir}")
             print(f"   - enhanced_doc.py: 增强版 doc.py (包含 batch_add_chunk 方法)")
             print(f"")
             print(f"💡 新增的批量 API 接口:")
@@ -475,9 +460,8 @@ def main():
         print("\n🎉 KnowFlow 扩展挂载完成!")
         
         # 检查是否使用插件系统
-        current_dir = Path.cwd()
-        knowflow_plugins_dir = current_dir / "knowflow_plugins"
-        plugin_app_files = list(knowflow_plugins_dir.glob("*_app.py")) if knowflow_plugins_dir.exists() else []
+        plugin_dir = manager.plugins_dir
+        plugin_app_files = list(plugin_dir.glob("*_app.py")) if plugin_dir.exists() else []
         use_plugin_system = len(plugin_app_files) > 0
         if use_plugin_system:
             print("🔌 使用插件系统模式 (批量插件挂载):")

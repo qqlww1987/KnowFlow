@@ -158,7 +158,7 @@ ES_PORT=1200
 
 # 数据库配置
 DB_HOST=$LOCAL_IP
-MYSQL_PORT=5455
+MYSQL_PORT=3306
 
 # MinIO 对象存储配置
 MINIO_HOST=$LOCAL_IP
@@ -238,12 +238,6 @@ show_usage_instructions() {
     echo ""
     echo "1. 启动KnowFlow服务："
     echo "   docker compose up -d"
-    echo ""
-    echo "2. 访问Web界面："
-    echo "   http://$LOCAL_IP:8081"
-    echo ""
-    echo "3. 查看API文档："
-    echo "   http://$LOCAL_IP:5000/docs"
     echo ""
 }
 
