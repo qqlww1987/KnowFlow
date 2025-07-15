@@ -1,7 +1,7 @@
 import time
 import logging
 from .excel_service import chunk_excel_for_knowledge_base
-from ..mineru_parse.ragflow_build import get_ragflow_doc, add_chunks_to_doc
+from ..mineru_parse.ragflow_build import get_ragflow_doc, add_chunks_with_positions
 
 logger = logging.getLogger(__name__)
 
@@ -36,12 +36,11 @@ def process_excel_entry(doc_id, file_content, kb_id, parser_config, doc_info, up
     # 使用 add_chunks_to_doc 批量保存分块
     if chunks:
         # 获取 RAGFlow 文档对象
-        doc = get_ragflow_doc(doc_id, kb_id)
+        doc, dataset = get_ragflow_doc(doc_id, kb_id)
         
-        # 批量添加
-        add_chunks_to_doc(doc, chunks, update_progress)
-        
-        chunk_count = len(chunks)
+        # Excel 分块没有位置信息，md_file_path 设为 None，chunk_content_to_index 用索引映射
+        chunk_content_to_index = {chunk: i for i, chunk in enumerate(chunks)}
+        chunk_count = add_chunks_with_positions(doc, chunks, None, chunk_content_to_index, update_progress)
         
         # 注意: Excel 分块目前没有位置信息，所以不需要调用 _update_chunks_position
 

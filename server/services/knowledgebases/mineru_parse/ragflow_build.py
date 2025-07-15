@@ -122,19 +122,25 @@ def add_chunks_with_positions(doc, chunks, md_file_path, chunk_content_to_index,
                 }
                 
                 # 获取位置信息
-                try:
-                    position_int_temp = get_bbox_for_chunk(md_file_path, chunk.strip())
-                    if position_int_temp is not None:
-                        # 有完整位置信息，使用positions参数
-                        chunk_data["positions"] = position_int_temp
-                    else:
-                        # 没有完整位置信息，使用top_int参数
-                        original_index = chunk_content_to_index.get(chunk.strip())
-                        if original_index is not None:
-                            chunk_data["top_int"] = original_index
-                except Exception as pos_e:
-                    pass
-                    # 即使位置信息获取失败，也继续添加chunk
+                if md_file_path is not None:
+                    try:
+                        position_int_temp = get_bbox_for_chunk(md_file_path, chunk.strip())
+                        if position_int_temp is not None:
+                            # 有完整位置信息，使用positions参数
+                            chunk_data["positions"] = position_int_temp
+                        else:
+                            # 没有完整位置信息，使用top_int参数
+                            original_index = chunk_content_to_index.get(chunk.strip())
+                            if original_index is not None:
+                                chunk_data["top_int"] = original_index
+                    except Exception as pos_e:
+                        pass
+                        # 即使位置信息获取失败，也继续添加chunk
+                else:
+                    # md_file_path 为 None，直接走 top_int 逻辑
+                    original_index = chunk_content_to_index.get(chunk.strip())
+                    if original_index is not None:
+                        chunk_data["top_int"] = original_index
                 
                 batch_chunks.append(chunk_data)
         
@@ -171,6 +177,9 @@ def add_chunks_with_positions(doc, chunks, md_file_path, chunk_content_to_index,
             
             try:
                 # 直接调用批量接口
+                print(f"🔗 发送批量请求到: /datasets/{doc.dataset_id}/documents/{doc.id}/chunks/batch")
+                print(f"📤 请求数据: {json.dumps(current_batch, ensure_ascii=False, indent=2)}")
+                
                 response = doc.rag.post(
                     f'/datasets/{doc.dataset_id}/documents/{doc.id}/chunks/batch',
                     {
@@ -178,6 +187,9 @@ def add_chunks_with_positions(doc, chunks, md_file_path, chunk_content_to_index,
                         "batch_size": min(batch_size, len(current_batch))
                     }
                 )
+                
+                print(f"📥 响应状态码: {response.status_code}")
+                print(f"📥 响应内容: {response.text}")
                 
                 result = response.json()
                 
@@ -214,6 +226,11 @@ def add_chunks_with_positions(doc, chunks, md_file_path, chunk_content_to_index,
                     update_progress(progress, f"批量添加进度: {batch_end}/{len(batch_chunks)} chunks (部分失败)")
                 
             except Exception as e:
+                print(f"❌ 网络异常详情: {str(e)}")
+                print(f"❌ 异常类型: {type(e).__name__}")
+                import traceback
+                print(f"❌ 异常堆栈: {traceback.format_exc()}")
+                
                 total_failed += len(current_batch)
                 
                 # 更新进度

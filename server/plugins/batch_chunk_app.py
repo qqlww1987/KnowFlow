@@ -282,9 +282,13 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
     current_time = str(datetime.datetime.now()).replace("T", " ")[:19]
     current_timestamp = datetime.datetime.now().timestamp()
     
+    print(f"[batch_add_chunk] 请求: dataset_id={dataset_id}, document_id={document_id}, chunks={len(chunks_data)}")
+    
     for batch_start in range(0, len(validated_chunks), batch_size):
         batch_end = min(batch_start + batch_size, len(validated_chunks))
         batch_chunks = validated_chunks[batch_start:batch_end]
+        
+        print(f"[batch_add_chunk] 处理batch: {batch_start}~{min(batch_start+batch_size, len(validated_chunks))}")
         
         try:
             # 构建chunk文档数据
@@ -320,6 +324,8 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
                 text_for_embedding = content if not d["question_kwd"] else "\n".join(d["question_kwd"])
                 embedding_texts.append([doc.name, text_for_embedding])
                 processed_chunks.append(d)
+                
+                print(f"[batch_add_chunk] chunk_idx={original_index}, content_len={len(chunk_req['content'])}, positions={chunk_req.get('positions')}, top_int={chunk_req.get('top_int')}")
             
             # 批量执行embedding
             all_texts_for_embedding = []
@@ -342,6 +348,7 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
                 try:
                     settings.docStoreConn.insert(batch_for_db, search.index_name(tenant_id), dataset_id)
                 except Exception as db_error:
+                    print(f"[batch_add_chunk] DB写入异常: {db_error}\n{traceback.format_exc()}")
                     raise db_error
             
             all_processed_chunks.extend(processed_chunks)
@@ -349,6 +356,7 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
         except Exception as e:
             error_msg = f"Batch {batch_start//batch_size + 1} failed: {str(e)}"
             processing_errors.append(error_msg)
+            print(f"[batch_add_chunk] embedding异常: {e}\n{traceback.format_exc()}")
             continue
     
     # ===== 6. 更新文档统计 =====
