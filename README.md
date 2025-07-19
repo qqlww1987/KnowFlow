@@ -7,6 +7,8 @@
 KnowFlow 是一个基于 RAGFlow 的开源项目，持续兼容 RAGFlow 官方版本，同时会将社区里做的比较好的最佳实践整合进来。
 KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的最后一公里服务。
 
+🌐 **官方网站**: [https://weizxfree.github.io/KnowFlowSite/](https://weizxfree.github.io/KnowFlowSite/)
+
 ---
 
 ### 🚀 项目亮点
