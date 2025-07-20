@@ -9,6 +9,8 @@ KnowFlow 可以理解成 RAGFlow 官方开源产品真正落地企业场景的�
 
 🌐 **官方网站**: [https://weizxfree.github.io/KnowFlowSite/](https://weizxfree.github.io/KnowFlowSite/)
 
+📺 **B站视频**: [https://www.bilibili.com/video/BV1Vfg8zDEUf/](https://www.bilibili.com/video/BV1Vfg8zDEUf/)
+
 ---
 
 ### 🚀 项目亮点
