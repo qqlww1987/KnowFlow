@@ -32,12 +32,12 @@ if not check_dependencies():
 class DockerComposeManager:
     def __init__(self):
         self.current_dir = Path.cwd()
-        # 更新路径：从项目根目录指向 patches 目录
+        # 更新路径：patches 和 plugins 目录都在 server 目录下
         if self.current_dir.name == "server":
-            self.patches_dir = self.current_dir.parent / "patches"
+            self.patches_dir = self.current_dir / "patches"
             self.plugins_dir = self.current_dir / "plugins"
         else:
-            self.patches_dir = self.current_dir / "patches"
+            self.patches_dir = self.current_dir / "server" / "patches"
             self.plugins_dir = self.current_dir / "server" / "plugins"
         
     def find_ragflow_containers(self) -> List[Dict]:
@@ -248,33 +248,49 @@ class DockerComposeManager:
         return None
     
     def add_knowflow_mounts(self, config: Dict, service_name: str) -> Dict:
-        """添加 KnowFlow 挂载配置 - 支持插件系统和传统扩展"""
+        """添加 KnowFlow 挂载配置 - 支持插件系统和传统扩展同时共存"""
         if service_name not in config['services']:
             raise ValueError(f"服务 {service_name} 不存在")
         service_config = config['services'][service_name]
         existing_volumes = service_config.get('volumes', [])
 
-        # 新插件系统路径
+        # 检查 plugins 目录下的 *_app.py 文件
         plugin_dir = self.plugins_dir
         plugin_app_files = list(plugin_dir.glob("*_app.py")) if plugin_dir.exists() else []
-        use_plugin_system = len(plugin_app_files) > 0
-
+        
+        # 检查 patches 目录下的 *_app.py 文件
+        patches_dir = self.patches_dir
+        patches_app_files = list(patches_dir.glob("*_app.py")) if patches_dir.exists() else []
+        
         knowflow_mounts = []
-        if use_plugin_system:
-            # 批量挂载所有 *_app.py 到 /ragflow/api/apps/sdk/
+        
+        # 挂载 plugins 目录下的 *_app.py 文件
+        if plugin_app_files:
+            print(f"✅ 检测到 plugins 目录下的插件文件:")
             for plugin_file in plugin_app_files:
                 abs_plugin_file = plugin_file.absolute()
                 target_name = plugin_file.name
                 mount_str = f"{abs_plugin_file}:/ragflow/api/apps/sdk/{target_name}:ro"
                 knowflow_mounts.append(mount_str)
-                print(f"✅ 检测到插件文件: {abs_plugin_file} -> /ragflow/api/apps/sdk/{target_name}")
-        else:
-            # 使用传统的扩展文件挂载
+                print(f"   {abs_plugin_file} -> /ragflow/api/apps/sdk/{target_name}")
+        
+        # 挂载 patches 目录下的 *_app.py 文件
+        if patches_app_files:
+            print(f"✅ 检测到 patches 目录下的插件文件:")
+            for patch_file in patches_app_files:
+                abs_patch_file = patch_file.absolute()
+                target_name = patch_file.name
+                mount_str = f"{abs_patch_file}:/ragflow/api/apps/sdk/{target_name}:ro"
+                knowflow_mounts.append(mount_str)
+                print(f"   {abs_patch_file} -> /ragflow/api/apps/sdk/{target_name}")
+        
+        # 如果两个目录都没有 *_app.py 文件，使用传统的扩展文件挂载
+        if not plugin_app_files and not patches_app_files:
             abs_patches_dir = self.patches_dir.absolute()
             knowflow_mounts = [
                 f"{abs_patches_dir}/enhanced_doc.py:/ragflow/api/apps/sdk/doc.py:ro",
             ]
-            print(f"✅ 未检测到插件系统，使用传统扩展挂载模式")
+            print(f"✅ 未检测到插件文件，使用传统扩展挂载模式")
             print(f"   扩展目录: {abs_patches_dir}")
 
         # 合并挂载点，避免重复
@@ -283,7 +299,9 @@ class DockerComposeManager:
         for volume in existing_volumes:
             if ':' in volume:
                 target = volume.split(':')[1]
-                kf_targets = [f"/ragflow/api/apps/sdk/{f.name}" for f in plugin_app_files]
+                # 检查是否与新的挂载点冲突
+                all_app_files = plugin_app_files + patches_app_files
+                kf_targets = [f"/ragflow/api/apps/sdk/{f.name}" for f in all_app_files]
                 if not any(kf_target in target for kf_target in kf_targets):
                     all_volumes.append(volume)
                     existing_targets.add(target)
@@ -309,18 +327,35 @@ class DockerComposeManager:
     
     def create_extension_files(self):
         """创建必要的扩展文件"""
+        # 检查 plugins 目录下的 *_app.py 文件
         plugin_dir = self.plugins_dir
         plugin_app_files = list(plugin_dir.glob("*_app.py")) if plugin_dir.exists() else []
-        use_plugin_system = len(plugin_app_files) > 0
-        if use_plugin_system:
-            print(f"✅ 插件目录已就绪: {plugin_dir}")
+        
+        # 检查 patches 目录下的 *_app.py 文件
+        patches_dir = self.patches_dir
+        patches_app_files = list(patches_dir.glob("*_app.py")) if patches_dir.exists() else []
+        
+        # 显示 plugins 目录下的插件文件
+        if plugin_app_files:
+            print(f"✅ plugins 目录已就绪: {plugin_dir}")
             for plugin_file in plugin_app_files:
                 print(f"   - {plugin_file.name}: 插件 (自动挂载)")
+        
+        # 显示 patches 目录下的插件文件
+        if patches_app_files:
+            print(f"✅ patches 目录已就绪: {patches_dir}")
+            for patch_file in patches_app_files:
+                print(f"   - {patch_file.name}: 插件 (自动挂载)")
+        
+        # 显示新增的 API 接口
+        all_app_files = plugin_app_files + patches_app_files
+        if all_app_files:
             print(f"")
             print(f"💡 新增的插件 API 接口:")
-            for plugin_file in plugin_app_files:
-                print(f"   POST /api/v1/{plugin_file.stem.replace('_app','')}/...")
+            for app_file in all_app_files:
+                print(f"   POST /api/v1/{app_file.stem.replace('_app','')}/...")
         else:
+            # 如果两个目录都没有 *_app.py 文件，使用传统扩展模式
             self.patches_dir.mkdir(exist_ok=True)
             print(f"✅ enhanced_doc.py 已存在: {self.patches_dir}")
             print(f"   - enhanced_doc.py: 增强版 doc.py (包含 batch_add_chunk 方法)")
@@ -329,9 +364,9 @@ class DockerComposeManager:
             print(f"   POST /datasets/<dataset_id>/documents/<document_id>/chunks/batch")
     
     def restart_services(self, compose_file: Path, compose_filename: str):
-        """重启 Docker Compose 服务"""
+        """重新加载 Docker Compose 服务"""
         try:
-            print("🔄 重启 Docker Compose 服务...")
+            print("🔄 重新加载 Docker Compose 服务...")
             
             # 获取 RAGFlow 项目目录（compose 文件所在目录）
             ragflow_project_dir = compose_file.parent
@@ -347,27 +382,21 @@ class DockerComposeManager:
             # 检查文件是否存在
             if not full_compose_path.exists():
                 print(f"❌ 文件不存在: {full_compose_path}")
-                print("💡 请检查文件名是否正确，或手动重启服务")
+                print("💡 请检查文件名是否正确，或手动重新加载服务")
                 return False
             
-            # 停止服务
-            print("🛑 停止服务...")
-            subprocess.run(["docker", "compose", "-f", str(full_compose_path), "down"], 
-                    check=True, cwd=ragflow_project_dir)
-
-            # 启动服务
-            print("🚀 启动服务...")
+            # 直接执行 up -d 重新加载服务配置
+            print("🚀 重新加载服务配置...")
             subprocess.run(["docker", "compose", "-f", str(full_compose_path), "up", "-d"], 
                         check=True, cwd=ragflow_project_dir)
             
-            print("✅ 服务重启完成，KnowFlow 扩展已加载!")
+            print("✅ 服务重新加载完成，KnowFlow 扩展已加载!")
             return True
             
         except subprocess.CalledProcessError as e:
-            print(f"⚠️ 重启服务失败: {e}")
-            print(f"💡 请手动重启服务以应用挂载:")
+            print(f"⚠️ 重新加载服务失败: {e}")
+            print(f"💡 请手动重新加载服务以应用挂载:")
             print(f"   cd {ragflow_project_dir}")
-            print(f"   docker compose -f {compose_filename} down")
             print(f"   docker compose -f {compose_filename} up -d")
             return False
     
@@ -423,12 +452,12 @@ class DockerComposeManager:
         # 保存配置
         self.save_compose_config(updated_config, compose_file)
         
-        # 自动重启服务以应用挂载
-        print("🔄 自动重启服务以应用挂载...")
+        # 自动重新加载服务以应用挂载
+        print("🔄 自动重新加载服务以应用挂载...")
         restart_success = self.restart_services(compose_file, compose_file_name)
         if not restart_success:
-            print(f"💡 如果重启失败，可以手动恢复: cp {backup_file} {compose_file}")
-            print("💡 手动重启命令:")
+            print(f"💡 如果重新加载失败，可以手动恢复: cp {backup_file} {compose_file}")
+            print("💡 手动重新加载命令:")
             print(f"   cd {project_dir}")
             print(f"   docker compose -f {compose_file_name} down")
             print(f"   docker compose -f {compose_file_name} up -d")
@@ -459,18 +488,25 @@ def main():
     if success:
         print("\n🎉 KnowFlow 扩展挂载完成!")
         
-        # 检查是否使用插件系统
+        # 检查插件文件
         plugin_dir = manager.plugins_dir
         plugin_app_files = list(plugin_dir.glob("*_app.py")) if plugin_dir.exists() else []
-        use_plugin_system = len(plugin_app_files) > 0
-        if use_plugin_system:
+        
+        patches_dir = manager.patches_dir
+        patches_app_files = list(patches_dir.glob("*_app.py")) if patches_dir.exists() else []
+        
+        all_app_files = plugin_app_files + patches_app_files
+        
+        if all_app_files:
             print("🔌 使用插件系统模式 (批量插件挂载):")
-            for plugin_file in plugin_app_files:
-                print(f"  POST /api/v1/{plugin_file.stem.replace('_app','')}/... - 插件接口")
-            print("\n📖 目录插件特点:")
+            for app_file in all_app_files:
+                source_dir = "plugins" if app_file in plugin_app_files else "patches"
+                print(f"  POST /api/v1/{app_file.stem.replace('_app','')}/... - {source_dir} 目录插件")
+            print("\n📖 插件系统特点:")
             print("  ✅ 增量挂载 - 无需维护整个文件副本")
             print("  ✅ 模块化设计 - 功能独立，易于扩展")  
             print("  ✅ 集成式实现 - 所有逻辑在单一文件中")
+            print("  ✅ 多目录支持 - plugins 和 patches 目录可同时共存")
         else:
             print("📄 使用传统扩展模式:")
             print("  POST /datasets/<dataset_id>/documents/<document_id>/chunks/batch - 原生批量插入")
@@ -491,4 +527,4 @@ def main():
         sys.exit(1)
 
 if __name__ == "__main__":
-    main() 
+    main()
