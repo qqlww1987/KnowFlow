@@ -203,11 +203,11 @@ class KnowledgebaseService:
                 query_embedding_model = """
                     SELECT llm_name
                     FROM tenant_llm
-                    WHERE model_type = 'embedding' AND update_time IS NOT NULL
+                    WHERE model_type = 'embedding' AND update_time IS NOT NULL AND tenant_id = %s
                     ORDER BY update_time DESC
                     LIMIT 1
                 """
-                cursor.execute(query_embedding_model)
+                cursor.execute(query_embedding_model, (tenant_id,))
                 embedding_model = cursor.fetchone()
 
                 if embedding_model and embedding_model.get("llm_name"):
