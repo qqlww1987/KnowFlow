@@ -38,7 +38,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
-      - ragflow
+      - ragflow-ragflow
     restart: on-failure
     depends_on:
       - knowflow-gotenberg
@@ -51,9 +51,9 @@ services:
     environment:
       - TZ=${TIMEZONE:-UTC}
     networks:
-      - ragflow
+      - ragflow-ragflow
     restart: on-failure
 
 networks:
-  ragflow:
+  ragflow-ragflow:
     external: true
