@@ -11,8 +11,54 @@ NC='\033[0m' # No Color
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_DIR="$PROJECT_ROOT/venv"
 
+# 默认使用容器名配置
+USE_DOCKER_CONTAINERS=true
+
+# 解析命令行参数
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --use-ip|--local)
+            USE_DOCKER_CONTAINERS=false
+            shift
+            ;;
+        --use-containers|--docker)
+            USE_DOCKER_CONTAINERS=true
+            shift
+            ;;
+        -h|--help)
+            echo "KnowFlow 安装脚本"
+            echo ""
+            echo "用法: $0 [选项]"
+            echo ""
+            echo "选项:"
+            echo "  --use-containers, --docker    使用容器名配置 (默认)"
+            echo "  --use-ip, --local            使用本地IP地址配置"
+            echo "  -h, --help                   显示此帮助信息"
+            echo ""
+            echo "示例:"
+            echo "  $0                           # 使用容器名配置"
+            echo "  $0 --use-containers          # 明确指定使用容器名配置"
+            echo "  $0 --use-ip                  # 使用本地IP地址配置"
+            exit 0
+            ;;
+        *)
+            echo "未知参数: $1"
+            echo "请使用 -h 或 --help 查看帮助信息"
+            exit 1
+            ;;
+    esac
+done
+
 echo -e "${BLUE}🚀 KnowFlow 安装脚本${NC}"
 echo "=================================="
+
+# 显示当前配置模式
+if [ "$USE_DOCKER_CONTAINERS" = true ]; then
+    echo -e "${GREEN}📋 配置模式: Docker Compose (容器名)${NC}"
+else
+    echo -e "${YELLOW}📋 配置模式: 本地环境 (IP地址)${NC}"
+fi
+echo ""
 
 # 自动检测本机IP地址
 get_local_ip() {
@@ -121,9 +167,15 @@ setup_env_file() {
     echo -e "${BLUE}📋 阶段 1: 环境变量自动生成${NC}"
     echo "=================================="
     
-    # 检测本机IP
-    LOCAL_IP=$(get_local_ip)
-    echo -e "${BLUE}🔍 检测到的本机IP: $LOCAL_IP${NC}"
+    # 根据参数选择配置模式
+    if [ "$USE_DOCKER_CONTAINERS" = true ]; then
+        echo -e "${BLUE}🐳 使用容器名配置模式${NC}"
+    else
+        echo -e "${BLUE}🖥️  使用本地IP地址配置模式${NC}"
+        # 检测本机IP
+        LOCAL_IP=$(get_local_ip)
+        echo -e "${BLUE}🔍 检测到的本机IP: $LOCAL_IP${NC}"
+    fi
     
     # 检查.env文件是否存在，如果存在则备份
     if [ -f "$PROJECT_ROOT/.env" ]; then
@@ -135,15 +187,58 @@ setup_env_file() {
     fi
     
     echo "生成.env文件..."
-    if ! cat > "$PROJECT_ROOT/.env" << EOF
+    
+    if [ "$USE_DOCKER_CONTAINERS" = true ]; then
+        # Docker Compose 环境配置
+        if ! cat > "$PROJECT_ROOT/.env" << EOF
 # =======================================================
-# KnowFlow 环境配置文件
+# KnowFlow 环境配置文件 (Docker Compose 环境)
+# 由安装脚本自动生成于 $(date)
+# =======================================================
+
+# RAGFlow 服务地址 (使用容器名)
+RAGFLOW_BASE_URL=http://ragflow-server:9380
+
+# =======================================================
+# 以下配置使用Docker容器名，适用于Docker Compose环境
+# =======================================================
+
+# Elasticsearch 配置
+ES_HOST=es01
+ES_PORT=9200
+
+# 数据库配置
+DB_HOST=mysql
+MYSQL_PORT=3306
+
+# MinIO 对象存储配置
+MINIO_HOST=minio
+MINIO_PORT=9000
+
+# Redis 配置
+REDIS_HOST=redis
+REDIS_PORT=6379
+
+# KnowFlow API 配置
+KNOWFLOW_API_URL=http://knowflow-backend:5000
+EOF
+        then
+            echo -e "${RED}❌ 生成.env文件失败${NC}"
+            return 1
+        fi
+        
+        echo -e "${GREEN}✅ .env文件生成成功 (Docker Compose配置)${NC}"
+        echo -e "${BLUE}ℹ️  使用容器名进行服务间通信${NC}"
+    else
+        # 本地环境配置
+        if ! cat > "$PROJECT_ROOT/.env" << EOF
+# =======================================================
+# KnowFlow 环境配置文件 (本地环境)
 # 由安装脚本自动生成于 $(date)
 # =======================================================
 
 # RAGFlow 服务地址 (已自动检测IP)
-# 请将端口号替换为实际的RAGFlow服务端口
-RAGFLOW_BASE_URL=http://$LOCAL_IP:请填入RAGFlow端口号
+RAGFLOW_BASE_URL=http://$LOCAL_IP:9380
 
 # =======================================================
 # 以下配置由系统自动生成和管理
@@ -167,14 +262,18 @@ MINIO_PORT=9000
 # Redis 配置
 REDIS_HOST=$LOCAL_IP
 REDIS_PORT=6379
+
+# KnowFlow API 配置
+KNOWFLOW_API_URL=http://localhost:5000
 EOF
-    then
-        echo -e "${RED}❌ 生成.env文件失败${NC}"
-        return 1
+        then
+            echo -e "${RED}❌ 生成.env文件失败${NC}"
+            return 1
+        fi
+        
+        echo -e "${GREEN}✅ .env文件生成成功 (本地IP配置)${NC}"
+        echo -e "${YELLOW}⚠️  请根据你的实际配置修改.env文件${NC}"
     fi
-    
-    echo -e "${GREEN}✅ .env文件生成成功${NC}"
-    echo -e "${YELLOW}⚠️  请根据你的实际配置修改.env文件${NC}"
     
     echo -e "${GREEN}✅ 阶段 1 完成: 环境变量自动生成${NC}"
     return 0
@@ -221,12 +320,25 @@ restart_ragflow_services() {
 show_config_instructions() {
     echo -e "${BLUE}📖 配置说明${NC}"
     echo "=================================="
-    echo "请确保以下服务已正确配置："
-    echo ""
-    echo "  1. RAGFLOW_BASE_URL - 确认端口号是否正确"
-    echo ""
-    echo "如果需要修改配置，请编辑 .env 文件："
-    echo "  nano $PROJECT_ROOT/.env"
+    
+    if [ "$USE_DOCKER_CONTAINERS" = true ]; then
+        echo "Docker Compose 环境配置已自动完成："
+        echo ""
+        echo "  ✅ 使用容器名进行服务间通信"
+        echo "  ✅ RAGFLOW_BASE_URL: http://ragflow-server:9380"
+        echo "  ✅ 所有服务使用容器名访问"
+        echo ""
+        echo "如果需要修改配置，请编辑 .env 文件："
+        echo "  nano $PROJECT_ROOT/.env"
+    else
+        echo "本地环境配置说明："
+        echo ""
+        echo "  1. RAGFLOW_BASE_URL - 确认端口号是否正确"
+        echo "  2. 确保所有服务的IP地址和端口配置正确"
+        echo ""
+        echo "如果需要修改配置，请编辑 .env 文件："
+        echo "  nano $PROJECT_ROOT/.env"
+    fi
     echo ""
 }
 
