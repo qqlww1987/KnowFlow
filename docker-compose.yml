@@ -33,8 +33,6 @@ services:
       - TZ=${TIMEZONE:-UTC}
     volumes:
       - ./server/services/config:/app/services/config:ro
-    env_file:
-      - .env
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
