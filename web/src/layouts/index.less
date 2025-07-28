@@ -1,0 +1,93 @@
+.navs {
+  ul {
+    padding: 0;
+    list-style: none;
+    display: flex;
+  }
+
+  li {
+    margin-right: 1em;
+  }
+}
+
+.layout {
+  height: 100vh;
+}
+.siderStyle {
+  text-align: center;
+  line-height: 120px;
+  color: '#fff';
+  background-color: '#001529';
+}
+
+// 强制覆盖 Ant Design 的侧边栏样式
+:global(.css-dev-only-do-not-override-1wxecgq.ant-layout .ant-layout-sider) {
+  background: #f8fafc !important;
+}
+
+:global(.ant-layout-sider) {
+  background: #f8fafc !important;
+}
+
+// 覆盖 Header 组件的背景色
+:global(.ant-layout-header) {
+  background: #f8fafc !important;
+}
+
+:global(.css-dev-only-do-not-override-1wxecgq .ant-layout-header) {
+  background: #f8fafc !important;
+}
+
+body {
+  margin: 0;
+}
+
+.divider {
+  margin: 0;
+}
+
+.clickAvailable {
+  cursor: pointer;
+}
+
+/* 滚动条整体宽度 */
+::-webkit-scrollbar {
+  width: 8px;
+  /* 对于垂直滚动条 */
+  height: 100%;
+  /* 对于水平滚动条 */
+}
+
+/* 滚动条轨道 */
+::-webkit-scrollbar-track {
+  background: transparent;
+  /* 轨道的颜色 */
+  border-radius: 10px;
+  /* 轨道的圆角 */
+}
+
+/* 滚动条滑块 */
+::-webkit-scrollbar-thumb {
+  // background: #ddecff;
+  background: #1570ef;
+  /* 滑块的颜色 */
+  border-radius: 10px;
+  /* 滑块的圆角 */
+}
+
+/* 当鼠标悬停在滑块上时 */
+::-webkit-scrollbar-thumb:hover {
+  // background: #ddecff;
+  background: #1570ef;
+  cursor: pointer;
+  /* 滑块悬停时的颜色 */
+}
+
+/* 滚动条按钮（上下箭头）的样式，不过大部分浏览器不支持直接修改这些按钮的样式 */
+/* ::-webkit-scrollbar-button { ... } */
+
+/* 滚动条两端的小块 */
+::-webkit-scrollbar-corner {
+  background: #ddecff;
+  /* 角落的颜色 */
+}
