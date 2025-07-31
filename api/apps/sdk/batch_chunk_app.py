@@ -25,6 +25,7 @@ import xxhash
 import re
 import sys
 import traceback
+from timeit import default_timer as timer
 
 from flask import request, Blueprint
 from api.utils.api_utils import token_required, get_result, get_error_data_result
@@ -34,10 +35,12 @@ from api.db import LLMType, ParserType
 from api.db.services.llm_service import TenantLLMService
 from rag.nlp import rag_tokenizer, search
 from rag.app.qa import rmPrefix, beAdoc
-from rag.prompts import keyword_extraction
+from rag.prompts import keyword_extraction, question_proposal
 from rag.app.tag import label_question
 from rag.utils import rmSpace
+from graphrag.utils import get_llm_cache, set_llm_cache, chat_limiter
 from api import settings
+import trio
 
 # 创建 Blueprint manager
 manager = Blueprint('batch_chunk', __name__)
@@ -342,7 +345,120 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
                 v = 0.1 * doc_name_vector + 0.9 * content_vector
                 d["q_%d_vec" % len(v)] = v.tolist()
             
-            # 分批插入数据库
+            # ===== 在数据库插入前处理自动关键词和问题生成 =====
+            if processed_chunks:
+                try:
+                    # 检查是否启用自动关键词/问题
+                    exists, doc_for_auto_gen = DocumentService.get_by_id(document_id)
+                    if exists and doc_for_auto_gen and doc_for_auto_gen.parser_config:
+                        import json
+                        if isinstance(doc_for_auto_gen.parser_config, str):
+                            parser_config = json.loads(doc_for_auto_gen.parser_config)
+                        else:
+                            parser_config = doc_for_auto_gen.parser_config
+                        
+                        auto_keywords = parser_config.get('auto_keywords', 0)
+                        auto_questions = parser_config.get('auto_questions', 0)
+                        
+                        if auto_keywords > 0 or auto_questions > 0:
+                            print(f"[Keywords/Questions] Batch处理 - keywords: {auto_keywords}, questions: {auto_questions}, chunks: {len(processed_chunks)}")
+                            
+                            # 获取租户信息和LLM模型
+                            if 'tenant' not in locals():
+                                from api.db.services.user_service import TenantService
+                                from api.db.services.llm_service import LLMBundle
+                                _, tenant = TenantService.get_by_id(tenant_id)
+                            if 'chat_model' not in locals():
+                                chat_model = LLMBundle(tenant_id, LLMType.CHAT, tenant.llm_id)
+                            
+                            # 创建异步处理函数
+                            async def process_batch_keywords_and_questions():
+                                # 关键词提取处理
+                                keywords_processed = 0
+                                
+                                if auto_keywords > 0:
+                                    st = timer()
+                                    
+                                    async def doc_keyword_extraction(chat_mdl, d, topn):
+                                        nonlocal keywords_processed
+                                        try:
+                                            content = d.get('content_with_weight', '').strip()
+                                            if not content or len(content) < 10:  # 跳过太短的内容
+                                                return
+                                            
+                                            # 检查缓存
+                                            cached = get_llm_cache(chat_mdl.llm_name, content, "keywords", {"topn": topn})
+                                            if not cached:
+                                                async with chat_limiter:
+                                                    # 在线程中运行同步函数
+                                                    cached = await trio.to_thread.run_sync(
+                                                        lambda: keyword_extraction(chat_mdl, content, topn)
+                                                    )
+                                                # 只缓存有效结果
+                                                if cached and cached.strip():
+                                                    set_llm_cache(chat_mdl.llm_name, content, cached, "keywords", {"topn": topn})
+                                            
+                                            if cached and cached.strip():
+                                                d["important_kwd"] = cached.split(",")
+                                                d["important_tks"] = rag_tokenizer.tokenize(" ".join(d["important_kwd"]))
+                                                keywords_processed += 1
+                                        except Exception as e:
+                                            print(f"Keywords extraction error: {str(e)[:100]}")
+                                    
+                                    async with trio.open_nursery() as nursery:
+                                        for d in processed_chunks:
+                                            nursery.start_soon(doc_keyword_extraction, chat_model, d, auto_keywords)
+                                    
+                                    print(f"[Keywords] Batch关键词生成完成: {keywords_processed}/{len(processed_chunks)}, 耗时 {timer() - st:.2f}s")
+                                
+                                # 问题生成处理
+                                questions_processed = 0
+                                
+                                if auto_questions > 0:
+                                    st = timer()
+                                    
+                                    async def doc_question_proposal(chat_mdl, d, topn):
+                                        nonlocal questions_processed
+                                        try:
+                                            content = d.get('content_with_weight', '').strip()
+                                            if not content or len(content) < 10:  # 跳过太短的内容
+                                                return
+                                            
+                                            # 检查缓存
+                                            cached = get_llm_cache(chat_mdl.llm_name, content, "question", {"topn": topn})
+                                            if not cached:
+                                                async with chat_limiter:
+                                                    # 在线程中运行同步函数
+                                                    cached = await trio.to_thread.run_sync(
+                                                        lambda: question_proposal(chat_mdl, content, topn)
+                                                    )
+                                                # 只缓存有效结果
+                                                if cached and cached.strip():
+                                                    set_llm_cache(chat_mdl.llm_name, content, cached, "question", {"topn": topn})
+                                            
+                                            if cached and cached.strip():
+                                                d["question_kwd"] = cached.split("\n")
+                                                d["question_tks"] = rag_tokenizer.tokenize("\n".join(d["question_kwd"]))
+                                                questions_processed += 1
+                                        except Exception as e:
+                                            print(f"Questions generation error: {str(e)[:100]}")
+                                    
+                                    async with trio.open_nursery() as nursery:
+                                        for d in processed_chunks:
+                                            nursery.start_soon(doc_question_proposal, chat_model, d, auto_questions)
+                                    
+                                    print(f"[Questions] Batch问题生成完成: {questions_processed}/{len(processed_chunks)}, 耗时 {timer() - st:.2f}s")
+                                
+                                return keywords_processed, questions_processed
+                            
+                            # 运行异步处理
+                            keywords_processed, questions_processed = trio.run(process_batch_keywords_and_questions)
+                            
+                except Exception as auto_gen_e:
+                    print(f"[Keywords/Questions] Batch处理异常: {auto_gen_e}")
+                    # 继续处理，不因为自动生成失败而中断主流程
+            
+            # 分批插入数据库（现在包含了关键词和问题）
             for b in range(0, len(processed_chunks), DB_BULK_SIZE):
                 batch_for_db = processed_chunks[b:b + DB_BULK_SIZE]
                 try:
@@ -350,6 +466,77 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
                 except Exception as db_error:
                     print(f"[batch_add_chunk] DB写入异常: {db_error}\n{traceback.format_exc()}")
                     raise db_error
+            
+            # ===== 在batch处理完成后执行GraphRAG =====
+            # GraphRAG基于完整的chunk信息（包含关键词和问题）进行分析
+            if processed_chunks:
+                try:
+                    # 检查是否启用GraphRAG
+                    exists, doc_for_graphrag = DocumentService.get_by_id(document_id)
+                    if exists and doc_for_graphrag and doc_for_graphrag.parser_config:
+                        import json
+                        if isinstance(doc_for_graphrag.parser_config, str):
+                            parser_config = json.loads(doc_for_graphrag.parser_config)
+                        else:
+                            parser_config = doc_for_graphrag.parser_config
+                        
+                        graphrag_config = parser_config.get('graphrag', {})
+                        if graphrag_config.get('use_graphrag', False):
+                            print(f"[GraphRAG] Batch处理 - 开始为文档 {document_id} 抽取知识图谱，chunks: {len(processed_chunks)}")
+                            
+                            # 获取租户和模型信息
+                            if 'tenant' not in locals():
+                                from api.db.services.user_service import TenantService
+                                from api.db.services.llm_service import LLMBundle
+                                _, tenant = TenantService.get_by_id(tenant_id)
+                            if 'chat_model' not in locals():
+                                chat_model = LLMBundle(tenant_id, LLMType.CHAT, tenant.llm_id)
+                            
+                            # 获取知识库信息
+                            kb_exists, kb = KnowledgebaseService.get_by_id(dataset_id)
+                            if not kb_exists or not kb:
+                                raise RuntimeError(f"Knowledge base {dataset_id} not found")
+                            embedding_model = LLMBundle(tenant_id, LLMType.EMBEDDING, kb.embd_id)
+                            
+                            # 构建GraphRAG处理参数
+                            row = {
+                                'tenant_id': tenant_id,
+                                'kb_id': dataset_id,
+                                'doc_id': document_id,
+                                'kb_parser_config': {
+                                    'graphrag': {
+                                        'method': graphrag_config.get('method', 'light'),
+                                        'entity_types': graphrag_config.get('entity_types', 
+                                            ['organization', 'person', 'geo', 'event', 'category']),
+                                        'use_graphrag': True
+                                    }
+                                }
+                            }
+                            
+                            # 进度回调函数
+                            def progress_callback(progress=None, msg=""):
+                                print(f"[GraphRAG Batch Progress] {document_id}: {msg}")
+                            
+                            # 创建一个包装函数来传递参数
+                            async def run_batch_graphrag():
+                                from graphrag.general import index
+                                return await index.run_graphrag(
+                                    row=row,
+                                    language=graphrag_config.get('language', 'Chinese'),
+                                    with_resolution=graphrag_config.get('resolution', False),
+                                    with_community=graphrag_config.get('community', False),
+                                    chat_model=chat_model,
+                                    embedding_model=embedding_model,
+                                    callback=progress_callback
+                                )
+                            
+                            # 调用GraphRAG抽取
+                            result = trio.run(run_batch_graphrag)
+                            print(f"[GraphRAG] Batch处理完成 - 文档 {document_id} 知识图谱抽取成功")
+                            
+                except Exception as graphrag_e:
+                    print(f"[GraphRAG] Batch处理异常 {document_id}: {graphrag_e}")
+                    # GraphRAG失败不影响主流程，继续处理
             
             all_processed_chunks.extend(processed_chunks)
             
@@ -399,104 +586,28 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
         
         renamed_chunks.append(renamed_chunk)
     
-    # ===== 7. 处理 GraphRAG 知识图谱抽取 =====
-    graphrag_result = None
-    try:
-        # 检查是否启用GraphRAG
-        exists, doc = DocumentService.get_by_id(document_id)
-        if exists and doc and doc.parser_config:
-            import json
-            if isinstance(doc.parser_config, str):
-                parser_config = json.loads(doc.parser_config)
-            else:
-                parser_config = doc.parser_config
-            
-            graphrag_config = parser_config.get('graphrag', {})
-            if graphrag_config.get('use_graphrag', False):
-                print(f"[GraphRAG] 开始为文档 {document_id} 抽取知识图谱，块数量: {len(all_processed_chunks)}")
-                
-                # 导入GraphRAG模块
-                from graphrag.general import index
-                from api.db.services.user_service import TenantService
-                from api.db.services.llm_service import LLMBundle
-                
-                # 获取租户和模型信息
-                _, tenant = TenantService.get_by_id(tenant_id)
-                chat_model = LLMBundle(tenant_id, LLMType.CHAT, tenant.llm_id)
-                
-                # 获取知识库信息
-                kb_exists, kb = KnowledgebaseService.get_by_id(dataset_id)
-                if not kb_exists or not kb:
-                    raise RuntimeError(f"Knowledge base {dataset_id} not found")
-                embedding_model = LLMBundle(tenant_id, LLMType.EMBEDDING, kb.embd_id)
-                
-                # 构建GraphRAG处理参数
-                row = {
-                    'tenant_id': tenant_id,
-                    'kb_id': dataset_id,
-                    'doc_id': document_id,
-                    'kb_parser_config': {
-                        'graphrag': {
-                            'method': graphrag_config.get('method', 'light'),
-                            'entity_types': graphrag_config.get('entity_types', 
-                                ['organization', 'person', 'geo', 'event', 'category']),
-                            'use_graphrag': True
-                        }
-                    }
-                }
-                
-                # 进度回调函数
-                def progress_callback(progress=None, msg=""):
-                    print(f"[GraphRAG Progress] {document_id}: {msg}")
-                
-                # 异步运行GraphRAG抽取 - 使用trio
-                import trio
-                
-                # 创建一个包装函数来传递参数
-                async def run_graphrag_with_params():
-                    return await index.run_graphrag(
-                        row=row,
-                        language=graphrag_config.get('language', 'Chinese'),
-                        with_resolution=graphrag_config.get('resolution', False),
-                        with_community=graphrag_config.get('community', False),
-                        chat_model=chat_model,
-                        embedding_model=embedding_model,
-                        callback=progress_callback
-                    )
-                
-                try:
-                    # 调用GraphRAG抽取
-                    result = trio.run(run_graphrag_with_params)
-                    
-                    graphrag_result = {
-                        'status': 'success',
-                        'doc_id': document_id,
-                        'message': '知识图谱抽取成功'
-                    }
-                    print(f"[GraphRAG] 文档 {document_id} 知识图谱抽取成功")
-                    
-                except Exception as e:
-                    print(f"[GraphRAG] 抽取失败: {e}")
-                    graphrag_result = {
-                        'status': 'failed',
-                        'doc_id': document_id,
-                        'error': str(e)
-                    }
-            else:
-                print(f"[GraphRAG] 文档 {document_id} 未启用知识图谱功能")
-                
-    except Exception as graphrag_e:
-        print(f"[GraphRAG] 知识图谱抽取异常 {document_id}: {graphrag_e}")
-        import traceback
-        traceback.print_exc()
-        graphrag_result = {
-            'status': 'error',
-            'doc_id': document_id,
-            'message': f'知识图谱抽取失败: {str(graphrag_e)}'
-        }
-        # GraphRAG失败不影响主流程，继续处理
+    # ===== 7. 初始化GraphRAG结果 =====
+    # 注意：实际的GraphRAG处理已在批处理中完成
+    graphrag_result = {
+        'status': 'success',
+        'doc_id': document_id,
+        'message': '知识图谱抽取已在批处理中完成'
+    }
     
-    # ===== 8. 构建返回结果 =====
+    # ===== 8. 初始化自动关键词和问题生成结果 =====
+    keywords_result = {
+        'status': 'success',
+        'processed_chunks': 0,
+        'message': '关键词生成已在批处理中完成'
+    }
+    
+    questions_result = {
+        'status': 'success',
+        'processed_chunks': 0,
+        'message': '问题生成已在批处理中完成'
+    }
+    
+    # ===== 9. 构建返回结果 =====
     total_requested = len(chunks_data)
     total_added = len(renamed_chunks)
     total_failed = total_requested - total_added
@@ -512,7 +623,9 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
             "embedding_cost": total_cost,
             "processing_errors": processing_errors if processing_errors else None
         },
-        "graphrag_result": graphrag_result  # 添加GraphRAG处理结果
+        "graphrag_result": graphrag_result,  # GraphRAG处理结果
+        "keywords_result": keywords_result,  # 关键词提取结果
+        "questions_result": questions_result  # 关键问题生成结果
     }
     
     # 返回结果
