@@ -399,6 +399,103 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
         
         renamed_chunks.append(renamed_chunk)
     
+    # ===== 7. 处理 GraphRAG 知识图谱抽取 =====
+    graphrag_result = None
+    try:
+        # 检查是否启用GraphRAG
+        exists, doc = DocumentService.get_by_id(document_id)
+        if exists and doc and doc.parser_config:
+            import json
+            if isinstance(doc.parser_config, str):
+                parser_config = json.loads(doc.parser_config)
+            else:
+                parser_config = doc.parser_config
+            
+            graphrag_config = parser_config.get('graphrag', {})
+            if graphrag_config.get('use_graphrag', False):
+                print(f"[GraphRAG] 开始为文档 {document_id} 抽取知识图谱，块数量: {len(all_processed_chunks)}")
+                
+                # 导入GraphRAG模块
+                from graphrag.general import index
+                from api.db.services.user_service import TenantService
+                from api.db.services.llm_service import LLMBundle
+                
+                # 获取租户和模型信息
+                _, tenant = TenantService.get_by_id(tenant_id)
+                chat_model = LLMBundle(tenant_id, LLMType.CHAT, tenant.llm_id)
+                
+                # 获取知识库信息
+                kb_exists, kb = KnowledgebaseService.get_by_id(dataset_id)
+                if not kb_exists or not kb:
+                    raise RuntimeError(f"Knowledge base {dataset_id} not found")
+                embedding_model = LLMBundle(tenant_id, LLMType.EMBEDDING, kb.embd_id)
+                
+                # 构建GraphRAG处理参数
+                row = {
+                    'tenant_id': tenant_id,
+                    'kb_id': dataset_id,
+                    'doc_id': document_id,
+                    'kb_parser_config': {
+                        'graphrag': {
+                            'method': graphrag_config.get('method', 'light'),
+                            'entity_types': graphrag_config.get('entity_types', 
+                                ['organization', 'person', 'geo', 'event', 'category']),
+                            'use_graphrag': True
+                        }
+                    }
+                }
+                
+                # 进度回调函数
+                def progress_callback(progress=None, msg=""):
+                    print(f"[GraphRAG Progress] {document_id}: {msg}")
+                
+                # 异步运行GraphRAG抽取 - 使用trio
+                import trio
+                
+                # 创建一个包装函数来传递参数
+                async def run_graphrag_with_params():
+                    return await index.run_graphrag(
+                        row=row,
+                        language=graphrag_config.get('language', 'Chinese'),
+                        with_resolution=graphrag_config.get('resolution', False),
+                        with_community=graphrag_config.get('community', False),
+                        chat_model=chat_model,
+                        embedding_model=embedding_model,
+                        callback=progress_callback
+                    )
+                
+                try:
+                    # 调用GraphRAG抽取
+                    result = trio.run(run_graphrag_with_params)
+                    
+                    graphrag_result = {
+                        'status': 'success',
+                        'doc_id': document_id,
+                        'message': '知识图谱抽取成功'
+                    }
+                    print(f"[GraphRAG] 文档 {document_id} 知识图谱抽取成功")
+                    
+                except Exception as e:
+                    print(f"[GraphRAG] 抽取失败: {e}")
+                    graphrag_result = {
+                        'status': 'failed',
+                        'doc_id': document_id,
+                        'error': str(e)
+                    }
+            else:
+                print(f"[GraphRAG] 文档 {document_id} 未启用知识图谱功能")
+                
+    except Exception as graphrag_e:
+        print(f"[GraphRAG] 知识图谱抽取异常 {document_id}: {graphrag_e}")
+        import traceback
+        traceback.print_exc()
+        graphrag_result = {
+            'status': 'error',
+            'doc_id': document_id,
+            'message': f'知识图谱抽取失败: {str(graphrag_e)}'
+        }
+        # GraphRAG失败不影响主流程，继续处理
+    
     # ===== 8. 构建返回结果 =====
     total_requested = len(chunks_data)
     total_added = len(renamed_chunks)
@@ -414,7 +511,8 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
             "batches_processed": (len(validated_chunks) - 1) // batch_size + 1,
             "embedding_cost": total_cost,
             "processing_errors": processing_errors if processing_errors else None
-        }
+        },
+        "graphrag_result": graphrag_result  # 添加GraphRAG处理结果
     }
     
     # 返回结果
