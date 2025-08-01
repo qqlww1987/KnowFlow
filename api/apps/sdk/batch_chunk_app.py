@@ -202,7 +202,7 @@ def get_progress_stats(tenant_id):
 
 def _add_positions_to_chunk_data(d, positions):
     """
-    Add position information to chunk data based on RAGFlow's _add_positions logic.
+    简化版本：仅添加position_int信息，不覆盖page_num_int和top_int排序字段
     Args:
         d: chunk data dictionary
         positions: list of [page_num, left, right, top, bottom] tuples
@@ -210,25 +210,22 @@ def _add_positions_to_chunk_data(d, positions):
     if not positions:
         return
     
-    page_num_int = []
     position_int = []
-    top_int = []
     
     for pos in positions:
         if len(pos) != 5:
             continue  # Skip invalid positions
             
         pn, left, right, top, bottom = pos
-        # 按照原始RAGFlow逻辑，page_num需要+1
-        page_num_int.append(int(pn + 1))
-        top_int.append(int(top))
         # 使用元组格式，与原始RAGFlow保持一致
         position_int.append((int(pn + 1), int(left), int(right), int(top), int(bottom)))
     
-    if page_num_int:  # Only add if we have valid positions
-        d["page_num_int"] = page_num_int
+    if position_int:  # Only add if we have valid positions
+        # 仅添加精确位置信息，不修改排序字段
         d["position_int"] = position_int
-        d["top_int"] = top_int
+
+
+
 
 
 @manager.route(  # noqa: F821
@@ -466,9 +463,15 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
                 processed_chunks = []
                 embedding_texts = []
                 
+                # 简化排序机制：固定page_num_int=1，用top_int保证顺序
+                
                 for original_index, chunk_req in batch_chunks:
                     content = chunk_req["content"]
-                    chunk_id = xxhash.xxh64((content + document_id + str(original_index)).encode("utf-8")).hexdigest()
+                    
+                    # 使用从 ragflow_build 传递过来的 top_int，如果没有则使用 original_index
+                    global_top_int = chunk_req.get("top_int", original_index)
+                    
+                    chunk_id = xxhash.xxh64((content + document_id + str(global_top_int)).encode("utf-8")).hexdigest()
                     
                     # 基础chunk数据结构
                     d = {
@@ -484,19 +487,24 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
                         "create_timestamp_flt": current_timestamp,
                         "kb_id": dataset_id,
                         "docnm_kwd": doc.name,
-                        "doc_id": document_id
+                        "doc_id": document_id,
+                        # 统一排序机制：固定page_num_int=1，top_int=原始索引
+                        "page_num_int": [1],  # 固定为1，保证所有chunks都在同一“页”
+                        "top_int": global_top_int  # 使用全局索引保证顺序
                     }
                     
-                    # 位置信息处理
+                    # 位置信息处理（作为额外信息，不影响排序）
                     if "positions" in chunk_req:
+                        # 添加精确位置信息，但不覆盖page_num_int和top_int
                         _add_positions_to_chunk_data(d, chunk_req["positions"])
+                        print(f"[batch_add_chunk] global_idx={global_top_int}: 精确坐标 + 索引排序 (page={d['page_num_int'][0]}, top={global_top_int})")
                     
                     # 准备embedding文本
                     text_for_embedding = content if not d["question_kwd"] else "\n".join(d["question_kwd"])
                     embedding_texts.append([doc.name, text_for_embedding])
                     processed_chunks.append(d)
                     
-                    print(f"[batch_add_chunk] chunk_idx={original_index}, content_len={len(chunk_req['content'])}, positions={chunk_req.get('positions')}, top_int={chunk_req.get('top_int')}")
+                    print(f"[batch_add_chunk] chunk_idx={original_index}, content_len={len(chunk_req['content'])}, has_positions={'positions' in chunk_req}, top_int={d.get('top_int')}")
                 
                 # 批量执行embedding
                 all_texts_for_embedding = []

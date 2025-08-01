@@ -121,26 +121,27 @@ def add_chunks_with_positions(doc, chunks, md_file_path, chunk_content_to_index,
                     "questions": []  # 可以根据需要添加问题生成
                 }
                 
-                # 获取位置信息
+                # 获取chunk的原始索引（确保排序正确性）
+                original_index = chunk_content_to_index.get(chunk.strip(), i)
+                
+                # 统一排序机制：固定page_num_int=1，top_int=原始索引
+                chunk_data["page_num_int"] = [1]  # 固定为1，保证所有chunks都在同一"页"
+                chunk_data["top_int"] = original_index  # 使用原始索引保证顺序
+                
+                # 尝试获取精确位置信息（作为额外的位置数据，不影响排序）
                 if md_file_path is not None:
                     try:
                         position_int_temp = get_bbox_for_chunk(md_file_path, chunk.strip())
                         if position_int_temp is not None:
-                            # 有完整位置信息，使用positions参数
+                            # 有完整位置信息时，仅添加positions，不覆盖排序字段
                             chunk_data["positions"] = position_int_temp
+                            print(f"📍 chunk {original_index}: 找到精确坐标 ({len(position_int_temp)} 个位置) + 索引排序 (page=1, top={original_index})")
                         else:
-                            # 没有完整位置信息，使用top_int参数
-                            original_index = chunk_content_to_index.get(chunk.strip())
-                            if original_index is not None:
-                                chunk_data["top_int"] = original_index
+                            print(f"📍 chunk {original_index}: 使用索引排序 (page=1, top={original_index})")
                     except Exception as pos_e:
-                        pass
-                        # 即使位置信息获取失败，也继续添加chunk
+                        print(f"📍 chunk {original_index}: 坐标获取异常，使用索引排序 (page=1, top={original_index})")
                 else:
-                    # md_file_path 为 None，直接走 top_int 逻辑
-                    original_index = chunk_content_to_index.get(chunk.strip())
-                    if original_index is not None:
-                        chunk_data["top_int"] = original_index
+                    print(f"📍 chunk {original_index}: 无MD文件，使用索引排序 (page=1, top={original_index})")
                 
                 batch_chunks.append(chunk_data)
         
@@ -152,8 +153,14 @@ def add_chunks_with_positions(doc, chunks, md_file_path, chunk_content_to_index,
         
         # 统计位置信息类型
         chunks_with_positions = [c for c in batch_chunks if "positions" in c]
-        chunks_with_top_int = [c for c in batch_chunks if "top_int" in c]
-        chunks_without_position = len(batch_chunks) - len(chunks_with_positions) - len(chunks_with_top_int)
+        chunks_with_top_int_only = [c for c in batch_chunks if "top_int" in c and "positions" not in c]
+        chunks_with_both = [c for c in batch_chunks if "positions" in c and "top_int" in c]
+        
+        print(f"📊 位置信息统计:")
+        print(f"   🎯 精确坐标: {len(chunks_with_positions)} 个")
+        print(f"   📏 仅索引排序: {len(chunks_with_top_int_only)} 个")
+        print(f"   🔄 坐标+索引: {len(chunks_with_both)} 个")
+        print(f"   📋 总计: {len(batch_chunks)} 个chunks")
         
         # 配置批量大小 - 根据chunk数量动态调整
         if len(batch_chunks) <= 10:
@@ -284,7 +291,7 @@ def add_chunks_with_positions(doc, chunks, md_file_path, chunk_content_to_index,
         print(f"   ✅ 成功: {total_added}/{len(batch_chunks)} chunks")
         print(f"   ❌ 失败: {total_failed} chunks") 
         print(f"   📈 成功率: {success_rate:.1f}%")
-        print(f"   📍 位置信息: {len(chunks_with_positions)} 完整位置, {len(chunks_with_top_int)} top_int")
+        print(f"   📍 位置信息: {len(chunks_with_positions)} 精确坐标, {len(chunks_with_top_int_only)} 索引排序, {len(chunks_with_both)} 双重定位")
         
         # 最终进度更新
         if total_failed == 0:
@@ -295,7 +302,7 @@ def add_chunks_with_positions(doc, chunks, md_file_path, chunk_content_to_index,
         # 记录性能统计
         end_time = time.time()
         processing_time = end_time - start_time
-        additional_info = f"合并模式, 批次数: {batch_count}, 成功率: {success_rate:.1f}%, 位置信息: {len(chunks_with_positions)}+{len(chunks_with_top_int)}"
+        additional_info = f"合并模式, 批次数: {batch_count}, 成功率: {success_rate:.1f}%, 位置信息: {len(chunks_with_positions)}+{len(chunks_with_top_int_only)}"
         _log_performance_stats("合并批量添加Chunks", start_time, end_time, len(batch_chunks), additional_info)
         
         return total_added
