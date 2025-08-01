@@ -163,79 +163,119 @@ def add_chunks_with_positions(doc, chunks, md_file_path, chunk_content_to_index,
         else:
             batch_size = 20
         
+        # 初始化批量处理进度
+        update_progress(0.8, f"开始批量添加 {len(batch_chunks)} 个chunks，分 {(len(batch_chunks) + batch_size - 1) // batch_size} 个批次处理")
+        
         # 分批处理，避免单次请求过大
         total_added = 0
         total_failed = 0
         batch_count = (len(batch_chunks) + batch_size - 1) // batch_size
         
-        for batch_idx in range(0, len(batch_chunks), batch_size):
-            batch_end = min(batch_idx + batch_size, len(batch_chunks))
-            current_batch = batch_chunks[batch_idx:batch_end]
+        # 启动进度轮询线程
+        import threading
+        polling_active = threading.Event()
+        polling_active.set()
+        
+        def poll_progress():
+            """后台轮询进度"""
+            last_progress = None
+            last_message = None
+            poll_count = 0
+            max_polls = 600  # 最多轮询10分钟
             
-            current_batch_num = batch_idx // batch_size + 1
-            print(f"🔄 处理批次 {current_batch_num}/{batch_count} ({len(current_batch)} chunks)")
+            while polling_active.is_set() and poll_count < max_polls:
+                time.sleep(5)  # 每2秒轮询一次
+                poll_count += 1
+                
+                try:
+                    # 查询文档进度状态
+                    progress_response = doc.rag.get(f'/datasets/{doc.dataset_id}/documents/{doc.id}/parse/progress')
+                    
+                    if progress_response.status_code == 200:
+                        progress_data = progress_response.json()
+                        
+                        if progress_data.get("code") == 0:
+                            data = progress_data.get("data", {})
+                            current_progress = data.get("progress", 0)
+                            current_message = data.get("message", "")
+                            
+                            # 检查是否有新的进度更新
+                            if (current_progress != last_progress or current_message != last_message):
+                                if current_message and current_message != last_message:
+                                    # 将批量处理的详细进度信息回调到 update_progress
+                                    update_progress(current_progress, current_message)
+                                    print(f"📊 批量处理进度回调: {current_progress:.3f} - {current_message}")
+                                
+                                last_progress = current_progress
+                                last_message = current_message
+                
+                except Exception as progress_e:
+                    print(f"⚠️  进度轮询异常: {progress_e}")
+                    # 继续轮询，不中断处理
             
-            try:
-                # 直接调用批量接口
-                print(f"🔗 发送批量请求到: /datasets/{doc.dataset_id}/documents/{doc.id}/chunks/batch")
-                print(f"📤 请求数据: {json.dumps(current_batch, ensure_ascii=False, indent=2)}")
+            print("🔄 进度轮询线程结束")
+        
+        # 启动后台轮询线程
+        polling_thread = threading.Thread(target=poll_progress, daemon=True)
+        polling_thread.start()
+        
+        try:
+            for batch_idx in range(0, len(batch_chunks), batch_size):
+                batch_end = min(batch_idx + batch_size, len(batch_chunks))
+                current_batch = batch_chunks[batch_idx:batch_end]
                 
-                response = doc.rag.post(
-                    f'/datasets/{doc.dataset_id}/documents/{doc.id}/chunks/batch',
-                    {
-                        "chunks": current_batch,
-                        "batch_size": min(batch_size, len(current_batch))
-                    }
-                )
+                current_batch_num = batch_idx // batch_size + 1
+                print(f"🔄 处理批次 {current_batch_num}/{batch_count} ({len(current_batch)} chunks)")
                 
-                print(f"📥 响应状态码: {response.status_code}")
-                print(f"📥 响应内容: {response.text}")
-                
-                result = response.json()
-                
-                if result.get("code") == 0:
-                    # 批量添加成功
-                    data = result.get("data", {})
-                    added = data.get("total_added", 0)
-                    failed = data.get("total_failed", 0)
+                try:
+                    # 调用批量接口（同步调用，等待完成）
+                    print(f"🔗 发送批量请求到: /datasets/{doc.dataset_id}/documents/{doc.id}/chunks/batch")
                     
-                    total_added += added
-                    total_failed += failed
+                    response = doc.rag.post(
+                        f'/datasets/{doc.dataset_id}/documents/{doc.id}/chunks/batch',
+                        {
+                            "chunks": current_batch,
+                            "batch_size": min(batch_size, len(current_batch))
+                        }
+                    )
                     
-                    # 更新进度
-                    progress = 0.8 + (batch_end / len(batch_chunks)) * 0.15  # 0.8-0.95范围
-                    update_progress(progress, f"批量添加进度: {batch_end}/{len(batch_chunks)} chunks")
+                    print(f"📥 批次 {current_batch_num} 响应状态码: {response.status_code}")
                     
-                    # 显示处理统计
-                    stats = data.get("processing_stats", {})
-                    if stats:
-                        pass # Removed redundant print statements
+                    if response.status_code == 200:
+                        try:
+                            result = response.json()
+                            if result.get("code") == 0:
+                                # 批量添加成功
+                                data = result.get("data", {})
+                                added = data.get("total_added", 0)
+                                failed = data.get("total_failed", 0)
+                                
+                                total_added += added
+                                total_failed += failed
+                                
+                                print(f"✅ 批次 {current_batch_num} 完成: 成功 {added} 个，失败 {failed} 个")
+                            else:
+                                # 批量添加失败
+                                error_msg = result.get("message", "Unknown error")
+                                total_failed += len(current_batch)
+                                print(f"❌ 批次 {current_batch_num} 失败: {error_msg}")
+                        except json.JSONDecodeError:
+                            print(f"❌ 批次 {current_batch_num} 响应解析失败")
+                            total_failed += len(current_batch)
+                    else:
+                        print(f"❌ 批次 {current_batch_num} HTTP 错误: {response.status_code}")
+                        total_failed += len(current_batch)
                     
-                    # 检查返回的chunks是否包含位置信息
-                    returned_chunks = data.get("chunks", [])
-                    if returned_chunks:
-                        pass # Removed redundant print statements
-                
-                else:
-                    # 批量添加失败
-                    error_msg = result.get("message", "Unknown error")
+                except Exception as e:
+                    print(f"❌ 批次 {current_batch_num} 网络异常: {str(e)}")
                     total_failed += len(current_batch)
-                    
-                    # 更新进度
-                    progress = 0.8 + (batch_end / len(batch_chunks)) * 0.15
-                    update_progress(progress, f"批量添加进度: {batch_end}/{len(batch_chunks)} chunks (部分失败)")
-                
-            except Exception as e:
-                print(f"❌ 网络异常详情: {str(e)}")
-                print(f"❌ 异常类型: {type(e).__name__}")
-                import traceback
-                print(f"❌ 异常堆栈: {traceback.format_exc()}")
-                
-                total_failed += len(current_batch)
-                
-                # 更新进度
-                progress = 0.8 + (batch_end / len(batch_chunks)) * 0.15
-                update_progress(progress, f"批量添加进度: {batch_end}/{len(batch_chunks)} chunks (网络异常)")
+        
+        finally:
+            # 停止轮询线程
+            polling_active.clear()
+            # 等待轮询线程结束
+            if polling_thread.is_alive():
+                polling_thread.join(timeout=5)
         
         # 最终统计
         success_rate = (total_added / len(batch_chunks) * 100) if len(batch_chunks) > 0 else 0

@@ -17,6 +17,7 @@
 """
 KnowFlow 批量 Chunk 添加插件 (集成式实现)
 提供 POST /datasets/{dataset_id}/documents/{document_id}/chunks/batch 接口
+提供 GET /datasets/{dataset_id}/documents/{document_id}/parse/progress 接口
 所有业务逻辑直接在此文件中实现，简化结构
 """
 
@@ -26,6 +27,8 @@ import re
 import sys
 import traceback
 from timeit import default_timer as timer
+import time
+import threading
 
 from flask import request, Blueprint
 from api.utils.api_utils import token_required, get_result, get_error_data_result
@@ -44,6 +47,157 @@ import trio
 
 # 创建 Blueprint manager
 manager = Blueprint('batch_chunk', __name__)
+
+# 全局进度状态存储 - 简化版本
+# 结构: {document_id: {"progress": float, "message": str, "timestamp": float, "stage": str}}
+_progress_states = {}
+_progress_lock = threading.Lock()
+
+
+def _update_progress_state(document_id, progress=None, message=None, stage=None):
+    """更新文档的进度状态"""
+    with _progress_lock:
+        if document_id not in _progress_states:
+            _progress_states[document_id] = {
+                "progress": 0.0,
+                "message": "",
+                "timestamp": time.time(),
+                "stage": "initializing"
+            }
+        
+        state = _progress_states[document_id]
+        if progress is not None:
+            state["progress"] = float(progress)
+        if message is not None:
+            state["message"] = str(message)
+        if stage is not None:
+            state["stage"] = str(stage)
+        state["timestamp"] = time.time()
+
+
+def _get_progress_state(document_id):
+    """获取文档的进度状态"""
+    with _progress_lock:
+        if document_id in _progress_states:
+            return _progress_states[document_id].copy()
+        else:
+            return {
+                "progress": 0.0,
+                "message": "未开始",
+                "timestamp": time.time(),
+                "stage": "unknown"
+            }
+
+
+def _clear_progress_state(document_id):
+    """清空指定文档的进度状态"""
+    with _progress_lock:
+        if document_id in _progress_states:
+            del _progress_states[document_id]
+            print(f"🧹 清空进度状态: {document_id}")
+
+
+def _get_progress_stats():
+    """获取进度状态统计信息（用于监控）"""
+    with _progress_lock:
+        total_states = len(_progress_states)
+        completed_states = sum(1 for state in _progress_states.values() 
+                             if state.get("stage", "") in ["completed", "completed_with_errors"])
+        active_states = total_states - completed_states
+        
+        return {
+            "total_states": total_states,
+            "active_states": active_states, 
+            "completed_states": completed_states
+        }
+
+
+@manager.route(  # noqa: F821
+    "/datasets/<dataset_id>/documents/<document_id>/parse/progress", methods=["GET"]
+)
+@token_required
+def get_parse_progress(tenant_id, dataset_id, document_id):
+    """
+    获取文档解析进度
+    ---
+    tags:
+      - Parse Progress
+    security:
+      - ApiKeyAuth: []
+    parameters:
+      - in: path
+        name: dataset_id
+        type: string
+        required: true
+        description: ID of the dataset.
+      - in: path
+        name: document_id
+        type: string
+        required: true
+        description: ID of the document.
+    responses:
+      200:
+        description: Progress information retrieved successfully.
+        schema:
+          type: object
+          properties:
+            progress:
+              type: number
+              description: Progress value (0.0 to 1.0).
+            message:
+              type: string
+              description: Current progress message.
+            stage:
+              type: string
+              description: Current processing stage.
+            timestamp:
+              type: number
+              description: Last update timestamp.
+    """
+    # 基础权限验证
+    if not KnowledgebaseService.accessible(kb_id=dataset_id, user_id=tenant_id):
+        return get_error_data_result(message=f"You don't own the dataset {dataset_id}.")
+    
+    doc = DocumentService.query(id=document_id, kb_id=dataset_id)
+    if not doc:
+        return get_error_data_result(message=f"You don't own the document {document_id}.")
+    
+    # 获取进度状态
+    progress_state = _get_progress_state(document_id)
+    
+    return get_result(data=progress_state)
+
+
+@manager.route(  # noqa: F821
+    "/progress/stats", methods=["GET"]
+)
+@token_required
+def get_progress_stats(tenant_id):
+    """
+    获取进度状态统计信息（监控接口）
+    ---
+    tags:
+      - Progress Stats
+    security:
+      - ApiKeyAuth: []
+    responses:
+      200:
+        description: Progress statistics retrieved successfully.
+        schema:
+          type: object
+          properties:
+            total_states:
+              type: integer
+              description: Total number of progress states in memory.
+            active_states:
+              type: integer
+              description: Number of active (non-completed) states.
+            completed_states:
+              type: integer
+              description: Number of completed states awaiting cleanup.
+    """
+    stats = _get_progress_stats()
+    return get_result(data=stats)
 
 
 def _add_positions_to_chunk_data(d, positions):
@@ -191,451 +345,516 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
     MAX_CONTENT_LENGTH = 10000
     DB_BULK_SIZE = 10
     
-    # ===== 1. 权限和基础验证 =====
-    if not KnowledgebaseService.accessible(kb_id=dataset_id, user_id=tenant_id):
-        return get_error_data_result(message=f"You don't own the dataset {dataset_id}.")
-    
-    doc = DocumentService.query(id=document_id, kb_id=dataset_id)
-    if not doc:
-        return get_error_data_result(message=f"You don't own the document {document_id}.")
-    doc = doc[0]
-    
-    # ===== 2. 请求数据解析和验证 =====
-    req = request.json
-    chunks_data = req.get("chunks", [])
-    batch_size = min(req.get("batch_size", DEFAULT_BATCH_SIZE), MAX_BATCH_SIZE)
-    
-    # 基础数据验证
-    if not chunks_data or not isinstance(chunks_data, list):
-        return get_error_data_result(message="`chunks` is required and must be a list")
-    
-    if len(chunks_data) == 0:
-        return get_error_data_result(message="No chunks provided")
-    
-    if len(chunks_data) > MAX_CHUNKS_PER_REQUEST:
-        return get_error_data_result(
-            message=f"Too many chunks. Maximum allowed: {MAX_CHUNKS_PER_REQUEST}, received: {len(chunks_data)}"
-        )
-    
-    # ===== 3. 数据验证 =====
-    validated_chunks = []
-    validation_errors = []
-    
-    for i, chunk_req in enumerate(chunks_data):
-        # 内容验证
-        content = str(chunk_req.get("content", "")).strip()
-        if not content:
-            validation_errors.append(f"Chunk {i}: content is required")
-            continue
-            
-        if len(content) > MAX_CONTENT_LENGTH:
-            validation_errors.append(f"Chunk {i}: content too long ({len(content)} chars, max {MAX_CONTENT_LENGTH})")
-            continue
-        
-        # 关键词和问题验证    
-        if "important_keywords" in chunk_req and not isinstance(chunk_req["important_keywords"], list):
-            validation_errors.append(f"Chunk {i}: important_keywords must be a list")
-            continue
-                
-        if "questions" in chunk_req and not isinstance(chunk_req["questions"], list):
-            validation_errors.append(f"Chunk {i}: questions must be a list")
-            continue
-        
-        # 位置信息验证
-        if "positions" in chunk_req:
-            positions = chunk_req["positions"]
-            if not isinstance(positions, list):
-                validation_errors.append(f"Chunk {i}: positions must be a list")
-                continue
-            
-            for j, pos in enumerate(positions):
-                if not isinstance(pos, list) or len(pos) != 5:
-                    validation_errors.append(f"Chunk {i}: positions[{j}] must be a list of 5 integers [page_num, left, right, top, bottom]")
-                    break
-                
-                try:
-                    [int(x) for x in pos]
-                except (ValueError, TypeError):
-                    validation_errors.append(f"Chunk {i}: positions[{j}] must contain only integers")
-                    break
-            
-            if validation_errors and validation_errors[-1].startswith(f"Chunk {i}:"):
-                continue
-        
-        validated_chunks.append((i, chunk_req))
-    
-    # 验证错误处理
-    if validation_errors:
-        error_msg = "; ".join(validation_errors[:10])
-        if len(validation_errors) > 10:
-            error_msg += f" ... and {len(validation_errors)-10} more errors"
-        return get_error_data_result(message=f"Validation errors: {error_msg}")
-    
-    # ===== 4. 初始化 embedding 模型 =====
     try:
-        embd_id = DocumentService.get_embd_id(document_id)
-        embd_mdl = TenantLLMService.model_instance(tenant_id, LLMType.EMBEDDING.value, embd_id)
-    except Exception as e:
-        return get_error_data_result(message=f"Failed to initialize embedding model: {str(e)}")
-    
-    # ===== 5. 批量处理 =====
-    all_processed_chunks = []
-    total_cost = 0
-    processing_errors = []
-    current_time = str(datetime.datetime.now()).replace("T", " ")[:19]
-    current_timestamp = datetime.datetime.now().timestamp()
-    
-    print(f"[batch_add_chunk] 请求: dataset_id={dataset_id}, document_id={document_id}, chunks={len(chunks_data)}")
-    
-    for batch_start in range(0, len(validated_chunks), batch_size):
-        batch_end = min(batch_start + batch_size, len(validated_chunks))
-        batch_chunks = validated_chunks[batch_start:batch_end]
+        # ===== 1. 权限和基础验证 =====
+        if not KnowledgebaseService.accessible(kb_id=dataset_id, user_id=tenant_id):
+            return get_error_data_result(message=f"You don't own the dataset {dataset_id}.")
         
-        print(f"[batch_add_chunk] 处理batch: {batch_start}~{min(batch_start+batch_size, len(validated_chunks))}")
+        doc = DocumentService.query(id=document_id, kb_id=dataset_id)
+        if not doc:
+            return get_error_data_result(message=f"You don't own the document {document_id}.")
+        doc = doc[0]
         
+        # ===== 2. 请求数据解析和验证 =====
+        req = request.json
+        chunks_data = req.get("chunks", [])
+        batch_size = min(req.get("batch_size", DEFAULT_BATCH_SIZE), MAX_BATCH_SIZE)
+        
+        # 基础数据验证
+        if not chunks_data or not isinstance(chunks_data, list):
+            return get_error_data_result(message="`chunks` is required and must be a list")
+        
+        if len(chunks_data) == 0:
+            return get_error_data_result(message="No chunks provided")
+        
+        if len(chunks_data) > MAX_CHUNKS_PER_REQUEST:
+            return get_error_data_result(
+                message=f"Too many chunks. Maximum allowed: {MAX_CHUNKS_PER_REQUEST}, received: {len(chunks_data)}"
+            )
+        
+        # ===== 3. 数据验证 =====
+        validated_chunks = []
+        validation_errors = []
+        
+        for i, chunk_req in enumerate(chunks_data):
+            # 内容验证
+            content = str(chunk_req.get("content", "")).strip()
+            if not content:
+                validation_errors.append(f"Chunk {i}: content is required")
+                continue
+                
+            if len(content) > MAX_CONTENT_LENGTH:
+                validation_errors.append(f"Chunk {i}: content too long ({len(content)} chars, max {MAX_CONTENT_LENGTH})")
+                continue
+            
+            # 关键词和问题验证    
+            if "important_keywords" in chunk_req and not isinstance(chunk_req["important_keywords"], list):
+                validation_errors.append(f"Chunk {i}: important_keywords must be a list")
+                continue
+                    
+            if "questions" in chunk_req and not isinstance(chunk_req["questions"], list):
+                validation_errors.append(f"Chunk {i}: questions must be a list")
+                continue
+            
+            # 位置信息验证
+            if "positions" in chunk_req:
+                positions = chunk_req["positions"]
+                if not isinstance(positions, list):
+                    validation_errors.append(f"Chunk {i}: positions must be a list")
+                    continue
+                
+                for j, pos in enumerate(positions):
+                    if not isinstance(pos, list) or len(pos) != 5:
+                        validation_errors.append(f"Chunk {i}: positions[{j}] must be a list of 5 integers [page_num, left, right, top, bottom]")
+                        break
+                    
+                    try:
+                        [int(x) for x in pos]
+                    except (ValueError, TypeError):
+                        validation_errors.append(f"Chunk {i}: positions[{j}] must contain only integers")
+                        break
+                
+                if validation_errors and validation_errors[-1].startswith(f"Chunk {i}:"):
+                    continue
+            
+            validated_chunks.append((i, chunk_req))
+        
+        # 验证错误处理
+        if validation_errors:
+            error_msg = "; ".join(validation_errors[:10])
+            if len(validation_errors) > 10:
+                error_msg += f" ... and {len(validation_errors)-10} more errors"
+            # 标记为验证失败状态
+            _update_progress_state(document_id, progress=-1, message=f"数据验证失败: {error_msg}", stage="validation_failed")
+            return get_error_data_result(message=f"Validation errors: {error_msg}")
+        
+        # ===== 4. 初始化 embedding 模型 =====
         try:
-            # 构建chunk文档数据
-            processed_chunks = []
-            embedding_texts = []
+            embd_id = DocumentService.get_embd_id(document_id)
+            embd_mdl = TenantLLMService.model_instance(tenant_id, LLMType.EMBEDDING.value, embd_id)
+        except Exception as e:
+            # 标记为初始化失败状态
+            _update_progress_state(document_id, progress=-1, message=f"模型初始化失败: {str(e)}", stage="initialization_failed")
+            return get_error_data_result(message=f"Failed to initialize embedding model: {str(e)}")
+        
+        # ===== 5. 批量处理 =====
+        all_processed_chunks = []
+        total_cost = 0
+        processing_errors = []
+        current_time = str(datetime.datetime.now()).replace("T", " ")[:19]
+        current_timestamp = datetime.datetime.now().timestamp()
+        
+        print(f"[batch_add_chunk] 请求: dataset_id={dataset_id}, document_id={document_id}, chunks={len(chunks_data)}")
+        
+        # 初始化进度状态
+        _update_progress_state(document_id, progress=0.1, message="开始批量处理文本块...", stage="initializing")
+        
+        for batch_start in range(0, len(validated_chunks), batch_size):
+            batch_end = min(batch_start + batch_size, len(validated_chunks))
+            batch_chunks = validated_chunks[batch_start:batch_end]
             
-            for original_index, chunk_req in batch_chunks:
-                content = chunk_req["content"]
-                chunk_id = xxhash.xxh64((content + document_id + str(original_index)).encode("utf-8")).hexdigest()
+            print(f"[batch_add_chunk] 处理batch: {batch_start}~{min(batch_start+batch_size, len(validated_chunks))}")
+            
+            # 更新分块处理进度
+            chunk_progress = 0.1 + (batch_start / len(validated_chunks)) * 0.4  # 0.1-0.5 用于分块处理
+            _update_progress_state(document_id, progress=chunk_progress, 
+                                 message=f"处理文本块 {batch_start+1}-{min(batch_start+batch_size, len(validated_chunks))}/{len(validated_chunks)}", 
+                                 stage="chunking")
+            
+            try:
+                # 构建chunk文档数据
+                processed_chunks = []
+                embedding_texts = []
                 
-                # 基础chunk数据结构
-                d = {
-                    "id": chunk_id,
-                    "content_ltks": rag_tokenizer.tokenize(content),
-                    "content_with_weight": content,
-                    "content_sm_ltks": rag_tokenizer.fine_grained_tokenize(rag_tokenizer.tokenize(content)),
-                    "important_kwd": chunk_req.get("important_keywords", []),
-                    "important_tks": rag_tokenizer.tokenize(" ".join(chunk_req.get("important_keywords", []))),
-                    "question_kwd": [str(q).strip() for q in chunk_req.get("questions", []) if str(q).strip()],
-                    "question_tks": rag_tokenizer.tokenize("\n".join(chunk_req.get("questions", []))),
-                    "create_time": current_time,
-                    "create_timestamp_flt": current_timestamp,
-                    "kb_id": dataset_id,
-                    "docnm_kwd": doc.name,
-                    "doc_id": document_id
-                }
+                for original_index, chunk_req in batch_chunks:
+                    content = chunk_req["content"]
+                    chunk_id = xxhash.xxh64((content + document_id + str(original_index)).encode("utf-8")).hexdigest()
+                    
+                    # 基础chunk数据结构
+                    d = {
+                        "id": chunk_id,
+                        "content_ltks": rag_tokenizer.tokenize(content),
+                        "content_with_weight": content,
+                        "content_sm_ltks": rag_tokenizer.fine_grained_tokenize(rag_tokenizer.tokenize(content)),
+                        "important_kwd": chunk_req.get("important_keywords", []),
+                        "important_tks": rag_tokenizer.tokenize(" ".join(chunk_req.get("important_keywords", []))),
+                        "question_kwd": [str(q).strip() for q in chunk_req.get("questions", []) if str(q).strip()],
+                        "question_tks": rag_tokenizer.tokenize("\n".join(chunk_req.get("questions", []))),
+                        "create_time": current_time,
+                        "create_timestamp_flt": current_timestamp,
+                        "kb_id": dataset_id,
+                        "docnm_kwd": doc.name,
+                        "doc_id": document_id
+                    }
+                    
+                    # 位置信息处理
+                    if "positions" in chunk_req:
+                        _add_positions_to_chunk_data(d, chunk_req["positions"])
+                    
+                    # 准备embedding文本
+                    text_for_embedding = content if not d["question_kwd"] else "\n".join(d["question_kwd"])
+                    embedding_texts.append([doc.name, text_for_embedding])
+                    processed_chunks.append(d)
+                    
+                    print(f"[batch_add_chunk] chunk_idx={original_index}, content_len={len(chunk_req['content'])}, positions={chunk_req.get('positions')}, top_int={chunk_req.get('top_int')}")
                 
-                # 位置信息处理
-                if "positions" in chunk_req:
-                    _add_positions_to_chunk_data(d, chunk_req["positions"])
+                # 批量执行embedding
+                all_texts_for_embedding = []
+                for doc_name, content_text in embedding_texts:
+                    all_texts_for_embedding.extend([doc_name, content_text])
                 
-                # 准备embedding文本
-                text_for_embedding = content if not d["question_kwd"] else "\n".join(d["question_kwd"])
-                embedding_texts.append([doc.name, text_for_embedding])
-                processed_chunks.append(d)
+                batch_vectors, batch_cost = embd_mdl.encode(all_texts_for_embedding)
+                total_cost += batch_cost
                 
-                print(f"[batch_add_chunk] chunk_idx={original_index}, content_len={len(chunk_req['content'])}, positions={chunk_req.get('positions')}, top_int={chunk_req.get('top_int')}")
-            
-            # 批量执行embedding
-            all_texts_for_embedding = []
-            for doc_name, content_text in embedding_texts:
-                all_texts_for_embedding.extend([doc_name, content_text])
-            
-            batch_vectors, batch_cost = embd_mdl.encode(all_texts_for_embedding)
-            total_cost += batch_cost
-            
-            # 添加向量到chunks
-            for i, d in enumerate(processed_chunks):
-                doc_name_vector = batch_vectors[i * 2]
-                content_vector = batch_vectors[i * 2 + 1]
-                v = 0.1 * doc_name_vector + 0.9 * content_vector
-                d["q_%d_vec" % len(v)] = v.tolist()
-            
-            # ===== 在数据库插入前处理自动关键词和问题生成 =====
-            if processed_chunks:
-                try:
-                    # 检查是否启用自动关键词/问题
-                    exists, doc_for_auto_gen = DocumentService.get_by_id(document_id)
-                    if exists and doc_for_auto_gen and doc_for_auto_gen.parser_config:
-                        import json
-                        if isinstance(doc_for_auto_gen.parser_config, str):
-                            parser_config = json.loads(doc_for_auto_gen.parser_config)
-                        else:
-                            parser_config = doc_for_auto_gen.parser_config
-                        
-                        auto_keywords = parser_config.get('auto_keywords', 0)
-                        auto_questions = parser_config.get('auto_questions', 0)
-                        
-                        if auto_keywords > 0 or auto_questions > 0:
-                            print(f"[Keywords/Questions] Batch处理 - keywords: {auto_keywords}, questions: {auto_questions}, chunks: {len(processed_chunks)}")
+                # 添加向量到chunks
+                for i, d in enumerate(processed_chunks):
+                    doc_name_vector = batch_vectors[i * 2]
+                    content_vector = batch_vectors[i * 2 + 1]
+                    v = 0.1 * doc_name_vector + 0.9 * content_vector
+                    d["q_%d_vec" % len(v)] = v.tolist()
+                
+                # ===== 在数据库插入前处理自动关键词和问题生成 =====
+                if processed_chunks:
+                    try:
+                        # 检查是否启用自动关键词/问题
+                        exists, doc_for_auto_gen = DocumentService.get_by_id(document_id)
+                        if exists and doc_for_auto_gen and doc_for_auto_gen.parser_config:
+                            import json
+                            if isinstance(doc_for_auto_gen.parser_config, str):
+                                parser_config = json.loads(doc_for_auto_gen.parser_config)
+                            else:
+                                parser_config = doc_for_auto_gen.parser_config
                             
-                            # 获取租户信息和LLM模型
-                            if 'tenant' not in locals():
-                                from api.db.services.user_service import TenantService
-                                from api.db.services.llm_service import LLMBundle
-                                _, tenant = TenantService.get_by_id(tenant_id)
-                            if 'chat_model' not in locals():
-                                chat_model = LLMBundle(tenant_id, LLMType.CHAT, tenant.llm_id)
+                            auto_keywords = parser_config.get('auto_keywords', 0)
+                            auto_questions = parser_config.get('auto_questions', 0)
                             
-                            # 创建异步处理函数
-                            async def process_batch_keywords_and_questions():
-                                # 关键词提取处理
-                                keywords_processed = 0
+                            if auto_keywords > 0 or auto_questions > 0:
+                                print(f"[Keywords/Questions] Batch处理 - keywords: {auto_keywords}, questions: {auto_questions}, chunks: {len(processed_chunks)}")
                                 
-                                if auto_keywords > 0:
-                                    st = timer()
+                                # 更新进度：开始关键词和问题生成
+                                _update_progress_state(document_id, progress=0.6, 
+                                                     message="开始生成自动关键词和问题...", 
+                                                     stage="keywords_questions")
+                                
+                                # 获取租户信息和LLM模型
+                                if 'tenant' not in locals():
+                                    from api.db.services.user_service import TenantService
+                                    from api.db.services.llm_service import LLMBundle
+                                    _, tenant = TenantService.get_by_id(tenant_id)
+                                if 'chat_model' not in locals():
+                                    chat_model = LLMBundle(tenant_id, LLMType.CHAT, tenant.llm_id)
+                                
+                                # 创建异步处理函数
+                                async def process_batch_keywords_and_questions():
+                                    # 关键词提取处理
+                                    keywords_processed = 0
                                     
-                                    async def doc_keyword_extraction(chat_mdl, d, topn):
-                                        nonlocal keywords_processed
-                                        try:
-                                            content = d.get('content_with_weight', '').strip()
-                                            if not content or len(content) < 10:  # 跳过太短的内容
-                                                return
-                                            
-                                            # 检查缓存
-                                            cached = get_llm_cache(chat_mdl.llm_name, content, "keywords", {"topn": topn})
-                                            if not cached:
-                                                async with chat_limiter:
-                                                    # 在线程中运行同步函数
-                                                    cached = await trio.to_thread.run_sync(
-                                                        lambda: keyword_extraction(chat_mdl, content, topn)
-                                                    )
-                                                # 只缓存有效结果
+                                    if auto_keywords > 0:
+                                        st = timer()
+                                        
+                                        async def doc_keyword_extraction(chat_mdl, d, topn):
+                                            nonlocal keywords_processed
+                                            try:
+                                                content = d.get('content_with_weight', '').strip()
+                                                if not content or len(content) < 10:  # 跳过太短的内容
+                                                    return
+                                                
+                                                # 检查缓存
+                                                cached = get_llm_cache(chat_mdl.llm_name, content, "keywords", {"topn": topn})
+                                                if not cached:
+                                                    async with chat_limiter:
+                                                        # 在线程中运行同步函数
+                                                        cached = await trio.to_thread.run_sync(
+                                                            lambda: keyword_extraction(chat_mdl, content, topn)
+                                                        )
+                                                    # 只缓存有效结果
+                                                    if cached and cached.strip():
+                                                        set_llm_cache(chat_mdl.llm_name, content, cached, "keywords", {"topn": topn})
+                                                
                                                 if cached and cached.strip():
-                                                    set_llm_cache(chat_mdl.llm_name, content, cached, "keywords", {"topn": topn})
-                                            
-                                            if cached and cached.strip():
-                                                d["important_kwd"] = cached.split(",")
-                                                d["important_tks"] = rag_tokenizer.tokenize(" ".join(d["important_kwd"]))
-                                                keywords_processed += 1
-                                        except Exception as e:
-                                            print(f"Keywords extraction error: {str(e)[:100]}")
+                                                    d["important_kwd"] = cached.split(",")
+                                                    d["important_tks"] = rag_tokenizer.tokenize(" ".join(d["important_kwd"]))
+                                                    keywords_processed += 1
+                                            except Exception as e:
+                                                print(f"Keywords extraction error: {str(e)[:100]}")
+                                        
+                                        async with trio.open_nursery() as nursery:
+                                            for d in processed_chunks:
+                                                nursery.start_soon(doc_keyword_extraction, chat_model, d, auto_keywords)
+                                        
+                                        print(f"[Keywords] Batch关键词生成完成: {keywords_processed}/{len(processed_chunks)}, 耗时 {timer() - st:.2f}s")
+                                        
+                                        # 更新关键词生成完成进度
+                                        if keywords_processed > 0:
+                                            _update_progress_state(document_id, progress=0.7, 
+                                                                 message=f"关键词生成完成: {keywords_processed}/{len(processed_chunks)} 个文本块", 
+                                                                 stage="keywords_completed")
                                     
-                                    async with trio.open_nursery() as nursery:
-                                        for d in processed_chunks:
-                                            nursery.start_soon(doc_keyword_extraction, chat_model, d, auto_keywords)
+                                    # 问题生成处理
+                                    questions_processed = 0
                                     
-                                    print(f"[Keywords] Batch关键词生成完成: {keywords_processed}/{len(processed_chunks)}, 耗时 {timer() - st:.2f}s")
-                                
-                                # 问题生成处理
-                                questions_processed = 0
-                                
-                                if auto_questions > 0:
-                                    st = timer()
-                                    
-                                    async def doc_question_proposal(chat_mdl, d, topn):
-                                        nonlocal questions_processed
-                                        try:
-                                            content = d.get('content_with_weight', '').strip()
-                                            if not content or len(content) < 10:  # 跳过太短的内容
-                                                return
-                                            
-                                            # 检查缓存
-                                            cached = get_llm_cache(chat_mdl.llm_name, content, "question", {"topn": topn})
-                                            if not cached:
-                                                async with chat_limiter:
-                                                    # 在线程中运行同步函数
-                                                    cached = await trio.to_thread.run_sync(
-                                                        lambda: question_proposal(chat_mdl, content, topn)
-                                                    )
-                                                # 只缓存有效结果
+                                    if auto_questions > 0:
+                                        st = timer()
+                                        
+                                        async def doc_question_proposal(chat_mdl, d, topn):
+                                            nonlocal questions_processed
+                                            try:
+                                                content = d.get('content_with_weight', '').strip()
+                                                if not content or len(content) < 10:  # 跳过太短的内容
+                                                    return
+                                                
+                                                # 检查缓存
+                                                cached = get_llm_cache(chat_mdl.llm_name, content, "question", {"topn": topn})
+                                                if not cached:
+                                                    async with chat_limiter:
+                                                        # 在线程中运行同步函数
+                                                        cached = await trio.to_thread.run_sync(
+                                                            lambda: question_proposal(chat_mdl, content, topn)
+                                                        )
+                                                    # 只缓存有效结果
+                                                    if cached and cached.strip():
+                                                        set_llm_cache(chat_mdl.llm_name, content, cached, "question", {"topn": topn})
+                                                
                                                 if cached and cached.strip():
-                                                    set_llm_cache(chat_mdl.llm_name, content, cached, "question", {"topn": topn})
-                                            
-                                            if cached and cached.strip():
-                                                d["question_kwd"] = cached.split("\n")
-                                                d["question_tks"] = rag_tokenizer.tokenize("\n".join(d["question_kwd"]))
-                                                questions_processed += 1
-                                        except Exception as e:
-                                            print(f"Questions generation error: {str(e)[:100]}")
+                                                    d["question_kwd"] = cached.split("\n")
+                                                    d["question_tks"] = rag_tokenizer.tokenize("\n".join(d["question_kwd"]))
+                                                    questions_processed += 1
+                                            except Exception as e:
+                                                print(f"Questions generation error: {str(e)[:100]}")
+                                        
+                                        async with trio.open_nursery() as nursery:
+                                            for d in processed_chunks:
+                                                nursery.start_soon(doc_question_proposal, chat_model, d, auto_questions)
+                                        
+                                        print(f"[Questions] Batch问题生成完成: {questions_processed}/{len(processed_chunks)}, 耗时 {timer() - st:.2f}s")
+                                        
+                                        # 更新问题生成完成进度
+                                        if questions_processed > 0:
+                                            _update_progress_state(document_id, progress=0.8, 
+                                                                 message=f"问题生成完成: {questions_processed}/{len(processed_chunks)} 个文本块", 
+                                                                 stage="questions_completed")
                                     
-                                    async with trio.open_nursery() as nursery:
-                                        for d in processed_chunks:
-                                            nursery.start_soon(doc_question_proposal, chat_model, d, auto_questions)
-                                    
-                                    print(f"[Questions] Batch问题生成完成: {questions_processed}/{len(processed_chunks)}, 耗时 {timer() - st:.2f}s")
+                                    return keywords_processed, questions_processed
                                 
-                                return keywords_processed, questions_processed
+                                # 运行异步处理
+                                keywords_processed, questions_processed = trio.run(process_batch_keywords_and_questions)
+                                
+                    except Exception as auto_gen_e:
+                        print(f"[Keywords/Questions] Batch处理异常: {auto_gen_e}")
+                        # 继续处理，不因为自动生成失败而中断主流程
+                
+                # 分批插入数据库（现在包含了关键词和问题）
+                for b in range(0, len(processed_chunks), DB_BULK_SIZE):
+                    batch_for_db = processed_chunks[b:b + DB_BULK_SIZE]
+                    try:
+                        settings.docStoreConn.insert(batch_for_db, search.index_name(tenant_id), dataset_id)
+                    except Exception as db_error:
+                        print(f"[batch_add_chunk] DB写入异常: {db_error}\n{traceback.format_exc()}")
+                        raise db_error
+                
+                # ===== 在batch处理完成后执行GraphRAG =====
+                # GraphRAG基于完整的chunk信息（包含关键词和问题）进行分析
+                if processed_chunks:
+                    try:
+                        # 检查是否启用GraphRAG
+                        exists, doc_for_graphrag = DocumentService.get_by_id(document_id)
+                        if exists and doc_for_graphrag and doc_for_graphrag.parser_config:
+                            import json
+                            if isinstance(doc_for_graphrag.parser_config, str):
+                                parser_config = json.loads(doc_for_graphrag.parser_config)
+                            else:
+                                parser_config = doc_for_graphrag.parser_config
                             
-                            # 运行异步处理
-                            keywords_processed, questions_processed = trio.run(process_batch_keywords_and_questions)
-                            
-                except Exception as auto_gen_e:
-                    print(f"[Keywords/Questions] Batch处理异常: {auto_gen_e}")
-                    # 继续处理，不因为自动生成失败而中断主流程
-            
-            # 分批插入数据库（现在包含了关键词和问题）
-            for b in range(0, len(processed_chunks), DB_BULK_SIZE):
-                batch_for_db = processed_chunks[b:b + DB_BULK_SIZE]
-                try:
-                    settings.docStoreConn.insert(batch_for_db, search.index_name(tenant_id), dataset_id)
-                except Exception as db_error:
-                    print(f"[batch_add_chunk] DB写入异常: {db_error}\n{traceback.format_exc()}")
-                    raise db_error
-            
-            # ===== 在batch处理完成后执行GraphRAG =====
-            # GraphRAG基于完整的chunk信息（包含关键词和问题）进行分析
-            if processed_chunks:
-                try:
-                    # 检查是否启用GraphRAG
-                    exists, doc_for_graphrag = DocumentService.get_by_id(document_id)
-                    if exists and doc_for_graphrag and doc_for_graphrag.parser_config:
-                        import json
-                        if isinstance(doc_for_graphrag.parser_config, str):
-                            parser_config = json.loads(doc_for_graphrag.parser_config)
-                        else:
-                            parser_config = doc_for_graphrag.parser_config
-                        
-                        graphrag_config = parser_config.get('graphrag', {})
-                        if graphrag_config.get('use_graphrag', False):
-                            print(f"[GraphRAG] Batch处理 - 开始为文档 {document_id} 抽取知识图谱，chunks: {len(processed_chunks)}")
-                            
-                            # 获取租户和模型信息
-                            if 'tenant' not in locals():
-                                from api.db.services.user_service import TenantService
-                                from api.db.services.llm_service import LLMBundle
-                                _, tenant = TenantService.get_by_id(tenant_id)
-                            if 'chat_model' not in locals():
-                                chat_model = LLMBundle(tenant_id, LLMType.CHAT, tenant.llm_id)
-                            
-                            # 获取知识库信息
-                            kb_exists, kb = KnowledgebaseService.get_by_id(dataset_id)
-                            if not kb_exists or not kb:
-                                raise RuntimeError(f"Knowledge base {dataset_id} not found")
-                            embedding_model = LLMBundle(tenant_id, LLMType.EMBEDDING, kb.embd_id)
-                            
-                            # 构建GraphRAG处理参数
-                            row = {
-                                'tenant_id': tenant_id,
-                                'kb_id': dataset_id,
-                                'doc_id': document_id,
-                                'kb_parser_config': {
-                                    'graphrag': {
-                                        'method': graphrag_config.get('method', 'light'),
-                                        'entity_types': graphrag_config.get('entity_types', 
-                                            ['organization', 'person', 'geo', 'event', 'category']),
-                                        'use_graphrag': True
+                            graphrag_config = parser_config.get('graphrag', {})
+                            if graphrag_config.get('use_graphrag', False):
+                                print(f"[GraphRAG] Batch处理 - 开始为文档 {document_id} 抽取知识图谱，chunks: {len(processed_chunks)}")
+                                
+                                # 更新进度：开始知识图谱构建
+                                _update_progress_state(document_id, progress=0.85, 
+                                                     message="开始构建知识图谱...", 
+                                                     stage="graphrag_processing")
+                                
+                                # 获取租户和模型信息
+                                if 'tenant' not in locals():
+                                    from api.db.services.user_service import TenantService
+                                    from api.db.services.llm_service import LLMBundle
+                                    _, tenant = TenantService.get_by_id(tenant_id)
+                                if 'chat_model' not in locals():
+                                    chat_model = LLMBundle(tenant_id, LLMType.CHAT, tenant.llm_id)
+                                
+                                # 获取知识库信息
+                                kb_exists, kb = KnowledgebaseService.get_by_id(dataset_id)
+                                if not kb_exists or not kb:
+                                    raise RuntimeError(f"Knowledge base {dataset_id} not found")
+                                embedding_model = LLMBundle(tenant_id, LLMType.EMBEDDING, kb.embd_id)
+                                
+                                # 构建GraphRAG处理参数
+                                row = {
+                                    'tenant_id': tenant_id,
+                                    'kb_id': dataset_id,
+                                    'doc_id': document_id,
+                                    'kb_parser_config': {
+                                        'graphrag': {
+                                            'method': graphrag_config.get('method', 'light'),
+                                            'entity_types': graphrag_config.get('entity_types', 
+                                                ['organization', 'person', 'geo', 'event', 'category']),
+                                            'use_graphrag': True
+                                        }
                                     }
                                 }
-                            }
-                            
-                            # 进度回调函数
-                            def progress_callback(progress=None, msg=""):
-                                print(f"[GraphRAG Batch Progress] {document_id}: {msg}")
-                            
-                            # 创建一个包装函数来传递参数
-                            async def run_batch_graphrag():
-                                from graphrag.general import index
-                                return await index.run_graphrag(
-                                    row=row,
-                                    language=graphrag_config.get('language', 'Chinese'),
-                                    with_resolution=graphrag_config.get('resolution', False),
-                                    with_community=graphrag_config.get('community', False),
-                                    chat_model=chat_model,
-                                    embedding_model=embedding_model,
-                                    callback=progress_callback
-                                )
-                            
-                            # 调用GraphRAG抽取
-                            result = trio.run(run_batch_graphrag)
-                            print(f"[GraphRAG] Batch处理完成 - 文档 {document_id} 知识图谱抽取成功")
-                            
-                except Exception as graphrag_e:
-                    print(f"[GraphRAG] Batch处理异常 {document_id}: {graphrag_e}")
-                    # GraphRAG失败不影响主流程，继续处理
-            
-            all_processed_chunks.extend(processed_chunks)
-            
-        except Exception as e:
-            error_msg = f"Batch {batch_start//batch_size + 1} failed: {str(e)}"
-            processing_errors.append(error_msg)
-            print(f"[batch_add_chunk] embedding异常: {e}\n{traceback.format_exc()}")
-            continue
-    
-    # ===== 6. 更新文档统计 =====
-    if all_processed_chunks:
-        try:
-            DocumentService.increment_chunk_num(doc.id, doc.kb_id, total_cost, len(all_processed_chunks), 0)
-        except Exception as e:
-            print(f"Warning: Failed to update document count: {e}")
-    
-    # ===== 7. 格式化响应数据 =====
-    key_mapping = {
-        "id": "id",
-        "content_with_weight": "content",
-        "doc_id": "document_id",
-        "important_kwd": "important_keywords",
-        "question_kwd": "questions",
-        "kb_id": "dataset_id",
-        "create_timestamp_flt": "create_timestamp",
-        "create_time": "create_time",
-        "position_int": "positions",
-        "image_id": "image_id",
-        "available_int": "available",
-    }
+                                
+                                # 进度回调函数
+                                def progress_callback(progress=None, msg=""):
+                                    print(f"[GraphRAG Batch Progress] {document_id}: {msg}")
+                                    if msg:
+                                        # 将GraphRAG的进度信息更新到状态中
+                                        _update_progress_state(document_id, progress=0.9, 
+                                                             message=f"知识图谱构建: {msg}", 
+                                                             stage="graphrag_processing")
+                                
+                                # 创建一个包装函数来传递参数
+                                async def run_batch_graphrag():
+                                    from graphrag.general import index
+                                    return await index.run_graphrag(
+                                        row=row,
+                                        language=graphrag_config.get('language', 'Chinese'),
+                                        with_resolution=graphrag_config.get('resolution', False),
+                                        with_community=graphrag_config.get('community', False),
+                                        chat_model=chat_model,
+                                        embedding_model=embedding_model,
+                                        callback=progress_callback
+                                    )
+                                
+                                # 调用GraphRAG抽取
+                                result = trio.run(run_batch_graphrag)
+                                print(f"[GraphRAG] Batch处理完成 - 文档 {document_id} 知识图谱抽取成功")
+                                
+                                # 更新知识图谱完成进度
+                                _update_progress_state(document_id, progress=0.95, 
+                                                     message="知识图谱构建完成", 
+                                                     stage="graphrag_completed")
+                                
+                    except Exception as graphrag_e:
+                        print(f"[GraphRAG] Batch处理异常 {document_id}: {graphrag_e}")
+                        # GraphRAG失败不影响主流程，继续处理
+                
+                all_processed_chunks.extend(processed_chunks)
+                
+            except Exception as e:
+                error_msg = f"Batch {batch_start//batch_size + 1} failed: {str(e)}"
+                processing_errors.append(error_msg)
+                print(f"[batch_add_chunk] embedding异常: {e}\n{traceback.format_exc()}")
+                continue
+        
+        # ===== 6. 更新文档统计 =====
+        if all_processed_chunks:
+            try:
+                DocumentService.increment_chunk_num(doc.id, doc.kb_id, total_cost, len(all_processed_chunks), 0)
+            except Exception as e:
+                print(f"Warning: Failed to update document count: {e}")
+        
+        # ===== 7. 格式化响应数据 =====
+        key_mapping = {
+            "id": "id",
+            "content_with_weight": "content",
+            "doc_id": "document_id",
+            "important_kwd": "important_keywords",
+            "question_kwd": "questions",
+            "kb_id": "dataset_id",
+            "create_timestamp_flt": "create_timestamp",
+            "create_time": "create_time",
+            "position_int": "positions",
+            "image_id": "image_id",
+            "available_int": "available",
+        }
 
-    renamed_chunks = []
-    for d in all_processed_chunks:
-        renamed_chunk = {}
-        for key, value in d.items():
-            if key in key_mapping:
-                new_key = key_mapping[key]
-                # 将position_int的元组格式转换为列表格式
-                if key == "position_int" and isinstance(value, list):
-                    renamed_chunk[new_key] = [list(pos) if isinstance(pos, tuple) else pos for pos in value]
-                else:
-                    renamed_chunk[new_key] = value
+        renamed_chunks = []
+        for d in all_processed_chunks:
+            renamed_chunk = {}
+            for key, value in d.items():
+                if key in key_mapping:
+                    new_key = key_mapping[key]
+                    # 将position_int的元组格式转换为列表格式
+                    if key == "position_int" and isinstance(value, list):
+                        renamed_chunk[new_key] = [list(pos) if isinstance(pos, tuple) else pos for pos in value]
+                    else:
+                        renamed_chunk[new_key] = value
+            
+            # 确保每个chunk都有positions字段
+            if "positions" not in renamed_chunk:
+                renamed_chunk["positions"] = []
+            
+            renamed_chunks.append(renamed_chunk)
         
-        # 确保每个chunk都有positions字段
-        if "positions" not in renamed_chunk:
-            renamed_chunk["positions"] = []
+        # ===== 7. 初始化GraphRAG结果 =====
+        # 注意：实际的GraphRAG处理已在批处理中完成
+        graphrag_result = {
+            'status': 'success',
+            'doc_id': document_id,
+            'message': '知识图谱抽取已在批处理中完成'
+        }
         
-        renamed_chunks.append(renamed_chunk)
+        # ===== 8. 初始化自动关键词和问题生成结果 =====
+        keywords_result = {
+            'status': 'success',
+            'processed_chunks': 0,
+            'message': '关键词生成已在批处理中完成'
+        }
+        
+        questions_result = {
+            'status': 'success',
+            'processed_chunks': 0,
+            'message': '问题生成已在批处理中完成'
+        }
+        
+        # ===== 9. 构建返回结果 =====
+        total_requested = len(chunks_data)
+        total_added = len(renamed_chunks)
+        total_failed = total_requested - total_added
+        
+        result_data = {
+            "chunks": renamed_chunks,
+            "total_added": total_added,
+            "total_failed": total_failed,
+            "processing_stats": {
+                "total_requested": total_requested,
+                "batch_size_used": batch_size,
+                "batches_processed": (len(validated_chunks) - 1) // batch_size + 1,
+                "embedding_cost": total_cost,
+                "processing_errors": processing_errors if processing_errors else None
+            },
+            "graphrag_result": graphrag_result,  # GraphRAG处理结果
+            "keywords_result": keywords_result,  # 关键词提取结果
+            "questions_result": questions_result  # 关键问题生成结果
+        }
+        
+        # 更新最终完成状态
+        if total_failed == 0:
+            _update_progress_state(document_id, progress=1.0, 
+                                 message=f"处理完成！成功添加 {total_added} 个文本块", 
+                                 stage="completed")
+        else:
+            _update_progress_state(document_id, progress=1.0, 
+                                 message=f"处理完成！成功 {total_added} 个，失败 {total_failed} 个", 
+                                 stage="completed_with_errors")
+        
+        # 返回结果
+        if processing_errors:
+            return get_result(
+                data=result_data,
+                message=f"Partial success: {total_added} chunks added, {total_failed} failed. Check processing_stats for details."
+            )
+        else:
+            return get_result(data=result_data)
+            
+    except Exception as e:
+        # 处理意外异常
+        _update_progress_state(document_id, progress=-1, message=f"处理失败: {str(e)}", stage="failed")
+        return get_error_data_result(message=f"Batch processing failed: {str(e)}")
     
-    # ===== 7. 初始化GraphRAG结果 =====
-    # 注意：实际的GraphRAG处理已在批处理中完成
-    graphrag_result = {
-        'status': 'success',
-        'doc_id': document_id,
-        'message': '知识图谱抽取已在批处理中完成'
-    }
-    
-    # ===== 8. 初始化自动关键词和问题生成结果 =====
-    keywords_result = {
-        'status': 'success',
-        'processed_chunks': 0,
-        'message': '关键词生成已在批处理中完成'
-    }
-    
-    questions_result = {
-        'status': 'success',
-        'processed_chunks': 0,
-        'message': '问题生成已在批处理中完成'
-    }
-    
-    # ===== 9. 构建返回结果 =====
-    total_requested = len(chunks_data)
-    total_added = len(renamed_chunks)
-    total_failed = total_requested - total_added
-    
-    result_data = {
-        "chunks": renamed_chunks,
-        "total_added": total_added,
-        "total_failed": total_failed,
-        "processing_stats": {
-            "total_requested": total_requested,
-            "batch_size_used": batch_size,
-            "batches_processed": (len(validated_chunks) - 1) // batch_size + 1,
-            "embedding_cost": total_cost,
-            "processing_errors": processing_errors if processing_errors else None
-        },
-        "graphrag_result": graphrag_result,  # GraphRAG处理结果
-        "keywords_result": keywords_result,  # 关键词提取结果
-        "questions_result": questions_result  # 关键问题生成结果
-    }
-    
-    # 返回结果
-    if processing_errors:
-        return get_result(
-            data=result_data,
-            message=f"Partial success: {total_added} chunks added, {total_failed} failed. Check processing_stats for details."
-        )
-    else:
-        return get_result(data=result_data)
+    finally:
+        # 请求结束后直接清空进度状态
+        _clear_progress_state(document_id)
 
 # 设置页面名称 (可选，用于自定义 URL 前缀)
 page_name = "batch_chunk"
