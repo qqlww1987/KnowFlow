@@ -44,6 +44,13 @@ export default defineConfig({
       target: 'http://127.0.0.1:9380',
       changeOrigin: true,
     },
+    '/minio': {
+      target: 'http://127.0.0.1:9000',
+      changeOrigin: true,
+      pathRewrite: {
+        '^/minio': '', // 去掉 /minio 前缀
+      },
+    },
   },
 
   chainWebpack(memo, args) {
