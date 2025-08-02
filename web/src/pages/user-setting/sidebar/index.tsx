@@ -100,7 +100,7 @@ const SideBar = () => {
         mode="inline"
         items={items}
         onClick={handleMenuClick}
-        style={{ width: 312 }}
+        style={{ width: 200 }}
       />
     </section>
   );
