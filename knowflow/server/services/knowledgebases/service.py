@@ -931,6 +931,56 @@ class KnowledgebaseService:
             if conn:
                 conn.close()
 
+    @classmethod
+    def cancel_document_parse(cls, doc_id):
+        """取消文档解析"""
+        conn = None
+        cursor = None
+        try:
+            conn = cls._get_db_connection()
+            cursor = conn.cursor(dictionary=True)
+
+            # 先检查文档当前状态
+            query = """
+                SELECT run, progress, progress_msg
+                FROM document
+                WHERE id = %s
+            """
+            cursor.execute(query, (doc_id,))
+            result = cursor.fetchone()
+
+            if not result:
+                raise Exception("文档不存在")
+
+            # 检查文档是否正在解析中
+            if result.get("run") != "1":  # "1" 表示正在运行
+                return {
+                    "success": False,
+                    "message": "文档当前未在解析中，无法取消"
+                }
+
+            # 更新文档状态为取消
+            _update_document_progress(
+                doc_id, 
+                run="2",  # "2" 表示已取消
+                message="解析已被用户取消",
+                progress=result.get("progress", 0.0)
+            )
+
+            return {
+                "success": True,
+                "message": "解析已成功取消"
+            }
+
+        except Exception as e:
+            print(f"取消文档解析失败 (Doc ID: {doc_id}): {str(e)}")
+            raise Exception(f"取消解析失败: {str(e)}")
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
     # --- 获取最早用户 ID ---
     @classmethod
     def _get_earliest_user_tenant_id(cls):

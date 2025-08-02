@@ -34,6 +34,7 @@ const {
   setMeta,
   knowflow_document_parse,
   knowflow_parse_progress,
+  knowflow_parse_cancel,
 } = api;
 
 const methods = {
@@ -160,6 +161,10 @@ const methods = {
   knowflow_parse_progress: {
     url: knowflow_parse_progress,
     method: 'get',
+  },
+  knowflow_parse_cancel: {
+    url: knowflow_parse_cancel,
+    method: 'post',
   },
 };
 

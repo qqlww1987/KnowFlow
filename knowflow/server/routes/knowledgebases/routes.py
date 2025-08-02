@@ -201,6 +201,24 @@ def get_parse_progress(doc_id):
         print(f"获取解析进度失败: {str(e)}")
         return error_response("解析进行中，请稍后重试", code=202)
 
+@knowledgebase_bp.route('/documents/<doc_id>/parse/cancel', methods=['POST'])
+def cancel_parse_document(doc_id):
+    """取消文档解析"""
+    # 处理 OPTIONS 预检请求
+    if request.method == 'OPTIONS':
+        response = success_response({})
+        # 添加 CORS 相关头
+        response.headers.add('Access-Control-Allow-Methods', 'POST')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        return response
+        
+    try:
+        result = KnowledgebaseService.cancel_document_parse(doc_id)
+        return success_response(data=result, message="取消解析成功")
+    except Exception as e:
+        print(f"取消解析失败: {str(e)}")
+        return error_response(f"取消解析失败: {str(e)}", code=500)
+
 # 获取系统 Embedding 配置路由
 @knowledgebase_bp.route('/system_embedding_config', methods=['GET'])
 def get_system_embedding_config_route():

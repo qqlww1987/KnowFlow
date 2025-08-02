@@ -16,7 +16,26 @@ interface KnowFlowApiConfig {
   };
 }
 
-// 调用 KnowFlow 解析 API (通过nginx代理)
+// 调用 KnowFlow 取消解析 API (通过nginx代理)
+const callKnowFlowCancelApi = async (documentId: string) => {
+  try {
+    // 通过统一的API服务调用knowflow取消解析接口
+    const response = await kbService.knowflow_parse_cancel(
+      {}, // 空请求体
+      `${documentId}/parse/cancel`,
+    );
+
+    // 因为 request 设置了 getResponse: true，响应数据在 response.data 中
+    return response.data;
+  } catch (error: any) {
+    console.error('KnowFlow 取消解析 API 调用失败:', error);
+    throw new Error(
+      error.response?.data?.message ||
+        error.message ||
+        'KnowFlow 取消解析 API 调用失败',
+    );
+  }
+};
 const callKnowFlowParseApi = async (
   documentId: string,
   config: KnowFlowApiConfig,
@@ -145,9 +164,31 @@ export const useRunMinerUDocument = () => {
 
         return { code: successCount > 0 ? 0 : -1 };
       } else if (run === 2) {
-        // 取消解析 - KnowFlow 可能不支持取消，这里只是返回成功
-        message.info('MinerU 解析器暂不支持取消操作');
-        return { code: 0 };
+        // 取消解析 - 调用 KnowFlow 取消解析 API
+        const results = [];
+        for (const docId of doc_ids) {
+          try {
+            const result = await callKnowFlowCancelApi(docId);
+            results.push(result);
+
+            // 每调用一次KnowFlow取消API后立即刷新文档列表
+            queryClient.invalidateQueries({ queryKey: ['fetchDocumentList'] });
+          } catch (error: any) {
+            console.error(`文档 ${docId} 取消解析失败:`, error);
+            results.push({ code: -1, message: error.message });
+          }
+        }
+
+        // 检查是否有成功的取消操作
+        const successCount = results.filter((r) => r.code === 0).length;
+        if (successCount > 0) {
+          message.success(`已成功取消 ${successCount} 个文档的解析`);
+        }
+        if (successCount < doc_ids.length) {
+          message.warning(`${doc_ids.length - successCount} 个文档取消失败`);
+        }
+
+        return { code: successCount > 0 ? 0 : -1 };
       }
 
       return { code: 0 };
