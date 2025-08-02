@@ -68,7 +68,7 @@ export function Header() {
   };
 
   const handleLogoClick = useCallback(() => {
-    navigate(Routes.Home);
+    navigate('/knowledge'); // 跳转到知识库页面，保持布局一致性
   }, [navigate]);
 
   return (

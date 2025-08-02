@@ -93,7 +93,7 @@ const RagHeader = () => {
         height: '72px',
       }}
     >
-      <a href={window.location.origin}>
+      <div>
         <Space
           size={12}
           onClick={handleLogoClick}
@@ -102,7 +102,7 @@ const RagHeader = () => {
           <img src="/logo.png" alt="" className={styles.appIcon} />
           {/* <span className={styles.appName}>{appConf.appName}</span> */}
         </Space>
-      </a>
+      </div>
       <Space size={[0, 8]} wrap>
         <div className={styles.ragContent}>
           {tagsData.map((item, index) => (
