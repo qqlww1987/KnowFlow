@@ -183,7 +183,13 @@ docker run --rm -d --gpus=all \
 
 #### 3. 启动容器，开始使用
 
-进入到 `docker` 目录执行（此步骤和 RAGFlow 官方一致）：
+1. 拉取本项目代码：
+
+```bash
+git clone https://github.com/weizxfree/KnowFlow.git
+```
+
+2. 进入到 `docker` 目录执行（此步骤和 RAGFlow 官方一致）：
 
 ```bash
 docker compose up -d
@@ -405,6 +411,10 @@ sudo snap install astral-uv --classic
 uv run download_deps.py
 docker build -f Dockerfile.deps -t infiniflow/ragflow_deps .
 docker build --build-arg LIGHTEN=1 -f Dockerfile -t infiniflow/ragflow:nightly-slim .
+
+
+docker tag infiniflow/ragflow:nightly-slim zxwei/knowflow:v2.0.2
+docker push zxwei/knowflow:v2.0.2
 
 vim docker/.env 
 RAGFLOW_IMAGE=infiniflow/ragflow:nightly-slim
