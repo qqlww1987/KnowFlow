@@ -114,4 +114,4 @@ echo "======================================"
 
 # 启动 API 服务
 cd /app
-python app.py
+python3 app.py

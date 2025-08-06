@@ -88,7 +88,7 @@ done
 IMAGE_NAME="mineru-sglang"
 IMAGE_TAG="${IMAGE_TAG:-v2.1.10-offline}"
 MINERU_VERSION="2.1.10"
-MODEL_SOURCE="${MODEL_SOURCE:-modelscope}"  # 可选: modelscope 或 huggingface
+MODEL_SOURCE="${MODEL_SOURCE:-huggingface}"  # 可选: modelscope 或 huggingface
 BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
