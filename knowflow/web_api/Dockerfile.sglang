@@ -47,14 +47,14 @@ RUN python3 -m pip install -U "mineru[all]==${MINERU_VERSION}" --break-system-pa
 
 # 复制配置文件和脚本（优先复制，利用Docker缓存）
 COPY .env.example /app/
-COPY start_services.sh /app/
 COPY start_with_env.sh /app/
 
 # 设置启动脚本权限
-RUN chmod +x start_services.sh start_with_env.sh
+RUN chmod +x  start_with_env.sh
 
 # 复制应用代码（最后复制，避免频繁变更影响缓存）
 COPY app.py /app/
+COPY download_models.py /app/
 # 设置模型下载环境变量
 ENV MINERU_MODEL_SOURCE=${MODEL_SOURCE}
 ENV HF_HUB_CACHE=/app/models/huggingface
@@ -65,24 +65,7 @@ ENV MINERU_MODELS_DIR=/app/models
 RUN mkdir -p /app/models/huggingface /app/models/modelscope /app/models/pipeline /app/models/vlm
 
 # 下载所有模型文件（pipeline + vlm）实现完全离线部署
-RUN python3 -c "\
-import os; \
-import sys; \
-from mineru.cli.models_download import download_pipeline_models, download_vlm_models; \
-from loguru import logger; \
-os.environ['MINERU_MODEL_SOURCE'] = '${MODEL_SOURCE}'; \
-try: \
-    logger.info('开始下载Pipeline模型...'); \
-    download_pipeline_models(); \
-    logger.info('Pipeline模型下载完成'); \
-    logger.info('开始下载VLM模型...'); \
-    download_vlm_models(); \
-    logger.info('VLM模型下载完成'); \
-    logger.info('所有模型下载完成，镜像已实现完全离线部署'); \
-except Exception as e: \
-    logger.error(f'模型下载失败: {e}'); \
-    sys.exit(1); \
-"
+RUN python3 download_models.py
 
 # 设置基础环境变量
 ENV PYTHONPATH=/app

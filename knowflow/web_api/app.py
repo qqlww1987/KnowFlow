@@ -101,11 +101,33 @@ def encode_image(image_path: str) -> str:
 
 def get_infer_result(file_suffix_identifier: str, file_name: str, parse_dir: str) -> Optional[str]:
     """从结果文件中读取推理结果"""
-    result_file_path = os.path.join(parse_dir, f"{file_name}{file_suffix_identifier}")
+    # MinerU实际的输出路径结构：output_dir/filename/auto/filename.md
+    # 其中filename是完整文件名（包含扩展名）
+    file_base = Path(file_name).stem  # 去掉扩展名，用于构建子目录
+    actual_parse_dir = os.path.join(parse_dir, file_name, "auto")
+    result_file_path = os.path.join(actual_parse_dir, f"{file_name}{file_suffix_identifier}")
+    
+    logger.info(f"Looking for result file: {result_file_path}")
+    
     if os.path.exists(result_file_path):
-        with open(result_file_path, "r", encoding="utf-8") as fp:
-            return fp.read()
-    return None
+        logger.info(f"Found result file: {result_file_path}")
+        try:
+            with open(result_file_path, "r", encoding="utf-8") as fp:
+                content = fp.read()
+                logger.info(f"Read {len(content)} characters from {result_file_path}")
+                return content
+        except Exception as e:
+            logger.error(f"Error reading file {result_file_path}: {e}")
+            return None
+    else:
+        logger.warning(f"Result file not found: {result_file_path}")
+        # 列出actual_parse_dir目录下的所有文件
+        if os.path.exists(actual_parse_dir):
+            files = os.listdir(actual_parse_dir)
+            logger.info(f"Files in {actual_parse_dir}: {files}")
+        else:
+            logger.warning(f"Parse directory does not exist: {actual_parse_dir}")
+        return None
 
 
 @app.post(
@@ -241,11 +263,17 @@ async def file_parse(
                 )
             
             # 读取文件内容
-            file_name = Path(file.filename).stem
+            file_name = Path(file.filename).stem  # 去掉扩展名
+            # 修正：使用完整文件名匹配MinerU的输出文件命名格式
+            file_basename = file.filename  # 保留完整文件名
             content = await file.read()
             
             # 使用官方 API 的 aio_do_parse 函数
             try:
+                logger.info(f"Starting to parse {file.filename} using backend {backend}")
+                logger.info(f"Output directory: {output_dir}")
+                logger.info(f"File name stem: {file_name}")
+                
                 await aio_do_parse(
                     output_dir=output_dir,
                     pdf_file_names=[file.filename],
@@ -260,25 +288,35 @@ async def file_parse(
                     server_url=server_url,
                 )
                 
+                logger.info(f"Parse completed for {file.filename}")
+                # 列出输出目录中的所有文件
+                if os.path.exists(output_dir):
+                    all_files = []
+                    for root, dirs, files in os.walk(output_dir):
+                        for f in files:
+                            all_files.append(os.path.join(root, f))
+                    logger.info(f"Files created in output directory: {all_files}")
+                
                 # 收集结果
                 file_result = {"filename": file.filename}
+                logger.info(f"Collecting results for {file.filename}")
                 
                 if return_md:
-                    md_content = get_infer_result(".md", file_name, output_dir)
+                    md_content = get_infer_result(".md", file_basename, output_dir)
                     file_result["md_content"] = md_content
                 
                 if return_middle_json:
-                    middle_json_content = get_infer_result("_middle.json", file_name, output_dir)
+                    middle_json_content = get_infer_result("_middle.json", file_basename, output_dir)
                     if middle_json_content:
                         file_result["middle_json"] = json.loads(middle_json_content)
                 
                 if return_model_output:
-                    model_json_content = get_infer_result("_model.json", file_name, output_dir)
+                    model_json_content = get_infer_result("_model.json", file_basename, output_dir)
                     if model_json_content:
                         file_result["model_output"] = json.loads(model_json_content)
                 
                 if return_content_list:
-                    content_list_content = get_infer_result("_content_list.json", file_name, output_dir)
+                    content_list_content = get_infer_result("_content_list.json", file_basename, output_dir)
                     if content_list_content:
                         file_result["content_list"] = json.loads(content_list_content)
                 

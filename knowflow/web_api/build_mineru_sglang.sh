@@ -116,7 +116,7 @@ log_info "使用缓存: $([[ "$NO_CACHE" == "true" ]] && echo "否" || echo "是
 echo ""
 
 # 构建 Docker 命令
-BUILD_CMD="docker build"
+BUILD_CMD="sudo docker build"
 BUILD_CMD="$BUILD_CMD --build-arg MINERU_VERSION=${MINERU_VERSION}"
 BUILD_CMD="$BUILD_CMD --build-arg MODEL_SOURCE=${MODEL_SOURCE}"
 BUILD_CMD="$BUILD_CMD --label build.date=${BUILD_DATE}"
