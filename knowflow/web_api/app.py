@@ -100,12 +100,9 @@ def encode_image(image_path: str) -> str:
 
 
 def get_infer_result(file_suffix_identifier: str, file_name: str, parse_dir: str) -> Optional[str]:
-    """从结果文件中读取推理结果"""
-    # MinerU实际的输出路径结构：output_dir/filename/auto/filename.md
-    # 其中filename是完整文件名（包含扩展名）
-    file_base = Path(file_name).stem  # 去掉扩展名，用于构建子目录
-    actual_parse_dir = os.path.join(parse_dir, file_name, "auto")
-    result_file_path = os.path.join(actual_parse_dir, f"{file_name}{file_suffix_identifier}")
+    """从结果文件中读取推理结果 - 与官方 MinerU 实现保持一致"""
+    # 官方实现：result_file_path = os.path.join(parse_dir, f"{pdf_name}{file_suffix_identifier}")
+    result_file_path = os.path.join(parse_dir, f"{file_name}{file_suffix_identifier}")
     
     logger.info(f"Looking for result file: {result_file_path}")
     
@@ -121,12 +118,12 @@ def get_infer_result(file_suffix_identifier: str, file_name: str, parse_dir: str
             return None
     else:
         logger.warning(f"Result file not found: {result_file_path}")
-        # 列出actual_parse_dir目录下的所有文件
-        if os.path.exists(actual_parse_dir):
-            files = os.listdir(actual_parse_dir)
-            logger.info(f"Files in {actual_parse_dir}: {files}")
+        # 列出parse_dir目录下的所有文件，帮助调试
+        if os.path.exists(parse_dir):
+            files = os.listdir(parse_dir)
+            logger.info(f"Files in {parse_dir}: {files}")
         else:
-            logger.warning(f"Parse directory does not exist: {actual_parse_dir}")
+            logger.warning(f"Parse directory does not exist: {parse_dir}")
         return None
 
 
