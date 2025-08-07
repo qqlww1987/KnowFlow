@@ -100,10 +100,11 @@ def encode_image(image_path: str) -> str:
 
 
 def get_infer_result(file_suffix_identifier: str, file_name: str, parse_dir: str) -> Optional[str]:
-    """从结果文件中读取推理结果 - 与官方 MinerU 实现保持一致"""
-    # 官方实现：result_file_path = os.path.join(parse_dir, f"{pdf_name}{file_suffix_identifier}")
-    result_file_path = os.path.join(parse_dir, f"{file_name}{file_suffix_identifier}")
+    """从结果文件中读取推理结果 - 支持嵌套目录查找"""
+    import glob
     
+    # 首先尝试官方路径格式
+    result_file_path = os.path.join(parse_dir, f"{file_name}{file_suffix_identifier}")
     logger.info(f"Looking for result file: {result_file_path}")
     
     if os.path.exists(result_file_path):
@@ -116,15 +117,62 @@ def get_infer_result(file_suffix_identifier: str, file_name: str, parse_dir: str
         except Exception as e:
             logger.error(f"Error reading file {result_file_path}: {e}")
             return None
+    
+    # 如果官方路径不存在，尝试递归查找
+    logger.warning(f"Result file not found at official path: {result_file_path}")
+    logger.info("Searching recursively in subdirectories...")
+    
+    # 构建文件名模式
+    file_pattern = f"*{file_suffix_identifier}"
+    logger.info(f"Searching for pattern: {file_pattern}")
+    
+    # 递归查找文件
+    found_files = []
+    for root, dirs, files in os.walk(parse_dir):
+        for file in files:
+            if file.endswith(file_suffix_identifier):
+                full_path = os.path.join(root, file)
+                found_files.append(full_path)
+                logger.info(f"Found potential result file: {full_path}")
+    
+    if found_files:
+        # 优先选择包含文件名的文件
+        for file_path in found_files:
+            if file_name in file_path:
+                logger.info(f"Selected result file: {file_path}")
+                try:
+                    with open(file_path, "r", encoding="utf-8") as fp:
+                        content = fp.read()
+                        logger.info(f"Read {len(content)} characters from {file_path}")
+                        return content
+                except Exception as e:
+                    logger.error(f"Error reading file {file_path}: {e}")
+                    continue
+        
+        # 如果没有找到包含文件名的文件，使用第一个找到的文件
+        if found_files:
+            selected_file = found_files[0]
+            logger.info(f"Using first found file: {selected_file}")
+            try:
+                with open(selected_file, "r", encoding="utf-8") as fp:
+                    content = fp.read()
+                    logger.info(f"Read {len(content)} characters from {selected_file}")
+                    return content
+            except Exception as e:
+                logger.error(f"Error reading file {selected_file}: {e}")
+                return None
+    
+    # 如果仍然没有找到，列出目录内容帮助调试
+    logger.warning(f"No result file found for pattern: {file_pattern}")
+    if os.path.exists(parse_dir):
+        logger.info(f"Listing all files in {parse_dir}:")
+        for root, dirs, files in os.walk(parse_dir):
+            for file in files:
+                logger.info(f"  {os.path.join(root, file)}")
     else:
-        logger.warning(f"Result file not found: {result_file_path}")
-        # 列出parse_dir目录下的所有文件，帮助调试
-        if os.path.exists(parse_dir):
-            files = os.listdir(parse_dir)
-            logger.info(f"Files in {parse_dir}: {files}")
-        else:
-            logger.warning(f"Parse directory does not exist: {parse_dir}")
-        return None
+        logger.warning(f"Parse directory does not exist: {parse_dir}")
+    
+    return None
 
 
 @app.post(
