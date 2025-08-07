@@ -92,17 +92,19 @@ class MinerUFastAPIAdapter:
                              table_enable: bool = None,
                              server_url: Optional[str] = None,
                              **kwargs) -> Dict[str, Any]:
-        """准备请求数据 - 使用适配器配置作为默认值"""
+        """准备请求数据 - 使用适配器配置作为默认值，匹配curl请求格式"""
         backend = backend or self.backend
         
         data = {
-            'backend': backend,
-            'return_content_list': True,  # 总是返回内容列表
-            'return_info': True,         # 默认返回解析信息（用于位置信息）
-            'return_layout': False,      # 默认不返回布局
-            'return_images': True,       # 获取原始图片数据
-            'is_json_md_dump': False,    # 默认不保存文件到服务器
-            'output_dir': 'output'  # 临时输出目录
+            'parse_method': parse_method or self.parse_method,
+            'lang_list': lang or self.lang,  # 修改为 lang_list
+            'formula_enable': formula_enable if formula_enable is not None else self.formula_enable,  # 保持布尔值
+            'table_enable': table_enable if table_enable is not None else self.table_enable,  # 保持布尔值
+            'return_md': True,               # 布尔值
+            'return_middle_json': True,      # 修改为 return_middle_json，布尔值
+            'return_content_list': True,     # 布尔值
+            'return_images': True,           # 布尔值，获取原始图片数据
+            'output_dir': 'output'           # 临时输出目录
         }
         
         # 添加特定后端参数，优先使用传入参数，否则使用适配器配置
@@ -114,14 +116,8 @@ class MinerUFastAPIAdapter:
             else:
                 logger.warning("vlm-sglang-client 后端需要 server_url 参数，但未配置")
                 
-        elif backend == 'pipeline':
-            data.update({
-                'parse_method': parse_method or self.parse_method,
-                'lang': lang or self.lang,
-                'formula_enable': formula_enable if formula_enable is not None else self.formula_enable,
-                'table_enable': table_enable if table_enable is not None else self.table_enable
-            })
-            logger.info(f"使用 Pipeline 配置: parse_method={data['parse_method']}, lang={data['lang']}, formula_enable={data['formula_enable']}, table_enable={data['table_enable']}")
+        # 注意：pipeline 配置已经在上面设置了，不需要重复设置
+        logger.info(f"使用配置: parse_method={data['parse_method']}, lang_list={data['lang_list']}, formula_enable={data['formula_enable']}, table_enable={data['table_enable']}")
         
         # 合并额外参数，允许用户覆盖默认设置
         data.update(kwargs)
@@ -187,11 +183,11 @@ class MinerUFastAPIAdapter:
             data = self._prepare_request_data(backend=backend, **kwargs)
             
             if update_progress:
-                update_progress(0.3, f"开始 {data['backend']} 后端处理")
+                update_progress(0.3, f"开始处理文档")
                 
             # 发送请求
             with open(pdf_to_process, 'rb') as f:
-                files = {'file': f}
+                files = {'files': (os.path.basename(pdf_to_process), f, 'application/pdf')}
                 response = self.session.post(
                     f"{self.base_url}/file_parse",
                     files=files,
@@ -207,7 +203,7 @@ class MinerUFastAPIAdapter:
                     
                 # 添加处理信息
                 result['_adapter_info'] = {
-                    'backend_used': result.get('backend', data['backend']),
+                    'backend_used': backend or self.backend,
                     'file_processed': os.path.basename(file_path),
                     'converted_from': os.path.basename(file_path) if temp_pdf_to_delete else None,
                     'adapter_version': '2.2.0',  # 更新版本号

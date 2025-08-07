@@ -366,16 +366,28 @@ async def file_parse(
                         file_result["content_list"] = json.loads(content_list_content)
                 
                 if return_images:
-                    # 在输出目录中查找图像文件
-                    image_dir = os.path.join(output_dir, file_name, "images")
-                    if os.path.exists(image_dir):
-                        image_paths = glob(os.path.join(image_dir, "*.jpg"))
-                        file_result["images"] = {
-                            os.path.basename(image_path): f"data:image/jpeg;base64,{encode_image(image_path)}"
-                            for image_path in image_paths
-                        }
-                    else:
-                        file_result["images"] = {}
+                    # 在输出目录中查找图像文件 - 支持多种目录结构
+                    image_dirs = [
+                        os.path.join(output_dir, file_name, "images"),  # 原始路径
+                        os.path.join(output_dir, file_name, "vlm", "images"),  # vlm 子目录
+                        os.path.join(output_dir, file_name, "auto", "images"),  # auto 子目录
+                    ]
+                    
+                    found_images = {}
+                    for image_dir in image_dirs:
+                        if os.path.exists(image_dir):
+                            logger.info(f"Found image directory: {image_dir}")
+                            # 支持多种图片格式
+                            for ext in ["*.jpg", "*.jpeg", "*.png", "*.bmp", "*.tiff", "*.tif"]:
+                                image_paths = glob(os.path.join(image_dir, ext))
+                                for image_path in image_paths:
+                                    image_name = os.path.basename(image_path)
+                                    if image_name not in found_images:  # 避免重复
+                                        found_images[image_name] = f"data:image/jpeg;base64,{encode_image(image_path)}"
+                                        logger.info(f"Added image: {image_name}")
+                    
+                    file_result["images"] = found_images
+                    logger.info(f"Total images found: {len(found_images)}")
                 
                 file_result["backend"] = backend
                 results.append(file_result)
