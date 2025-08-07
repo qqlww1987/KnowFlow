@@ -368,9 +368,9 @@ async def file_parse(
                 if return_images:
                     # 在输出目录中查找图像文件 - 支持多种目录结构
                     image_dirs = [
-                        os.path.join(output_dir, file_name, "images"),  # 原始路径
-                        os.path.join(output_dir, file_name, "vlm", "images"),  # vlm 子目录
-                        os.path.join(output_dir, file_name, "auto", "images"),  # auto 子目录
+                        os.path.join(output_dir, file_basename, "images"),  # 原始路径
+                        os.path.join(output_dir, file_basename, "vlm", "images"),  # vlm 子目录
+                        os.path.join(output_dir, file_basename, "auto", "images"),  # auto 子目录
                     ]
                     
                     found_images = {}
