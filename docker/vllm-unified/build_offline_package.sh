@@ -11,7 +11,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # 默认配置
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 OUTPUT_DIR="$PROJECT_ROOT/dist"
 PACKAGE_NAME="knowflow-offline"
 VERSION="$(date +%Y%m%d-%H%M%S)"
@@ -20,6 +20,7 @@ COMPRESS="true"
 QUIET="false"
 CLEAN="true"
 VERIFY="true"
+USE_SUDO="false"
 
 # 镜像配置
 VLLM_IMAGE="knowflow/vllm-unified:latest"
@@ -49,6 +50,7 @@ KnowFlow 离线部署包构建脚本
     -q, --quiet             静默模式
     --no-clean              不清理临时文件
     --no-verify             跳过验证步骤
+    --sudo                  使用 sudo 执行 Docker 命令
     -h, --help              显示此帮助信息
 
 示例:
@@ -56,6 +58,7 @@ KnowFlow 离线部署包构建脚本
     $0 --version v1.0.0                # 指定版本
     $0 --skip-models --no-compress     # 跳过模型，不压缩
     $0 --output /tmp/build             # 指定输出目录
+    $0 --sudo                          # 使用 sudo 执行 Docker 命令
 
 EOF
 }
@@ -95,6 +98,10 @@ while [[ $# -gt 0 ]]; do
             VERIFY="false"
             shift
             ;;
+        --sudo)
+            USE_SUDO="true"
+            shift
+            ;;
         -h|--help)
             show_help
             exit 0
@@ -106,6 +113,30 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# Docker 命令函数
+docker_cmd() {
+    if [[ "$USE_SUDO" == "true" ]]; then
+        sudo docker "$@"
+    else
+        docker "$@"
+    fi
+}
+
+# Docker Compose 命令函数
+compose_cmd() {
+    if command -v docker-compose &> /dev/null; then
+        local cmd="docker-compose"
+    else
+        local cmd="docker compose"
+    fi
+    
+    if [[ "$USE_SUDO" == "true" ]]; then
+        sudo $cmd "$@"
+    else
+        $cmd "$@"
+    fi
+}
 
 # 日志函数
 log_info() {
@@ -145,13 +176,13 @@ check_dependencies() {
     fi
     
     # 检查 Docker 服务
-    if ! docker info &> /dev/null; then
+    if ! docker_cmd info &> /dev/null; then
         log_error "Docker 服务未运行或无权限访问"
         exit 1
     fi
     
     # 检查 Docker Compose
-    if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
+    if ! command -v docker-compose &> /dev/null && ! compose_cmd version &> /dev/null; then
         log_error "Docker Compose 未安装"
         exit 1
     fi
@@ -205,7 +236,7 @@ build_custom_images() {
         build_args+=("--build-arg" "DOWNLOAD_MODELS=false")
     fi
     
-    if docker build "${build_args[@]}" -t "$VLLM_IMAGE" .; then
+    if docker_cmd build "${build_args[@]}" -t "$VLLM_IMAGE" .; then
         log_success "vLLM 统一服务镜像构建完成"
     else
         log_error "vLLM 统一服务镜像构建失败"
@@ -217,7 +248,7 @@ build_custom_images() {
         log_info "构建 MinerU SGLang 镜像..."
         cd "$PROJECT_ROOT/docker/mineru-sglang"
         
-        if docker build -t "$MINERU_IMAGE" .; then
+        if docker_cmd build -t "$MINERU_IMAGE" .; then
             log_success "MinerU SGLang 镜像构建完成"
         else
             log_warning "MinerU SGLang 镜像构建失败，跳过"
@@ -244,7 +275,7 @@ pull_base_images() {
     
     for image in "${images[@]}"; do
         log_info "拉取镜像: $image"
-        if docker pull "$image"; then
+        if docker_cmd pull "$image"; then
             log_success "镜像拉取完成: $image"
         else
             log_warning "镜像拉取失败: $image"
@@ -269,14 +300,14 @@ export_images() {
     )
     
     # 添加 MinerU 镜像（如果存在）
-    if docker image inspect "$MINERU_IMAGE" &> /dev/null; then
+    if docker_cmd image inspect "$MINERU_IMAGE" &> /dev/null; then
         images+=("$MINERU_IMAGE")
     fi
     
     local images_file="$OUTPUT_DIR/images/knowflow-images.tar"
     
     log_info "导出镜像到: $images_file"
-    if docker save -o "$images_file" "${images[@]}"; then
+    if docker_cmd save -o "$images_file" "${images[@]}"; then
         log_success "镜像导出完成"
         
         # 显示文件大小
@@ -343,6 +374,45 @@ NC='\033[0m'
 INSTALL_DIR="/opt/knowflow"
 DATA_DIR="/var/lib/knowflow"
 LOG_DIR="/var/log/knowflow"
+USE_SUDO="false"
+
+# 解析参数
+while [[ \$# -gt 0 ]]; do
+    case \$1 in
+        --sudo)
+            USE_SUDO="true"
+            shift
+            ;;
+        *)
+            echo "用法: \$0 [--sudo]"
+            exit 1
+            ;;
+    esac
+done
+
+# Docker 命令函数
+docker_cmd() {
+    if [[ "\$USE_SUDO" == "true" ]]; then
+        sudo docker "\$@"
+    else
+        docker "\$@"
+    fi
+}
+
+# Docker Compose 命令函数
+compose_cmd() {
+    if command -v docker-compose &> /dev/null; then
+        local cmd="docker-compose"
+    else
+        local cmd="docker compose"
+    fi
+    
+    if [[ "\$USE_SUDO" == "true" ]]; then
+        sudo \$cmd "\$@"
+    else
+        \$cmd "\$@"
+    fi
+}
 
 log_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -481,7 +551,7 @@ load_images() {
         exit 1
     fi
     
-    if docker load -i "$images_file"; then
+    if docker_cmd load -i "$images_file"; then
         log_success "Docker 镜像加载完成"
     else
         log_error "Docker 镜像加载失败"
@@ -516,14 +586,14 @@ start_services() {
     cd "$INSTALL_DIR"
     
     # 启动服务
-    docker compose up -d
+    compose_cmd up -d
     
     # 等待服务启动
     log_info "等待服务启动..."
     sleep 30
     
     # 检查服务状态
-    if docker compose ps | grep -q "Up"; then
+    if compose_cmd ps | grep -q "Up"; then
         log_success "KnowFlow 服务启动成功"
         
         echo
@@ -540,7 +610,7 @@ start_services() {
         echo
     else
         log_error "服务启动失败，请检查日志"
-        docker compose logs
+        compose_cmd logs
         exit 1
     fi
 }
@@ -591,6 +661,7 @@ INSTALL_DIR="/opt/knowflow"
 DATA_DIR="/var/lib/knowflow"
 LOG_DIR="/var/log/knowflow"
 FORCE="false"
+USE_SUDO="false"
 
 log_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -609,18 +680,46 @@ log_error() {
 }
 
 # 解析参数
-while [[ $# -gt 0 ]]; do
-    case $1 in
+while [[ \$# -gt 0 ]]; do
+    case \$1 in
         --force)
             FORCE="true"
             shift
             ;;
+        --sudo)
+            USE_SUDO="true"
+            shift
+            ;;
         *)
-            echo "用法: $0 [--force]"
+            echo "用法: \$0 [--force] [--sudo]"
             exit 1
             ;;
     esac
 done
+
+# Docker 命令函数
+docker_cmd() {
+    if [[ "\$USE_SUDO" == "true" ]]; then
+        sudo docker "\$@"
+    else
+        docker "\$@"
+    fi
+}
+
+# Docker Compose 命令函数
+compose_cmd() {
+    if command -v docker-compose &> /dev/null; then
+        local cmd="docker-compose"
+    else
+        local cmd="docker compose"
+    fi
+    
+    if [[ "\$USE_SUDO" == "true" ]]; then
+        sudo \$cmd "\$@"
+    else
+        \$cmd "\$@"
+    fi
+}
 
 # 确认卸载
 confirm_uninstall() {
@@ -645,15 +744,15 @@ confirm_uninstall() {
 stop_services() {
     log_info "停止 KnowFlow 服务..."
     
-    if [[ -f "$INSTALL_DIR/docker-compose.yml" ]]; then
-        cd "$INSTALL_DIR"
-        docker compose down --remove-orphans || true
+    if [[ -f "\$INSTALL_DIR/docker-compose.yml" ]]; then
+        cd "\$INSTALL_DIR"
+        compose_cmd down --remove-orphans || true
     fi
     
     # 停止所有相关容器
-    docker ps -a --filter "name=knowflow" --format "{{.ID}}" | xargs -r docker stop || true
-    docker ps -a --filter "name=vllm" --format "{{.ID}}" | xargs -r docker stop || true
-    docker ps -a --filter "name=ragflow" --format "{{.ID}}" | xargs -r docker stop || true
+    docker_cmd ps -a --filter "name=knowflow" --format "{{.ID}}" | xargs -r docker_cmd stop || true
+    docker_cmd ps -a --filter "name=vllm" --format "{{.ID}}" | xargs -r docker_cmd stop || true
+    docker_cmd ps -a --filter "name=ragflow" --format "{{.ID}}" | xargs -r docker_cmd stop || true
     
     log_success "服务已停止"
 }
@@ -663,9 +762,9 @@ remove_containers() {
     log_info "删除 Docker 容器..."
     
     # 删除所有相关容器
-    docker ps -a --filter "name=knowflow" --format "{{.ID}}" | xargs -r docker rm -f || true
-    docker ps -a --filter "name=vllm" --format "{{.ID}}" | xargs -r docker rm -f || true
-    docker ps -a --filter "name=ragflow" --format "{{.ID}}" | xargs -r docker rm -f || true
+    docker_cmd ps -a --filter "name=knowflow" --format "{{.ID}}" | xargs -r docker_cmd rm -f || true
+    docker_cmd ps -a --filter "name=vllm" --format "{{.ID}}" | xargs -r docker_cmd rm -f || true
+    docker_cmd ps -a --filter "name=ragflow" --format "{{.ID}}" | xargs -r docker_cmd rm -f || true
     
     log_success "容器已删除"
 }
@@ -675,8 +774,8 @@ remove_images() {
     log_info "删除 Docker 镜像..."
     
     # 删除 KnowFlow 相关镜像
-    docker images --filter "reference=knowflow/*" --format "{{.ID}}" | xargs -r docker rmi -f || true
-    docker images --filter "reference=infiniflow/ragflow*" --format "{{.ID}}" | xargs -r docker rmi -f || true
+    docker_cmd images --filter "reference=knowflow/*" --format "{{.ID}}" | xargs -r docker_cmd rmi -f || true
+    docker_cmd images --filter "reference=infiniflow/ragflow*" --format "{{.ID}}" | xargs -r docker_cmd rmi -f || true
     
     log_success "镜像已删除"
 }
@@ -686,9 +785,9 @@ remove_volumes() {
     log_info "删除 Docker 数据卷..."
     
     # 删除相关数据卷
-    docker volume ls --filter "name=knowflow" --format "{{.Name}}" | xargs -r docker volume rm || true
-    docker volume ls --filter "name=vllm" --format "{{.Name}}" | xargs -r docker volume rm || true
-    docker volume ls --filter "name=ragflow" --format "{{.Name}}" | xargs -r docker volume rm || true
+    docker_cmd volume ls --filter "name=knowflow" --format "{{.Name}}" | xargs -r docker_cmd volume rm || true
+    docker_cmd volume ls --filter "name=vllm" --format "{{.Name}}" | xargs -r docker_cmd volume rm || true
+    docker_cmd volume ls --filter "name=ragflow" --format "{{.Name}}" | xargs -r docker_cmd volume rm || true
     
     log_success "数据卷已删除"
 }
@@ -698,7 +797,7 @@ remove_networks() {
     log_info "删除 Docker 网络..."
     
     # 删除相关网络
-    docker network ls --filter "name=knowflow" --format "{{.ID}}" | xargs -r docker network rm || true
+    docker_cmd network ls --filter "name=knowflow" --format "{{.ID}}" | xargs -r docker_cmd network rm || true
     
     log_success "网络已删除"
 }
@@ -1067,10 +1166,10 @@ cleanup() {
     log_info "清理临时文件..."
     
     # 清理 Docker 构建缓存
-    docker builder prune -f &> /dev/null || true
+    docker_cmd builder prune -f &> /dev/null || true
     
     # 清理未使用的镜像
-    docker image prune -f &> /dev/null || true
+    docker_cmd image prune -f &> /dev/null || true
     
     log_success "临时文件清理完成"
 }

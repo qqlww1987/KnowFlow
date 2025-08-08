@@ -19,6 +19,7 @@ QUIET="false"
 VERIFY="true"
 PUSH="false"
 REGISTRY=""
+USE_SUDO="false"
 
 # 显示帮助信息
 show_help() {
@@ -36,12 +37,14 @@ vLLM 统一服务构建脚本
     -v, --no-verify         跳过构建验证
     -p, --push              构建后推送到仓库
     -r, --registry URL      Docker 仓库地址
+    --sudo                  使用 sudo 执行 docker 命令
     -h, --help              显示此帮助信息
 
 示例:
     $0                                    # 默认构建
     $0 --tag v1.0.0                     # 指定标签
     $0 --skip-models --no-cache         # 跳过模型下载，不使用缓存
+    $0 --sudo                           # 使用 sudo 执行 docker 命令
     $0 --push --registry registry.com   # 构建并推送到仓库
 
 EOF
@@ -82,6 +85,10 @@ while [[ $# -gt 0 ]]; do
             REGISTRY="$2"
             shift 2
             ;;
+        --sudo)
+            USE_SUDO="true"
+            shift
+            ;;
         -h|--help)
             show_help
             exit 0
@@ -113,6 +120,15 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Docker 命令包装函数
+docker_cmd() {
+    if [[ "$USE_SUDO" == "true" ]]; then
+        sudo docker "$@"
+    else
+        docker "$@"
+    fi
+}
+
 # 检查依赖
 check_dependencies() {
     log_info "检查构建依赖..."
@@ -122,13 +138,16 @@ check_dependencies() {
         exit 1
     fi
     
-    if ! docker info &> /dev/null; then
+    if ! docker_cmd info &> /dev/null; then
         log_error "Docker 服务未运行或无权限访问"
+        if [[ "$USE_SUDO" != "true" ]]; then
+            log_info "提示: 如果需要 sudo 权限，请使用 --sudo 参数"
+        fi
         exit 1
     fi
     
     # 检查 NVIDIA Docker 支持
-    if ! docker run --rm --gpus all nvidia/cuda:12.1-base-ubuntu22.04 nvidia-smi &> /dev/null; then
+    if ! docker_cmd run --rm --gpus all nvidia/cuda:12.1-base-ubuntu22.04 nvidia-smi &> /dev/null; then
         log_warning "NVIDIA Docker 支持不可用，GPU 功能可能无法正常工作"
     fi
     
@@ -178,7 +197,7 @@ build_image() {
     log_info "模型下载: $DOWNLOAD_MODELS"
     log_info "使用缓存: $([ "$NO_CACHE" == "true" ] && echo "否" || echo "是")"
     
-    if docker build "${build_args[@]}" -t "$full_image_name" .; then
+    if docker_cmd build "${build_args[@]}" -t "$full_image_name" .; then
         log_success "镜像构建完成: $full_image_name"
     else
         log_error "镜像构建失败"
@@ -200,18 +219,18 @@ verify_image() {
     fi
     
     # 检查镜像是否存在
-    if ! docker image inspect "$full_image_name" &> /dev/null; then
+    if ! docker_cmd image inspect "$full_image_name" &> /dev/null; then
         log_error "镜像不存在: $full_image_name"
         exit 1
     fi
     
     # 检查镜像大小
-    local image_size=$(docker image inspect "$full_image_name" --format='{{.Size}}' | awk '{print int($1/1024/1024/1024)}')
+    local image_size=$(docker_cmd image inspect "$full_image_name" --format='{{.Size}}' | awk '{print int($1/1024/1024/1024)}')
     log_info "镜像大小: ${image_size}GB"
     
     # 测试容器启动
     log_info "测试容器启动..."
-    if docker run --rm "$full_image_name" python3 -c "import vllm; print('vLLM 导入成功')"; then
+    if docker_cmd run --rm "$full_image_name" python3 -c "import vllm; print('vLLM 导入成功')"; then
         log_success "镜像验证通过"
     else
         log_error "镜像验证失败"
@@ -234,7 +253,7 @@ push_image() {
     
     log_info "推送镜像到仓库: $full_image_name"
     
-    if docker push "$full_image_name"; then
+    if docker_cmd push "$full_image_name"; then
         log_success "镜像推送完成"
     else
         log_error "镜像推送失败"
@@ -249,6 +268,7 @@ show_build_info() {
     echo "  镜像标签: $IMAGE_TAG"
     echo "  下载模型: $DOWNLOAD_MODELS"
     echo "  使用缓存: $([ "$NO_CACHE" == "true" ] && echo "否" || echo "是")"
+    echo "  使用 sudo: $([ "$USE_SUDO" == "true" ] && echo "是" || echo "否")"
     echo "  验证镜像: $VERIFY"
     echo "  推送镜像: $PUSH"
     if [[ -n "$REGISTRY" ]]; then

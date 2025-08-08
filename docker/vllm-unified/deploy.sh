@@ -19,6 +19,7 @@ WAIT_TIMEOUT=300
 HEALTH_CHECK_RETRIES=10
 QUIET="false"
 FORCE="false"
+USE_SUDO="false"
 
 # 显示帮助信息
 show_help() {
@@ -44,6 +45,7 @@ vLLM 统一服务部署脚本
     -t, --timeout SECONDS   等待超时时间 (默认: $WAIT_TIMEOUT)
     -q, --quiet             静默模式
     --force                 强制执行操作
+    --sudo                  使用 sudo 执行 Docker 命令
     -h, --help              显示此帮助信息
 
 示例:
@@ -52,6 +54,7 @@ vLLM 统一服务部署脚本
     $0 restart --timeout 600    # 重启服务，等待10分钟
     $0 logs --follow            # 实时查看日志
     $0 clean --force            # 强制清理所有数据
+    $0 start --sudo             # 使用 sudo 启动服务
 
 EOF
 }
@@ -87,6 +90,10 @@ while [[ $# -gt 0 ]]; do
             FORCE="true"
             shift
             ;;
+        --sudo)
+            USE_SUDO="true"
+            shift
+            ;;
         --follow)
             FOLLOW="true"
             shift
@@ -102,6 +109,15 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# Docker 命令函数
+docker_cmd() {
+    if [[ "$USE_SUDO" == "true" ]]; then
+        sudo docker "$@"
+    else
+        docker "$@"
+    fi
+}
 
 # 日志函数
 log_info() {
@@ -136,7 +152,7 @@ check_dependencies() {
         exit 1
     fi
     
-    if ! docker info &> /dev/null; then
+    if ! docker_cmd info &> /dev/null; then
         log_error "Docker 服务未运行或无权限访问"
         exit 1
     fi
@@ -168,10 +184,17 @@ check_files() {
 
 # 获取 Docker Compose 命令
 get_compose_cmd() {
+    local compose_cmd
     if command -v docker-compose &> /dev/null; then
-        echo "docker-compose"
+        compose_cmd="docker-compose"
     else
-        echo "docker compose"
+        compose_cmd="docker compose"
+    fi
+    
+    if [[ "$USE_SUDO" == "true" ]]; then
+        echo "sudo $compose_cmd"
+    else
+        echo "$compose_cmd"
     fi
 }
 
@@ -254,7 +277,7 @@ show_status() {
     
     echo
     echo -e "${BLUE}=== 资源使用情况 ===${NC}"
-    docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}\t{{.BlockIO}}" | grep vllm || echo "服务未运行"
+    docker_cmd stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}\t{{.BlockIO}}" | grep vllm || echo "服务未运行"
     
     echo
     echo -e "${BLUE}=== 健康检查 ===${NC}"
@@ -352,11 +375,11 @@ clean_service() {
     
     # 删除数据卷
     log_info "删除数据卷..."
-    docker volume rm vllm_models vllm_cache vllm_logs 2>/dev/null || true
+    docker_cmd volume rm vllm_models vllm_cache vllm_logs 2>/dev/null || true
     
     # 删除未使用的镜像
     log_info "清理未使用的镜像..."
-    docker image prune -f
+    docker_cmd image prune -f
     
     log_success "服务清理完成"
 }
