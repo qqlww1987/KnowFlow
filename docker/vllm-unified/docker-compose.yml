@@ -3,11 +3,6 @@ version: '3.8'
 services:
   # 统一 vLLM 服务
   vllm-unified:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        DOWNLOAD_MODELS: "true"
     image: zxwei/vllm-unified:latest
     container_name: vllm-unified
     restart: unless-stopped
