@@ -1,7 +1,7 @@
 # vLLM 统一服务 Dockerfile
 # 支持 Chat、Embedding、Rerank 模型的统一部署
 
-FROM nvidia/cuda:12.1.1-devel-ubuntu22.04
+FROM nvidia/cuda:12.4.0-devel-ubuntu22.04
 
 # 设置环境变量
 ENV DEBIAN_FRONTEND=noninteractive
@@ -51,6 +51,18 @@ COPY requirements.txt /app/
 
 # 先安装 torch (flash-attn 构建依赖)
 RUN pip install --no-cache-dir torch>=2.1.0
+
+# 安装预编译的 flash-attn wheel (避免编译卡住)
+# 根据环境信息：Python 3.10 (cp310), CUDA 12.4 (cu124)
+# 优先使用测试验证的预编译包，如果失败则回退到 PyPI 或编译安装
+# 设置环境变量以优化编译过程
+ENV MAX_JOBS=4
+ENV FLASH_ATTENTION_FORCE_BUILD=FALSE
+RUN pip install --no-cache-dir https://github.com/mjun0812/flash-attention-prebuild-wheels/releases/download/v0.3.14/flash_attn-2.6.3+cu124torch2.5-cp310-cp310-linux_x86_64.whl \
+    || pip install --no-cache-dir flash-attn>=2.5.0 --prefer-binary \
+    || (echo "预编译包不可用，使用优化设置进行编译安装..." && \
+        pip install --no-cache-dir ninja packaging && \
+        pip install --no-cache-dir flash-attn>=2.3.0 --no-build-isolation)
 
 # 安装 Python 依赖
 RUN pip install --no-cache-dir -r requirements.txt

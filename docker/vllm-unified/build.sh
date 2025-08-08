@@ -13,7 +13,7 @@ NC='\033[0m' # No Color
 # 默认配置
 IMAGE_NAME="zxwei/vllm-unified"
 IMAGE_TAG="latest"
-DOWNLOAD_MODELS="true"
+DOWNLOAD_MODELS="false"
 NO_CACHE="false"
 QUIET="false"
 VERIFY="true"
@@ -152,6 +152,12 @@ check_dependencies() {
     fi
     
     log_success "依赖检查通过"
+    
+    # 检查网络连接（预编译 flash-attn 需要下载）
+    if ! curl -s --connect-timeout 5 https://github.com &> /dev/null; then
+        log_warning "网络连接不可用，flash-attn 预编译包可能下载失败"
+        log_info "如果构建失败，请检查网络连接或使用离线安装包"
+    fi
 }
 
 # 检查磁盘空间
@@ -160,7 +166,7 @@ check_disk_space() {
     
     # 获取当前目录可用空间（GB）
     available_space=$(df . | awk 'NR==2 {print int($4/1024/1024)}')
-    required_space=50  # 至少需要 50GB
+    required_space=20  # 至少需要 50GB
     
     if [[ $available_space -lt $required_space ]]; then
         log_error "磁盘空间不足。需要至少 ${required_space}GB，当前可用 ${available_space}GB"

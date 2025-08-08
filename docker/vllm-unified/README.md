@@ -213,7 +213,7 @@ docker run -d \
   --gpus all \
   -p 8000-8003:8000-8003 \
   -v /path/to/your/models:/app/models \
-  knowflow/vllm-unified:latest
+  zxwei/vllm-unified:latest
 ```
 
 ### 监控部署

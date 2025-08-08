@@ -25,7 +25,6 @@ pyyaml>=6.0
 loguru>=0.7.0
 
 # 优化和加速
-flash-attn>=2.3.0
 xformers>=0.0.22
 
 # 模型相关
