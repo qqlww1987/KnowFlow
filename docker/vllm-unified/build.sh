@@ -11,7 +11,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # 默认配置
-IMAGE_NAME="knowflow/vllm-unified"
+IMAGE_NAME="zxwei/vllm-unified"
 IMAGE_TAG="latest"
 DOWNLOAD_MODELS="true"
 NO_CACHE="false"
