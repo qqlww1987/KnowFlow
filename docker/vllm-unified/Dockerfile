@@ -1,7 +1,7 @@
 # vLLM 统一服务 Dockerfile
 # 支持 Chat、Embedding、Rerank 模型的统一部署
 
-FROM nvidia/cuda:12.1-devel-ubuntu22.04
+FROM nvidia/cuda:12.1.1-devel-ubuntu22.04
 
 # 设置环境变量
 ENV DEBIAN_FRONTEND=noninteractive
@@ -49,6 +49,9 @@ RUN python3 -m pip install --upgrade pip setuptools wheel
 # 复制 requirements.txt
 COPY requirements.txt /app/
 
+# 先安装 torch (flash-attn 构建依赖)
+RUN pip install --no-cache-dir torch>=2.1.0
+
 # 安装 Python 依赖
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -95,28 +98,28 @@ RUN if [ "$DOWNLOAD_MODELS" = "true" ]; then \
     fi
 
 # 创建启动脚本
-RUN cat > /app/start.sh << 'EOF' && \
+RUN cat > /app/start.sh <<EOF
 #!/bin/bash
 set -e
 
 echo "=== vLLM 统一服务启动 ==="
-echo "时间: $(date)"
+echo "时间: \$(date)"
 echo "GPU 信息:"
 nvidia-smi --query-gpu=name,memory.total,memory.free --format=csv,noheader,nounits || echo "无法获取 GPU 信息"
 
 # 检查模型文件
 echo "检查模型文件..."
 for model_dir in /app/models/*/; do
-    if [ -d "$model_dir" ]; then
-        echo "模型目录: $model_dir"
-        ls -la "$model_dir" | head -5
+    if [ -d "\$model_dir" ]; then
+        echo "模型目录: \$model_dir"
+        ls -la "\$model_dir" | head -5
     fi
 done
 
 # 设置环境变量
-export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-"0,1"}
-export VLLM_WORKER_MULTIPROC_METHOD=${VLLM_WORKER_MULTIPROC_METHOD:-"spawn"}
-export VLLM_LOGGING_LEVEL=${VLLM_LOGGING_LEVEL:-"INFO"}
+export CUDA_VISIBLE_DEVICES=\${CUDA_VISIBLE_DEVICES:-"0,1"}
+export VLLM_WORKER_MULTIPROC_METHOD=\${VLLM_WORKER_MULTIPROC_METHOD:-"spawn"}
+export VLLM_LOGGING_LEVEL=\${VLLM_LOGGING_LEVEL:-"INFO"}
 
 # 启动服务
 echo "启动 vLLM 统一服务..."
@@ -128,7 +131,7 @@ EOF
 RUN chmod +x /app/start.sh
 
 # 创建健康检查脚本
-RUN cat > /app/healthcheck.sh << 'EOF' && \
+RUN cat > /app/healthcheck.sh <<EOF
 #!/bin/bash
 curl -f http://localhost:8000/health || exit 1
 EOF
