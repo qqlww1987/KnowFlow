@@ -1,0 +1,59 @@
+{
+  "_comment": "这是一个示例配置文件，展示如何添加自定义模型",
+  "models": {
+    "qwen3-14b": {
+      "repo_id": "Qwen/Qwen2.5-14B-Instruct",
+      "description": "Qwen2.5 14B 指令微调模型",
+      "size": "约 28GB",
+      "type": "llm",
+      "enabled": true
+    },
+    "bge-reranker-v2-m3": {
+      "repo_id": "BAAI/bge-reranker-v2-m3",
+      "description": "BGE Reranker v2 M3 模型",
+      "size": "约 2GB",
+      "type": "reranker",
+      "enabled": true
+    },
+    "bge-m3": {
+      "repo_id": "BAAI/bge-m3",
+      "description": "BGE M3 嵌入模型",
+      "size": "约 2GB",
+      "type": "embedding",
+      "enabled": true
+    },
+    "custom-llama": {
+      "repo_id": "meta-llama/Llama-2-7b-chat-hf",
+      "description": "Llama 2 7B Chat 模型",
+      "size": "约 14GB",
+      "type": "llm",
+      "enabled": false,
+      "_comment": "设置 enabled: false 可以禁用此模型的下载"
+    },
+    "custom-embedding": {
+      "repo_id": "sentence-transformers/all-MiniLM-L6-v2",
+      "description": "轻量级嵌入模型",
+      "size": "约 90MB",
+      "type": "embedding",
+      "enabled": false
+    }
+  },
+  "download_settings": {
+    "base_dir": "./models",
+    "resume_download": true,
+    "use_symlinks": false,
+    "max_workers": 4,
+    "_comment": "下载设置说明",
+    "_base_dir_comment": "模型保存的基础目录",
+    "_resume_download_comment": "是否支持断点续传",
+    "_use_symlinks_comment": "是否使用符号链接（建议 false）",
+    "_max_workers_comment": "并发下载线程数"
+  },
+  "gpustack_settings": {
+    "port": 9000,
+    "auto_register": false,
+    "_comment": "GPUStack 相关设置",
+    "_port_comment": "GPUStack 服务端口",
+    "_auto_register_comment": "是否自动注册模型到 GPUStack（暂未实现）"
+  }
+}
