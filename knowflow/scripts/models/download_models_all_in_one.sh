@@ -36,7 +36,7 @@ show_help() {
     echo "  --all              下载所有支持的模型"
     echo "  --list             列出所有支持的模型"
     echo "  --force            强制重新下载"
-    echo "  --base-dir DIR     指定模型保存目录 (默认: ./models)"
+    echo "  --base-dir DIR     指定模型保存目录 (默认: /var/lib/docker/volumes/gpustack-data/_data/models)"
     echo "  --hf-token TOKEN   Hugging Face 访问令牌"
     echo "  --help, -h         显示此帮助信息"
     echo
@@ -134,7 +134,7 @@ main() {
     
     echo
     print_success "所有操作完成！"
-    print_info "模型已下载到 ./models/ 目录"
+    print_info "模型已下载到 /var/lib/docker/volumes/gpustack-data/_data/models/ 目录"
     print_info "您现在可以在 GPUStack 中添加这些本地模型"
 }
 

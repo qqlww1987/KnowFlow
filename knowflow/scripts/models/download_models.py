@@ -39,7 +39,7 @@ MODEL_CONFIGS = {
 }
 
 class ModelDownloader:
-    def __init__(self, base_dir: str = "./models", hf_token: Optional[str] = None):
+    def __init__(self, base_dir: str = "/var/lib/docker/volumes/gpustack-data/_data/models", hf_token: Optional[str] = None):
         self.base_dir = Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.hf_token = hf_token
@@ -200,8 +200,8 @@ def main():
     
     parser.add_argument(
         "--base-dir",
-        default="./models",
-        help="模型保存的基础目录（默认: ./models）"
+        default="/var/lib/docker/volumes/gpustack-data/_data/models",
+        help="模型保存的基础目录（默认: /var/lib/docker/volumes/gpustack-data/_data/models）"
     )
     
     parser.add_argument(
