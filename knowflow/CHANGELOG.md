@@ -1,7 +1,17 @@
 # KnowFlow 更新日志
 
+## [v2.0.3] - 2025-08-10
 
-## [v2.0.1] - 2025-07-20
+### 新增
+- MinerU 基于官方 v2.1.10 最新版本进行构建，支持纯离线部署
+- knowflow-server 后端服务支持纯离线部署
+- 支持本地离线部署 GPUStack 对接 RAGFlow
+
+### 优化
+- 支持 docker-compose-gpu yml 启动 knowflow server
+
+
+## [v2.0.2] - 2025-8-03
 
 ### 新增
 - MinerU 支持知识图谱、自动问题、自动关键字
