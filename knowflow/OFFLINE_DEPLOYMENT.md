@@ -94,11 +94,11 @@ cd knowflow/scripts/models/
 #### 支持的模型
 
 **Qwen 系列模型**
-- **qwen3-14b**: Qwen2.5 14B 指令微调模型（约 28GB）
-- **qwen3-32b**: Qwen2.5 32B 指令微调模型（约 65GB）
-- **qwen3-32b-q8**: Qwen2.5 32B 8位量化模型（约 36GB）
-- **qwen3-32b-q6**: Qwen2.5 32B 6位量化模型（约 28GB）
-- **qwen3-30b-a3b**: Qwen2.5 30B A3B 模型（约 24GB）
+- **qwen3-14b**: Qwen3 14B 指令微调模型（约 28GB）
+- **qwen3-32b**: Qwen3 32B 指令微调模型（约 65GB）
+- **qwen3-32b-q8**: Qwen3 32B 8位量化模型（约 36GB）
+- **qwen3-32b-q6**: Qwen3 32B 6位量化模型（约 28GB）
+- **qwen3-30b-a3b**: Qwen3 30B A3B 模型（约 24GB）
 
 **嵌入和重排序模型**
 - **bge-reranker-v2-m3**: BGE Reranker v2 M3 模型（约 2GB）
