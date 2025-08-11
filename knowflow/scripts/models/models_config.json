@@ -1,9 +1,9 @@
 {
   "models": {
-    "qwen3-14b": {
-      "repo_id": "Qwen/Qwen2.5-14B-Instruct",
-      "description": "Qwen2.5 14B 指令微调模型",
-      "size": "约 28GB",
+    "qwen3-30b-a3b": {
+      "repo_id": "Qwen/Qwen3-30B-A3B-Instruct-2507",
+      "description": "Qwen3 30B A3B 指令微调模型",
+      "size": "约 24GB",
       "type": "llm",
       "enabled": true
     },
