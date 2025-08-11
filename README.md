@@ -191,8 +191,14 @@ git clone https://github.com/weizxfree/KnowFlow.git
 
 2. 进入到 `docker` 目录执行（此步骤和 RAGFlow 官方一致）：
 
+如有 GPU 则选择：
 ```bash
-docker compose up -d
+docker compose -f docker-compose-gpu.yml up -d
+```
+
+无 GPU 则选择：
+```bash
+docker compose -f docker-compose.yml up -d
 ```
 
 访问地址：`http://服务器IP:80`，进入 KnowFlow 首页
