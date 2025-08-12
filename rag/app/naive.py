@@ -351,6 +351,42 @@ class Markdown(MarkdownParser):
         return sections, tbls
 
 
+class MinerUParser:
+    """Simple parser for MinerU that handles position tags similar to DeepDOC"""
+    
+    def __init__(self):
+        pass
+    
+    def crop(self, text, ZM=3, need_position=False):
+        """Extract position information from MinerU text with position tags"""
+        import re
+        
+        poss = []
+        # Find all position tags in format @@page_number\tx0\tx1\ty0\ty1##
+        for tag in re.findall(r"@@[0-9-]+\t[0-9.\t]+##", text):
+            try:
+                # Parse the tag: @@page\tx0\tx1\ty0\ty1##
+                tag_content = tag.strip("#").strip("@")
+                parts = tag_content.split("\t")
+                if len(parts) >= 5:
+                    page_number = int(parts[0])
+                    x0, x1, y0, y1 = float(parts[1]), float(parts[2]), float(parts[3]), float(parts[4])
+                    # Convert to the format expected by add_positions: (page-1, x0, x1, y0, y1)
+                    poss.append((page_number - 1, x0, x1, y0, y1))
+            except (ValueError, IndexError) as e:
+                logging.warning(f"Failed to parse position tag {tag}: {e}")
+                continue
+        
+        if need_position:
+            return None, poss  # Return None for image, positions for coordinates
+        return None
+    
+    def remove_tag(self, txt):
+        """Remove position tags from text"""
+        import re
+        return re.sub(r"@@[\t0-9.-]+?##", "", txt)
+
+
 def chunk(filename, binary=None, from_page=0, to_page=100000,
           lang="Chinese", callback=None, **kwargs):
     """
@@ -525,15 +561,20 @@ def chunk(filename, binary=None, from_page=0, to_page=100000,
                         callback(0.6, "KnowFlow MinerU parsing completed")
                         res = tokenize_table(tables, doc, is_english)
                         callback(0.8, "Finish parsing.")
+                        
+                        # Create MinerU parser instance for position handling
+                        pdf_parser = MinerUParser()
                     else:
                         error_msg = json_data.get('message', 'Unknown error')
                         callback(0.8, f"KnowFlow MinerU API error: {error_msg}")
                         sections, tables = [], []
                         res = []
+                        pdf_parser = None
                 else:
                     callback(0.8, f"KnowFlow MinerU API error: {response.status_code}")
                     sections, tables = [], []
                     res = []
+                    pdf_parser = None
                     
             except Exception as e:
                 callback(0.8, f"KnowFlow MinerU parsing failed: {str(e)}. Falling back to plain text.")
