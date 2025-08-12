@@ -440,6 +440,108 @@ def chunk(filename, binary=None, from_page=0, to_page=100000,
             res = tokenize_table(tables, doc, is_english)
             callback(0.8, "Finish parsing.")
 
+        elif layout_recognizer == "MinerU":
+            import requests
+            import os
+            
+            callback(0.1, "MinerU parsing started")
+            
+            # Call KnowFlow MinerU service
+            try:
+                # 获取 KnowFlow 服务地址，默认为本地
+                knowflow_url = os.getenv('KNOWFLOW_API_URL', 'http://localhost:5000')
+                api_url = f"{knowflow_url}/api/v1/documents/parse-with-mineru"
+                
+                # 准备文件数据
+                if binary:
+                    files = {'file': ('document.pdf', binary, 'application/pdf')}
+                else:
+                    files = {'file': open(filename, 'rb')}
+                
+                # 准备表单数据
+                data = {
+                    'from_page': from_page,
+                    'to_page': to_page if to_page != 100000 else -1
+                }
+                
+                response = requests.post(api_url, files=files, data=data, timeout=300)
+                
+                # 关闭文件句柄
+                if not binary:
+                    files['file'].close()
+                    
+                callback(0.4, "KnowFlow MinerU API call completed")
+                
+                if response.status_code == 200:
+                    json_data = response.json()
+                    
+                    if json_data.get('code') == 0 and 'data' in json_data:
+                        result_data = json_data['data']
+                        sections = []
+                        tables = []
+                        
+                        # 处理文本段落
+                        for section in result_data.get('sections', []):
+                            content = section.get('content', '')
+                            positions = section.get('positions', [])
+                            
+                            if content:
+                                # 提取真实的位置信息
+                                if positions and len(positions) > 0:
+                                    # positions格式: [[page_number, x0, x1, y0, y1]]
+                                    pos = positions[0]  # 取第一个位置
+                                    if len(pos) >= 5:
+                                        page_number, x0, x1, y0, y1 = pos[0], pos[1], pos[2], pos[3], pos[4]
+                                        # 转换为RAGFlow期望的格式
+                                        sections.append((content, f'@@{page_number}\t{x0}\t{x1}\t{y0}\t{y1}##'))
+                                    else:
+                                        # 位置信息不完整，使用默认值
+                                        sections.append((content, f'@@1\t0\t100\t0\t100##'))
+                                else:
+                                    # 没有位置信息，使用默认值
+                                    sections.append((content, f'@@1\t0\t100\t0\t100##'))
+                        
+                        # 处理表格
+                        for table in result_data.get('tables', []):
+                            content = table.get('content', '')
+                            positions = table.get('positions', [])
+                            
+                            if content:
+                                # 提取真实的位置信息
+                                if positions and len(positions) > 0:
+                                    # positions格式: [[page_number, x0, x1, y0, y1]]
+                                    pos = positions[0]  # 取第一个位置
+                                    if len(pos) >= 5:
+                                        page_number, x0, x1, y0, y1 = pos[0], pos[1], pos[2], pos[3], pos[4]
+                                        # 转换为RAGFlow期望的格式
+                                        tables.append(((None, content), [(page_number, x0, x1, y0, y1)]))
+                                    else:
+                                        # 位置信息不完整，使用默认值
+                                        tables.append(((None, content), [(1, 0, 100, 0, 100)]))
+                                else:
+                                    # 没有位置信息，使用默认值
+                                    tables.append(((None, content), [(1, 0, 100, 0, 100)]))
+                        
+                        callback(0.6, "KnowFlow MinerU parsing completed")
+                        res = tokenize_table(tables, doc, is_english)
+                        callback(0.8, "Finish parsing.")
+                    else:
+                        error_msg = json_data.get('message', 'Unknown error')
+                        callback(0.8, f"KnowFlow MinerU API error: {error_msg}")
+                        sections, tables = [], []
+                        res = []
+                else:
+                    callback(0.8, f"KnowFlow MinerU API error: {response.status_code}")
+                    sections, tables = [], []
+                    res = []
+                    
+            except Exception as e:
+                callback(0.8, f"KnowFlow MinerU parsing failed: {str(e)}. Falling back to plain text.")
+                # Fallback to plain text parsing
+                pdf_parser = PlainParser()
+                sections, tables = pdf_parser(filename if not binary else binary, from_page=from_page, to_page=to_page, callback=callback)
+                res = tokenize_table(tables, doc, is_english)
+
         else:
             if layout_recognizer == "Plain Text":
                 pdf_parser = PlainParser()
