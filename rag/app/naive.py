@@ -362,23 +362,24 @@ class MinerUParser:
         import re
         
         poss = []
-        # Find all position tags in format @@page_number\tx0\tx1\ty0\ty1##
-        for tag in re.findall(r"@@[0-9-]+\t[0-9.\t]+##", text):
+        position_tags = re.findall(r"@@[0-9-]+\t[0-9.\t]+##", text)
+        
+        for idx, tag in enumerate(position_tags):
             try:
-                # Parse the tag: @@page\tx0\tx1\ty0\ty1##
                 tag_content = tag.strip("#").strip("@")
                 parts = tag_content.split("\t")
+                
                 if len(parts) >= 5:
                     page_number = int(parts[0])
                     x0, x1, y0, y1 = float(parts[1]), float(parts[2]), float(parts[3]), float(parts[4])
-                    # Convert to the format expected by add_positions: (page-1, x0, x1, y0, y1)
-                    poss.append((page_number - 1, x0, x1, y0, y1))
+                    converted_pos = (page_number, x0, x1, y0, y1)
+                    poss.append(converted_pos)
             except (ValueError, IndexError) as e:
                 logging.warning(f"Failed to parse position tag {tag}: {e}")
                 continue
         
         if need_position:
-            return None, poss  # Return None for image, positions for coordinates
+            return None, poss
         return None
     
     def remove_tag(self, txt):
@@ -517,46 +518,41 @@ def chunk(filename, binary=None, from_page=0, to_page=100000,
                         tables = []
                         
                         # 处理文本段落
-                        for section in result_data.get('sections', []):
+                        logging.info(f"处理 MinerU 解析结果: {len(result_data.get('sections', []))} 个段落, {len(result_data.get('tables', []))} 个表格")
+                        
+                        for idx, section in enumerate(result_data.get('sections', [])):
                             content = section.get('content', '')
                             positions = section.get('positions', [])
                             
                             if content:
-                                # 提取真实的位置信息
                                 if positions and len(positions) > 0:
-                                    # positions格式: [[page_number, x0, x1, y0, y1]]
-                                    pos = positions[0]  # 取第一个位置
+                                    pos = positions[0]
                                     if len(pos) >= 5:
                                         page_number, x0, x1, y0, y1 = pos[0], pos[1], pos[2], pos[3], pos[4]
-                                        # 转换为RAGFlow期望的格式
-                                        sections.append((content, f'@@{page_number}\t{x0}\t{x1}\t{y0}\t{y1}##'))
+                                        position_tag = f'@@{page_number}\t{x0}\t{x1}\t{y0}\t{y1}##'
+                                        sections.append((content, position_tag))
                                     else:
-                                        # 位置信息不完整，使用默认值
                                         sections.append((content, f'@@1\t0\t100\t0\t100##'))
                                 else:
-                                    # 没有位置信息，使用默认值
                                     sections.append((content, f'@@1\t0\t100\t0\t100##'))
                         
                         # 处理表格
-                        for table in result_data.get('tables', []):
+                        for idx, table in enumerate(result_data.get('tables', [])):
                             content = table.get('content', '')
                             positions = table.get('positions', [])
                             
                             if content:
-                                # 提取真实的位置信息
                                 if positions and len(positions) > 0:
-                                    # positions格式: [[page_number, x0, x1, y0, y1]]
-                                    pos = positions[0]  # 取第一个位置
+                                    pos = positions[0]
                                     if len(pos) >= 5:
                                         page_number, x0, x1, y0, y1 = pos[0], pos[1], pos[2], pos[3], pos[4]
-                                        # 转换为RAGFlow期望的格式
-                                        tables.append(((None, content), [(page_number, x0, x1, y0, y1)]))
+                                        adjusted_page = page_number - 1 if page_number > 0 else 0
+                                        table_positions = [(adjusted_page, x0, x1, y0, y1)]
+                                        tables.append(((None, content), table_positions))
                                     else:
-                                        # 位置信息不完整，使用默认值
-                                        tables.append(((None, content), [(1, 0, 100, 0, 100)]))
+                                        tables.append(((None, content), [(0, 0, 100, 0, 100)]))
                                 else:
-                                    # 没有位置信息，使用默认值
-                                    tables.append(((None, content), [(1, 0, 100, 0, 100)]))
+                                    tables.append(((None, content), [(0, 0, 100, 0, 100)]))
                         
                         callback(0.6, "KnowFlow MinerU parsing completed")
                         res = tokenize_table(tables, doc, is_english)
