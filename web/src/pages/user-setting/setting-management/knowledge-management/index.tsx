@@ -11,6 +11,7 @@ import {
   SearchOutlined,
   SettingOutlined,
   ThunderboltOutlined,
+  UserOutlined,
 } from '@ant-design/icons';
 import {
   Alert,
@@ -32,6 +33,7 @@ import {
 import React, { useEffect, useState } from 'react';
 import styles from './index.less';
 import { ParsingStatusCard } from './parsing-status-card';
+import PermissionModal from './permission-modal';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -86,6 +88,7 @@ const KnowledgeManagementPage = () => {
 
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [viewModalVisible, setViewModalVisible] = useState(false);
+  const [permissionModalVisible, setPermissionModalVisible] = useState(false);
   const [currentKnowledgeBase, setCurrentKnowledgeBase] =
     useState<KnowledgeBaseData | null>(null);
   const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
@@ -129,6 +132,12 @@ const KnowledgeManagementPage = () => {
   });
   const [chunkConfigLoading, setChunkConfigLoading] = useState(false);
   const [chunkConfigSaving, setChunkConfigSaving] = useState(false);
+
+  // 权限管理相关函数
+  const handleOpenPermissionModal = (record: KnowledgeBaseData) => {
+    setCurrentKnowledgeBase(record);
+    setPermissionModalVisible(true);
+  };
 
   // 解析进度弹窗相关状态
   // const [parseProgressModalVisible, setParseProgressModalVisible] = useState(false);
@@ -520,7 +529,7 @@ const KnowledgeManagementPage = () => {
       title: '操作',
       key: 'action',
       fixed: 'right' as const,
-      width: 200,
+      width: 280,
       render: (_: any, record: KnowledgeBaseData) => (
         <Space size="small">
           <Button
@@ -530,6 +539,14 @@ const KnowledgeManagementPage = () => {
             onClick={() => handleView(record)}
           >
             查看
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<UserOutlined />}
+            onClick={() => handleOpenPermissionModal(record)}
+          >
+            权限
           </Button>
           <Popconfirm
             title={`确定要删除知识库 "${record.name}" 吗？`}
@@ -1048,6 +1065,14 @@ const KnowledgeManagementPage = () => {
 
       {/* 解析进度弹窗 */}
       {/* 解析进度弹窗相关代码已移除 */}
+
+      {/* 权限管理模态框 */}
+      <PermissionModal
+        visible={permissionModalVisible}
+        onCancel={() => setPermissionModalVisible(false)}
+        knowledgeBaseId={currentKnowledgeBase?.id || ''}
+        knowledgeBaseName={currentKnowledgeBase?.name || ''}
+      />
     </div>
   );
 };

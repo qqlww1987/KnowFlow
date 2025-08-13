@@ -1,0 +1,247 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+初始化知识库 RBAC 权限系统
+创建知识库专用的角色和权限
+"""
+
+import sys
+import os
+import mysql.connector
+import json
+from datetime import datetime
+
+# 添加项目根目录到 Python 路径
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'server'))
+
+from server.database import DB_CONFIG
+
+def get_db_connection():
+    """获取数据库连接"""
+    return mysql.connector.connect(**DB_CONFIG)
+
+def init_kb_roles():
+    """初始化知识库相关角色"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # 知识库角色定义
+        kb_roles = [
+            {
+                'name': '知识库管理员',
+                'code': 'kb_admin',
+                'description': '可以新增和删除知识库，管理知识库所有内容',
+                'role_type': 'kb_admin',
+                'is_system': 1
+            },
+            {
+                'name': '知识库编辑者',
+                'code': 'kb_writer',
+                'description': '可以上传文件以及文件解析，编辑知识库内容',
+                'role_type': 'kb_writer',
+                'is_system': 1
+            },
+            {
+                'name': '知识库查看者',
+                'code': 'kb_reader',
+                'description': '可以查看知识库内的文档内容',
+                'role_type': 'kb_reader',
+                'is_system': 1
+            }
+        ]
+        
+        for role in kb_roles:
+            # 检查角色是否已存在
+            cursor.execute("SELECT id FROM rbac_roles WHERE code = %s", (role['code'],))
+            if cursor.fetchone():
+                print(f"角色 {role['code']} 已存在，跳过创建")
+                continue
+            
+            # 插入角色
+            cursor.execute("""
+                INSERT INTO rbac_roles (name, code, description, role_type, is_system, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (
+                role['name'],
+                role['code'], 
+                role['description'],
+                role['role_type'],
+                role['is_system'],
+                datetime.now()
+            ))
+            
+            print(f"创建角色: {role['name']} ({role['code']})")
+        
+        conn.commit()
+        print("知识库角色初始化完成")
+        
+    except Exception as e:
+        print(f"初始化角色失败: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+        conn.close()
+
+def init_kb_permissions():
+    """初始化知识库相关权限"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # 权限定义
+        permissions = [
+            {
+                'name': '查看知识库',
+                'code': 'kb_read',
+                'description': '可以查看知识库和文档内容',
+                'resource_type': 'knowledgebase',
+                'permission_type': 'read',
+                'is_system': 1
+            },
+            {
+                'name': '编辑知识库',
+                'code': 'kb_write',
+                'description': '可以上传文件、编辑文档和配置',
+                'resource_type': 'knowledgebase',
+                'permission_type': 'write',
+                'is_system': 1
+            },
+            {
+                'name': '删除知识库',
+                'code': 'kb_delete',
+                'description': '可以删除知识库和文档',
+                'resource_type': 'knowledgebase',
+                'permission_type': 'delete',
+                'is_system': 1
+            },
+            {
+                'name': '管理知识库',
+                'code': 'kb_admin',
+                'description': '可以管理知识库的所有权限',
+                'resource_type': 'knowledgebase',
+                'permission_type': 'admin',
+                'is_system': 1
+            },
+            {
+                'name': '分享知识库',
+                'code': 'kb_share',
+                'description': '可以分享知识库给其他用户',
+                'resource_type': 'knowledgebase',
+                'permission_type': 'share',
+                'is_system': 1
+            }
+        ]
+        
+        for perm in permissions:
+            # 检查权限是否已存在
+            cursor.execute("SELECT id FROM rbac_permissions WHERE code = %s", (perm['code'],))
+            if cursor.fetchone():
+                print(f"权限 {perm['code']} 已存在，跳过创建")
+                continue
+            
+            # 插入权限
+            cursor.execute("""
+                INSERT INTO rbac_permissions (name, code, description, resource_type, permission_type, is_system, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                perm['name'],
+                perm['code'],
+                perm['description'],
+                perm['resource_type'],
+                perm['permission_type'],
+                perm['is_system'],
+                datetime.now()
+            ))
+            
+            print(f"创建权限: {perm['name']} ({perm['code']})")
+        
+        conn.commit()
+        print("知识库权限初始化完成")
+        
+    except Exception as e:
+        print(f"初始化权限失败: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+        conn.close()
+
+def init_role_permissions():
+    """初始化角色权限关联"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # 角色权限映射
+        role_permissions = {
+            'kb_admin': ['kb_read', 'kb_write', 'kb_delete', 'kb_admin', 'kb_share'],
+            'kb_writer': ['kb_read', 'kb_write', 'kb_share'],
+            'kb_reader': ['kb_read']
+        }
+        
+        for role_code, perm_codes in role_permissions.items():
+            # 获取角色ID
+            cursor.execute("SELECT id FROM rbac_roles WHERE code = %s", (role_code,))
+            role_result = cursor.fetchone()
+            if not role_result:
+                print(f"角色 {role_code} 不存在，跳过权限关联")
+                continue
+            role_id = role_result[0]
+            
+            for perm_code in perm_codes:
+                # 获取权限ID
+                cursor.execute("SELECT id FROM rbac_permissions WHERE code = %s", (perm_code,))
+                perm_result = cursor.fetchone()
+                if not perm_result:
+                    print(f"权限 {perm_code} 不存在，跳过关联")
+                    continue
+                perm_id = perm_result[0]
+                
+                # 检查关联是否已存在
+                cursor.execute("""
+                    SELECT id FROM rbac_role_permissions 
+                    WHERE role_id = %s AND permission_id = %s
+                """, (role_id, perm_id))
+                if cursor.fetchone():
+                    print(f"角色 {role_code} 与权限 {perm_code} 的关联已存在，跳过")
+                    continue
+                
+                # 创建角色权限关联
+                cursor.execute("""
+                    INSERT INTO rbac_role_permissions (role_id, permission_id, is_active, created_at)
+                    VALUES (%s, %s, %s, %s)
+                """, (role_id, perm_id, 1, datetime.now()))
+                
+                print(f"关联角色 {role_code} 与权限 {perm_code}")
+        
+        conn.commit()
+        print("角色权限关联初始化完成")
+        
+    except Exception as e:
+        print(f"初始化角色权限关联失败: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+        conn.close()
+
+def main():
+    """主函数"""
+    print("开始初始化知识库 RBAC 权限系统...")
+    
+    # 1. 初始化角色
+    print("\n1. 初始化知识库角色...")
+    init_kb_roles()
+    
+    # 2. 初始化权限
+    print("\n2. 初始化知识库权限...")
+    init_kb_permissions()
+    
+    # 3. 初始化角色权限关联
+    print("\n3. 初始化角色权限关联...")
+    init_role_permissions()
+    
+    print("\n知识库 RBAC 权限系统初始化完成！")
+
+if __name__ == "__main__":
+    main() 

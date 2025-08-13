@@ -1,10 +1,13 @@
 from flask import request, jsonify
 from utils import success_response, error_response
 from services.files.document_service import DocumentService
+from services.rbac.permission_decorator import require_permission
+from models.rbac_models import ResourceType, PermissionType
 from .. import documents_bp
 import json
 
 @documents_bp.route('/<doc_id>/chunking-config', methods=['GET'])
+@require_permission('kb_read', resource_id_param='doc_id', resource_type=ResourceType.DOCUMENT)
 def get_document_chunking_config(doc_id):
     """获取文档分块配置"""
     try:
@@ -33,6 +36,7 @@ def get_document_chunking_config(doc_id):
         return error_response(f"获取分块配置失败: {str(e)}", code=500)
 
 @documents_bp.route('/<doc_id>/chunking-config', methods=['PUT'])
+@require_permission('kb_write', resource_id_param='doc_id', resource_type=ResourceType.DOCUMENT)
 def update_document_chunking_config(doc_id):
     """更新文档分块配置"""
     try:
