@@ -104,6 +104,20 @@ class PermissionCheck:
         if self.granted_roles is None:
             self.granted_roles = []
 
+@dataclass
+class TeamRole:
+    """团队角色映射"""
+    id: Optional[str] = None
+    team_id: str = ""  # 团队ID (tenant_id)
+    role_code: str = ""  # 角色代码
+    resource_type: Optional[ResourceType] = None  # 资源类型
+    resource_id: Optional[str] = None  # 资源ID
+    tenant_id: str = "default"  # 租户ID
+    granted_by: Optional[str] = None  # 授权者
+    granted_at: Optional[str] = None  # 授权时间
+    expires_at: Optional[str] = None  # 过期时间
+    is_active: bool = True  # 是否激活
+
 # 预定义的系统角色和权限
 SYSTEM_ROLES = {
     RoleType.SUPER_ADMIN: {

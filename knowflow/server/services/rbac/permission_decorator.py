@@ -15,7 +15,7 @@ from flask import request, jsonify, g
 import logging
 from models.rbac_models import ResourceType, PermissionType
 from services.rbac.permission_service import permission_service
-from database import get_db_connection
+from services.knowledgebases.utils import _get_tenant_by_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -37,22 +37,13 @@ def extract_user_from_token() -> tuple[Optional[str], Optional[str]]:
             token = auth_header.split(' ')[1]
             logger.info(f"[AUTH] 提取到token: {token[:20]}...")
             
-            # 尝试从api_token表查询
-            try:
-                db = get_db_connection()
-                cursor = db.cursor()
-                cursor.execute("SELECT tenant_id FROM api_token WHERE token = %s", (token,))
-                result = cursor.fetchone()
-                cursor.close()
-                
-                if result:
-                    tenant_id = result[0]
-                    logger.info(f"[AUTH] API Token验证成功，tenant_id: {tenant_id}")
-                    return tenant_id, tenant_id
-                else:
-                    logger.info(f"[AUTH] Token在数据库中未找到，使用默认用户身份")
-            except Exception as e:
-                logger.warning(f"[AUTH] API Token查询失败: {e}，使用默认用户身份")
+            # 使用utils中的函数查询tenant_id
+            tenant_id = _get_tenant_by_api_key(token)
+            if tenant_id:
+                logger.info(f"[AUTH] API Token验证成功，tenant_id: {tenant_id}")
+                return tenant_id, tenant_id
+            else:
+                logger.info(f"[AUTH] Token在数据库中未找到，使用默认用户身份")
         
         # 返回默认的用户身份（不需要登录）
         default_user_id = "default_user"

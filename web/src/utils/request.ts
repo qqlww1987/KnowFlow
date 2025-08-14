@@ -75,6 +75,9 @@ const request: RequestMethod = extend({
   errorHandler,
   timeout: 300000,
   getResponse: true,
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
 request.interceptors.request.use((url: string, options: any) => {

@@ -370,3 +370,78 @@ def reset_user_password(user_id, new_password):
             cursor.close()
             conn.close()
         return False
+
+def get_assignable_users_with_pagination(current_page, page_size, username='', email=''):
+    """
+    查询可分配权限的用户信息（排除超级管理员），支持分页和条件筛选
+    超级管理员自动拥有所有权限，不需要单独分配
+    """
+    try:
+        # 建立数据库连接
+        conn = mysql.connector.connect(**DB_CONFIG)
+        cursor = conn.cursor(dictionary=True)
+        
+        # 构建WHERE子句和参数
+        where_clauses = ["is_superuser != 1"]  # 排除超级管理员
+        params = []
+        
+        if username:
+            where_clauses.append("nickname LIKE %s")
+            params.append(f"%{username}%")
+        
+        if email:
+            where_clauses.append("email LIKE %s")
+            params.append(f"%{email}%")
+        
+        # 排除拥有super_admin角色的用户
+        where_clauses.append("""
+            id NOT IN (
+                SELECT DISTINCT ur.user_id 
+                FROM rbac_user_roles ur 
+                JOIN rbac_roles r ON ur.role_id = r.id 
+                WHERE r.code = 'super_admin' AND ur.is_active = 1
+            )
+        """)
+        
+        # 组合WHERE子句
+        where_sql = " AND ".join(where_clauses)
+        
+        # 查询总记录数
+        count_sql = f"SELECT COUNT(*) as total FROM user WHERE {where_sql}"
+        cursor.execute(count_sql, params)
+        total = cursor.fetchone()['total']
+        
+        # 计算分页偏移量
+        offset = (current_page - 1) * page_size
+        
+        # 执行分页查询
+        query = f"""
+        SELECT id, nickname, email, create_date, update_date, status, is_superuser
+        FROM user
+        WHERE {where_sql}
+        ORDER BY id DESC
+        LIMIT %s OFFSET %s
+        """
+        cursor.execute(query, params + [page_size, offset])
+        results = cursor.fetchall()
+        
+        # 关闭连接
+        cursor.close()
+        conn.close()
+        
+        # 格式化结果
+        formatted_users = []
+        for user in results:
+            formatted_users.append({
+                "id": user["id"],
+                "username": user["nickname"],
+                "email": user["email"],
+                "createTime": user["create_date"].strftime("%Y-%m-%d %H:%M:%S") if user["create_date"] else "",
+                "updateTime": user["update_date"].strftime("%Y-%m-%d %H:%M:%S") if user["update_date"] else "",
+            })
+        
+        return formatted_users, total
+        
+    except mysql.connector.Error as err:
+        print(f"数据库错误: {err}")
+        return [], 0

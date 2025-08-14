@@ -16,8 +16,9 @@ from database import get_db_connection
 from models.rbac_models import (
     Permission, Role, UserRole, RolePermission,
     PermissionCheck, PermissionType, ResourceType, RoleType,
-    SYSTEM_ROLES, SYSTEM_PERMISSIONS
+    SYSTEM_ROLES, SYSTEM_PERMISSIONS, TeamRole
 )
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -176,11 +177,15 @@ class PermissionService:
     def _check_role_permission(self, user_id: str, resource_type: ResourceType,
                              resource_id: str, permission_type: PermissionType,
                              tenant_id: Optional[str] = None) -> Tuple[bool, List[str]]:
-        """检查角色权限"""
+        """检查角色权限（包含用户直接角色和团队角色）"""
+        db = None
+        cursor = None
         try:
             db = self._get_db_connection()
             cursor = db.cursor()
-            sql = """
+            
+            # 1. 检查用户直接角色权限
+            user_sql = """
                 SELECT DISTINCT r.code, r.name FROM rbac_user_roles ur
                 JOIN rbac_roles r ON ur.role_id = r.id
                 JOIN rbac_role_permissions rp ON r.id = rp.role_id
@@ -190,22 +195,55 @@ class PermissionService:
                 AND (ur.expires_at IS NULL OR ur.expires_at > NOW())
                 AND (ur.resource_id IS NULL OR ur.resource_id = %s)
             """
-            params = [user_id, resource_type.value, permission_type.value, resource_id]
+            user_params = [user_id, resource_type.value, permission_type.value, resource_id]
             
             if tenant_id:
-                sql += " AND ur.tenant_id = %s"
-                params.append(tenant_id)
+                user_sql += " AND ur.tenant_id = %s"
+                user_params.append(tenant_id)
             
-            cursor.execute(sql, params)
-            roles = cursor.fetchall()
+            cursor.execute(user_sql, user_params)
+            user_roles = cursor.fetchall()
             
-            if roles:
-                role_names = [role[1] for role in roles]
+            # 2. 检查用户团队角色权限
+            team_sql = """
+                SELECT DISTINCT r.code, r.name FROM rbac_team_roles tr
+                JOIN user_tenant ut ON tr.team_id = ut.tenant_id
+                JOIN rbac_roles r ON tr.role_code = r.code
+                JOIN rbac_role_permissions rp ON r.id = rp.role_id
+                JOIN rbac_permissions p ON rp.permission_id = p.id
+                WHERE ut.user_id = %s AND ut.status = 1 AND tr.is_active = 1
+                AND p.resource_type = %s AND p.permission_type = %s
+                AND (tr.expires_at IS NULL OR tr.expires_at > NOW())
+                AND (tr.resource_id IS NULL OR tr.resource_id = %s)
+            """
+            team_params = [user_id, resource_type.value, permission_type.value, resource_id]
+            
+            if tenant_id:
+                team_sql += " AND tr.tenant_id = %s"
+                team_params.append(tenant_id)
+            
+            cursor.execute(team_sql, team_params)
+            team_roles = cursor.fetchall()
+            
+            # 3. 合并结果
+            all_roles = list(user_roles) + list(team_roles)
+            
+            if all_roles:
+                role_names = []
+                for role in all_roles:
+                    role_name = f"{role[1]}(通过团队)" if role in team_roles else role[1]
+                    role_names.append(role_name)
                 return True, role_names
             return False, []
+            
         except Exception as e:
             logger.error(f"检查角色权限失败: {e}")
             return False, []
+        finally:
+            if cursor:
+                cursor.close()
+            if db:
+                db.close()
     
     def _is_resource_owner(self, user_id: str, resource_type: ResourceType, resource_id: str) -> bool:
         """检查是否为资源所有者"""
@@ -539,6 +577,282 @@ class PermissionService:
         except Exception as e:
             logger.error(f"权限检查失败: {e}")
             return False
+
+    def _role_exists(self, role_code: str, tenant_id: str = "default") -> bool:
+        """检查角色是否存在"""
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            query = "SELECT COUNT(*) FROM rbac_roles WHERE code = %s"
+            cursor.execute(query, (role_code,))
+            count = cursor.fetchone()[0]
+            
+            return count > 0
+            
+        except Exception as e:
+            logger.error(f"检查角色存在性失败: {e}")
+            return False
+        finally:
+            if cursor:
+                cursor.close()
+
+    def get_user_team_roles(self, user_id: str, tenant_id: str = "default") -> List[TeamRole]:
+        """
+        获取用户通过团队获得的角色
+        
+        Args:
+            user_id: 用户ID
+            tenant_id: 租户ID
+            
+        Returns:
+            List[TeamRole]: 团队角色列表
+        """
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor(dictionary=True)
+            
+            # 查询用户所属的团队，然后查询这些团队的角色
+            query = """
+            SELECT DISTINCT 
+                tr.id,
+                tr.team_id,
+                tr.role_code,
+                tr.resource_type,
+                tr.resource_id,
+                tr.tenant_id,
+                tr.granted_by,
+                tr.granted_at,
+                tr.expires_at,
+                tr.is_active
+            FROM rbac_team_roles tr
+            JOIN user_tenant ut ON tr.team_id = ut.tenant_id
+            WHERE ut.user_id = %s 
+                AND ut.status = 1 
+                AND tr.tenant_id = %s 
+                AND tr.is_active = 1
+                AND (tr.expires_at IS NULL OR tr.expires_at > NOW())
+            """
+            
+            cursor.execute(query, (user_id, tenant_id))
+            results = cursor.fetchall()
+            
+            team_roles = []
+            for row in results:
+                team_role = TeamRole(
+                    id=row['id'],
+                    team_id=row['team_id'],
+                    role_code=row['role_code'],
+                    resource_type=ResourceType(row['resource_type']) if row['resource_type'] else None,
+                    resource_id=row['resource_id'],
+                    tenant_id=row['tenant_id'],
+                    granted_by=row['granted_by'],
+                    granted_at=row['granted_at'].isoformat() if row['granted_at'] else None,
+                    expires_at=row['expires_at'].isoformat() if row['expires_at'] else None,
+                    is_active=bool(row['is_active'])
+                )
+                team_roles.append(team_role)
+                
+            return team_roles
+            
+        except Exception as e:
+            logger.error(f"获取用户团队角色失败: {e}")
+            return []
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    def grant_team_role(self, team_id: str, role_code: str, resource_type: ResourceType = None, 
+                       resource_id: str = None, tenant_id: str = "default", 
+                       granted_by: str = None) -> bool:
+        """
+        为团队授予角色
+        
+        Args:
+            team_id: 团队ID
+            role_code: 角色代码
+            resource_type: 资源类型
+            resource_id: 资源ID
+            tenant_id: 租户ID
+            granted_by: 授权者ID
+            
+        Returns:
+            bool: 是否授权成功
+        """
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            # 检查角色是否存在
+            if not self._role_exists(role_code, tenant_id):
+                logger.error(f"角色不存在: {role_code}")
+                return False
+            
+            # 生成ID
+            team_role_id = str(uuid.uuid4()).replace('-', '')
+            
+            # 插入团队角色映射
+            query = """
+            INSERT INTO rbac_team_roles 
+            (id, team_id, role_code, resource_type, resource_id, tenant_id, granted_by, is_active)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, 1)
+            ON DUPLICATE KEY UPDATE 
+                is_active = 1, 
+                granted_by = VALUES(granted_by),
+                granted_at = CURRENT_TIMESTAMP
+            """
+            
+            cursor.execute(query, (
+                team_role_id, team_id, role_code, 
+                resource_type.value if resource_type else None,
+                resource_id, tenant_id, granted_by
+            ))
+            
+            conn.commit()
+            logger.info(f"团队角色授权成功: team_id={team_id}, role={role_code}, resource={resource_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"团队角色授权失败: {e}")
+            if conn:
+                conn.rollback()
+            return False
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    def revoke_team_role(self, team_id: str, role_code: str = None, resource_type: ResourceType = None,
+                        resource_id: str = None, tenant_id: str = "default") -> bool:
+        """
+        撤销团队角色
+        
+        Args:
+            team_id: 团队ID
+            role_code: 角色代码(可选，为空则撤销该资源的所有角色)
+            resource_type: 资源类型
+            resource_id: 资源ID
+            tenant_id: 租户ID
+            
+        Returns:
+            bool: 是否撤销成功
+        """
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            # 构建删除条件
+            where_conditions = ["team_id = %s", "tenant_id = %s"]
+            params = [team_id, tenant_id]
+            
+            if role_code:
+                where_conditions.append("role_code = %s")
+                params.append(role_code)
+                
+            if resource_type:
+                where_conditions.append("resource_type = %s")
+                params.append(resource_type.value)
+                
+            if resource_id:
+                where_conditions.append("resource_id = %s")
+                params.append(resource_id)
+            
+            where_clause = " AND ".join(where_conditions)
+            
+            # 执行删除
+            query = f"DELETE FROM rbac_team_roles WHERE {where_clause}"
+            cursor.execute(query, params)
+            
+            affected_rows = cursor.rowcount
+            conn.commit()
+            
+            logger.info(f"团队角色撤销成功: team_id={team_id}, 影响行数={affected_rows}")
+            return affected_rows > 0
+            
+        except Exception as e:
+            logger.error(f"团队角色撤销失败: {e}")
+            if conn:
+                conn.rollback()
+            return False
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    def get_team_roles(self, team_id: str, resource_type: ResourceType = None, 
+                      resource_id: str = None, tenant_id: str = "default") -> List[TeamRole]:
+        """
+        获取团队角色列表
+        
+        Args:
+            team_id: 团队ID
+            resource_type: 资源类型(可选)
+            resource_id: 资源ID(可选)
+            tenant_id: 租户ID
+            
+        Returns:
+            List[TeamRole]: 团队角色列表
+        """
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor(dictionary=True)
+            
+            # 构建查询条件
+            where_conditions = ["team_id = %s", "tenant_id = %s", "is_active = 1"]
+            params = [team_id, tenant_id]
+            
+            if resource_type:
+                where_conditions.append("resource_type = %s")
+                params.append(resource_type.value)
+                
+            if resource_id:
+                where_conditions.append("resource_id = %s")
+                params.append(resource_id)
+            
+            where_clause = " AND ".join(where_conditions)
+            
+            query = f"""
+            SELECT 
+                id, team_id, role_code, resource_type, resource_id, 
+                tenant_id, granted_by, granted_at, expires_at, is_active
+            FROM rbac_team_roles 
+            WHERE {where_clause}
+            ORDER BY granted_at DESC
+            """
+            
+            cursor.execute(query, params)
+            results = cursor.fetchall()
+            
+            team_roles = []
+            for row in results:
+                team_role = TeamRole(
+                    id=row['id'],
+                    team_id=row['team_id'],
+                    role_code=row['role_code'],
+                    resource_type=ResourceType(row['resource_type']) if row['resource_type'] else None,
+                    resource_id=row['resource_id'],
+                    tenant_id=row['tenant_id'],
+                    granted_by=row['granted_by'],
+                    granted_at=row['granted_at'].isoformat() if row['granted_at'] else None,
+                    expires_at=row['expires_at'].isoformat() if row['expires_at'] else None,
+                    is_active=bool(row['is_active'])
+                )
+                team_roles.append(team_role)
+                
+            return team_roles
+            
+        except Exception as e:
+            logger.error(f"获取团队角色失败: {e}")
+            return []
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
 
 # 全局权限服务实例
 permission_service = PermissionService()

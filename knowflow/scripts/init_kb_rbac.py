@@ -225,9 +225,54 @@ def init_role_permissions():
         cursor.close()
         conn.close()
 
+def init_team_roles_table():
+    """初始化团队角色表"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 创建团队角色表
+        create_table_sql = """
+        CREATE TABLE IF NOT EXISTS rbac_team_roles (
+            id VARCHAR(32) PRIMARY KEY,
+            team_id VARCHAR(32) NOT NULL COMMENT '团队ID',
+            role_code VARCHAR(50) NOT NULL COMMENT '角色代码', 
+            resource_type ENUM('system', 'knowledgebase', 'document', 'team', 'user') DEFAULT NULL COMMENT '资源类型',
+            resource_id VARCHAR(32) DEFAULT NULL COMMENT '资源ID',
+            tenant_id VARCHAR(32) NOT NULL DEFAULT 'default' COMMENT '租户ID',
+            granted_by VARCHAR(32) DEFAULT NULL COMMENT '授权者',
+            granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '授权时间',
+            expires_at TIMESTAMP NULL COMMENT '过期时间',
+            is_active TINYINT(1) DEFAULT 1 COMMENT '是否激活',
+            create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_team_resource (team_id, resource_type, resource_id),
+            INDEX idx_role_code (role_code),
+            INDEX idx_tenant_id (tenant_id),
+            UNIQUE KEY uk_team_role_resource (team_id, role_code, resource_type, resource_id, tenant_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='团队角色映射表';
+        """
+        
+        cursor.execute(create_table_sql)
+        conn.commit()
+        print("✅ 团队角色表创建成功")
+        
+    except Exception as e:
+        print(f"❌ 创建团队角色表失败: {e}")
+        if conn:
+            conn.rollback()
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
 def main():
     """主函数"""
     print("开始初始化知识库 RBAC 权限系统...")
+    
+    # 初始化基础表
+    init_team_roles_table()
     
     # 1. 初始化角色
     print("\n1. 初始化知识库角色...")
@@ -244,4 +289,14 @@ def main():
     print("\n知识库 RBAC 权限系统初始化完成！")
 
 if __name__ == "__main__":
-    main() 
+    print("开始初始化知识库RBAC系统...")
+    
+    # 初始化基础表
+    init_team_roles_table()
+    
+    # 其他初始化...
+    init_kb_roles()
+    init_kb_permissions()
+    init_role_permissions()
+    
+    print("知识库RBAC系统初始化完成！") 

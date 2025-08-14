@@ -1,5 +1,5 @@
 from flask import jsonify, request
-from services.users.service import get_users_with_pagination, delete_user, create_user, update_user, reset_user_password
+from services.users.service import get_users_with_pagination, delete_user, create_user, update_user, reset_user_password, get_assignable_users_with_pagination
 from .. import users_bp
 
 @users_bp.route('', methods=['GET'])
@@ -29,6 +29,35 @@ def get_users():
         return jsonify({
             "code": 500,
             "message": f"获取用户列表失败: {str(e)}"
+        }), 500
+
+@users_bp.route('/assignable', methods=['GET'])
+def get_assignable_users():
+    """获取可分配权限的用户列表（排除超级管理员）"""
+    try:
+        # 获取查询参数
+        current_page = int(request.args.get('currentPage', 1))
+        page_size = int(request.args.get('size', 10))
+        username = request.args.get('username', '')
+        email = request.args.get('email', '')
+        
+        # 调用服务函数获取可分配权限的用户数据
+        users, total = get_assignable_users_with_pagination(current_page, page_size, username, email)
+        
+        # 返回符合前端期望格式的数据
+        return jsonify({
+            "code": 0,  # 成功状态码
+            "data": {
+                "list": users,
+                "total": total
+            },
+            "message": "获取可分配权限用户列表成功"
+        })
+    except Exception as e:
+        # 错误处理
+        return jsonify({
+            "code": 500,
+            "message": f"获取可分配权限用户列表失败: {str(e)}"
         }), 500
 
 @users_bp.route('/<string:user_id>', methods=['DELETE'])
