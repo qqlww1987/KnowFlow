@@ -1,0 +1,337 @@
+#
+#  Copyright 2024 The InfiniFlow Authors. All Rights Reserved.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+#
+
+"""
+RBAC集成工具模块
+提供主项目与KnowFlow RBAC系统的集成适配功能
+"""
+
+import requests
+import logging
+from functools import wraps
+from flask import request as flask_request, jsonify, current_app
+from flask_login import login_required, current_user
+
+from api.utils.api_utils import get_json_result
+from api.settings import RetCode
+
+logger = logging.getLogger(__name__)
+
+# RBAC服务配置
+RBAC_SERVICE_URL = "http://localhost:5000/api/v1/rbac"
+RBAC_ENABLED = True  # 全局开关，可通过环境变量控制
+
+class RBACPermissionType:
+    """RBAC权限类型枚举"""
+    KB_READ = "read"         # 知识库读取权限
+    KB_WRITE = "write"       # 知识库写入权限  
+    KB_ADMIN = "admin"       # 知识库管理权限
+
+class RBACResourceType:
+    """RBAC资源类型枚举"""
+    KNOWLEDGEBASE = "knowledgebase"
+    DOCUMENT = "document"
+
+
+def grant_role_to_user(user_id: str, role_code: str, resource_type: str | None = None,
+                       resource_id: str | None = None, tenant_id: str | None = None) -> bool:
+    """为用户授予角色（可选资源级）
+
+    仅用于在不改变旧接口签名/返回的前提下，在业务创建成功后同步 RBAC 数据。
+    返回布尔，不抛异常，失败记日志但不影响旧流程。
+    """
+    try:
+        payload = {
+            "role_code": role_code,
+            "tenant_id": tenant_id or "default",
+        }
+        if resource_type:
+            payload["resource_type"] = resource_type
+        if resource_id:
+            payload["resource_id"] = resource_id
+
+        resp = requests.post(f"{RBAC_SERVICE_URL}/users/{user_id}/roles", json=payload, timeout=5)
+        if resp.status_code == 200:
+            return True
+        logger.error(f"授予角色失败: {resp.status_code} - {resp.text}")
+        return False
+    except Exception as e:
+        logger.error(f"授予角色异常: {e}")
+        return False
+
+def get_user_tenant_info():
+    """获取当前用户和租户信息"""
+    try:
+        user_id = getattr(current_user, 'id', None)
+        # 从request的上下文中获取tenant_id（通过装饰器设置）
+        tenant_id = getattr(flask_request, 'tenant_id', None)
+        if not tenant_id:
+            tenant_id = 'default'  # 默认租户
+        
+        return user_id, tenant_id
+    except Exception as e:
+        logger.warning(f"获取用户租户信息失败: {e}")
+        return None, None
+
+def check_rbac_permission(user_id, resource_type, resource_id, permission_type, tenant_id=None):
+    """
+    调用RBAC服务检查权限
+    
+    Args:
+        user_id: 用户ID
+        resource_type: 资源类型
+        resource_id: 资源ID
+        permission_type: 权限类型
+        tenant_id: 租户ID
+        
+    Returns:
+        bool: 是否有权限
+    """
+    if not RBAC_ENABLED:
+        logger.info("RBAC未启用，跳过权限检查")
+        return True
+        
+    if not user_id:
+        logger.warning("用户ID为空，权限检查失败")
+        return False
+        
+    try:
+        payload = {
+            "user_id": user_id,
+            "resource_type": resource_type,
+            "resource_id": resource_id,
+            "permission_type": permission_type,
+            "tenant_id": tenant_id or "default"
+        }
+        
+        response = requests.post(
+            f"{RBAC_SERVICE_URL}/permissions/check",
+            json=payload,
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            has_permission = result.get('has_permission', False)
+            logger.debug(f"RBAC权限检查结果: user={user_id}, resource={resource_id}, permission={permission_type}, result={has_permission}")
+            return has_permission
+        else:
+            logger.error(f"RBAC权限检查服务错误: {response.status_code} - {response.text}")
+            return False
+            
+    except requests.RequestException as e:
+        logger.error(f"RBAC权限检查网络错误: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"RBAC权限检查异常: {e}")
+        return False
+
+def rbac_permission_required(
+    permission_type,
+    resource_type=RBACResourceType.KNOWLEDGEBASE,
+    resource_id_param='kb_id',
+    fallback_check=None,
+    deny_code=RetCode.AUTHENTICATION_ERROR,
+    deny_message="No authorization."
+):
+    """
+    RBAC权限检查装饰器
+    
+    Args:
+        permission_type: 权限类型 (kb_read, kb_write, kb_admin)
+        resource_type: 资源类型 (默认为knowledgebase)
+        resource_id_param: 从请求中提取资源ID的参数名
+        fallback_check: 当RBAC检查失败时的回退检查函数
+    """
+    def decorator(func):
+        @login_required
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                # 1. 获取用户和租户信息
+                user_id, tenant_id = get_user_tenant_info()
+                if not user_id:
+                    return get_json_result(
+                        data=False, 
+                        message="用户认证失败", 
+                        code=RetCode.AUTHENTICATION_ERROR
+                    )
+                
+                # 2. 从请求中提取资源ID
+                resource_id = None
+                
+                # 从URL路径参数提取
+                if resource_id_param in kwargs:
+                    resource_id = kwargs[resource_id_param]
+                # 从查询参数提取    
+                elif hasattr(flask_request, 'args') and resource_id_param in flask_request.args:
+                    resource_id = flask_request.args.get(resource_id_param)
+                # 从JSON Body提取
+                elif hasattr(flask_request, 'json') and flask_request.json and resource_id_param in flask_request.json:
+                    resource_id = flask_request.json.get(resource_id_param)
+                # 从表单数据提取（multipart/form-data 或 application/x-www-form-urlencoded）
+                elif hasattr(flask_request, 'form') and resource_id_param in flask_request.form:
+                    resource_id = flask_request.form.get(resource_id_param)
+                
+                if not resource_id:
+                    logger.warning(f"无法从请求中提取资源ID参数: {resource_id_param}")
+                    return get_json_result(
+                        data=False, 
+                        message="缺少必要的资源标识", 
+                        code=RetCode.ARGUMENT_ERROR
+                    )
+                
+                # 3. 执行RBAC权限检查
+                has_permission = check_rbac_permission(
+                    user_id=user_id,
+                    resource_type=resource_type,
+                    resource_id=resource_id,
+                    permission_type=permission_type,
+                    tenant_id=tenant_id
+                )
+                
+                # 4. 如果RBAC检查失败且有回退检查，执行回退逻辑
+                if not has_permission and fallback_check:
+                    logger.info(f"RBAC检查失败，执行回退检查: {fallback_check.__name__}")
+                    has_permission = fallback_check(resource_id, user_id)
+                
+                # 5. 权限验证失败
+                if not has_permission:
+                    logger.warning(f"权限不足: user={user_id}, resource={resource_id}, permission={permission_type}")
+                    return get_json_result(
+                        data=False,
+                        message=deny_message,
+                        code=deny_code
+                    )
+                
+                # 6. 权限验证通过，执行原函数
+                logger.debug(f"权限检查通过: user={user_id}, resource={resource_id}, permission={permission_type}")
+                return func(*args, **kwargs)
+                
+            except Exception as e:
+                logger.error(f"权限检查异常: {e}")
+                return get_json_result(
+                    data=False, 
+                    message="权限检查服务异常", 
+                    code=RetCode.EXCEPTION_ERROR
+                )
+        
+        return wrapper
+    return decorator
+
+def kb_admin_required(resource_id_param='kb_id', fallback_check=None):
+    """知识库管理权限装饰器"""
+    return rbac_permission_required(
+        permission_type=RBACPermissionType.KB_ADMIN,
+        resource_id_param=resource_id_param,
+        fallback_check=fallback_check
+    )
+
+def kb_write_required(resource_id_param='kb_id', fallback_check=None):
+    """知识库写入权限装饰器"""
+    return rbac_permission_required(
+        permission_type=RBACPermissionType.KB_WRITE,
+        resource_id_param=resource_id_param,
+        fallback_check=fallback_check
+    )
+
+def kb_read_required(resource_id_param='kb_id', fallback_check=None):
+    """知识库读取权限装饰器"""
+    return rbac_permission_required(
+        permission_type=RBACPermissionType.KB_READ,
+        resource_id_param=resource_id_param,
+        fallback_check=fallback_check
+    )
+
+# 为文档权限提供便捷方法（基于知识库权限）
+def doc_read_required(fallback_check=None):
+    """文档读取权限装饰器（基于知识库权限）"""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # 从doc_id获取kb_id，然后检查知识库读取权限
+            from api.db.services.document_service import DocumentService
+            
+            doc_id = kwargs.get('doc_id') or flask_request.args.get('doc_id')
+            if not doc_id:
+                return get_json_result(
+                    data=False, 
+                    message="缺少文档ID", 
+                    code=RetCode.ARGUMENT_ERROR
+                )
+            
+            # 获取文档所属的知识库ID
+            try:
+                kb_id = DocumentService.get_kb_id_by_doc_id(doc_id)
+                if not kb_id:
+                    return get_json_result(
+                        data=False, 
+                        message="文档不存在或已删除", 
+                        code=RetCode.DATA_ERROR
+                    )
+                
+                # 使用知识库读取权限检查
+                kwargs['kb_id'] = kb_id
+                return kb_read_required(resource_id_param='kb_id', fallback_check=fallback_check)(func)(*args, **kwargs)
+                
+            except Exception as e:
+                logger.error(f"获取文档知识库ID失败: {e}")
+                return get_json_result(
+                    data=False, 
+                    message="权限检查失败", 
+                    code=RetCode.EXCEPTION_ERROR
+                )
+        
+        return wrapper
+    return decorator
+
+def doc_write_required(fallback_check=None):
+    """文档写入权限装饰器（基于知识库权限）"""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            from api.db.services.document_service import DocumentService
+            
+            doc_id = kwargs.get('doc_id') or flask_request.args.get('doc_id')
+            if not doc_id:
+                return get_json_result(
+                    data=False, 
+                    message="缺少文档ID", 
+                    code=RetCode.ARGUMENT_ERROR
+                )
+            
+            try:
+                kb_id = DocumentService.get_kb_id_by_doc_id(doc_id)
+                if not kb_id:
+                    return get_json_result(
+                        data=False, 
+                        message="文档不存在或已删除", 
+                        code=RetCode.DATA_ERROR
+                    )
+                
+                kwargs['kb_id'] = kb_id
+                return kb_write_required(resource_id_param='kb_id', fallback_check=fallback_check)(func)(*args, **kwargs)
+                
+            except Exception as e:
+                logger.error(f"获取文档知识库ID失败: {e}")
+                return get_json_result(
+                    data=False, 
+                    message="权限检查失败", 
+                    code=RetCode.EXCEPTION_ERROR
+                )
+        
+        return wrapper
+    return decorator

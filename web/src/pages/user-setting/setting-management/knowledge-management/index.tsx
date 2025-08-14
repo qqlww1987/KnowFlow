@@ -1,4 +1,10 @@
 import { useTranslate } from '@/hooks/common-hooks';
+import {
+  checkKbPermission,
+  useGlobalKbAdmin,
+  useKbPermission,
+} from '@/hooks/permission-hooks';
+import { useFetchUserInfo } from '@/hooks/user-setting-hooks';
 import request from '@/utils/request';
 import {
   DatabaseOutlined,
@@ -138,8 +144,32 @@ const KnowledgeManagementPage = () => {
   const [chunkConfigLoading, setChunkConfigLoading] = useState(false);
   const [chunkConfigSaving, setChunkConfigSaving] = useState(false);
 
+  // 登录用户信息
+  const { data: userInfo } = useFetchUserInfo();
+  const userId = userInfo?.id;
+
+  // 权限：全局 kb_admin（创建、批量删除）
+  const { allowed: canCreateKb } = useGlobalKbAdmin();
+  // 权限：针对当前选中知识库
+  const {
+    canRead,
+    canWrite,
+    canAdmin,
+    can: canDo,
+  } = useKbPermission(currentKnowledgeBase?.id);
+
   // 权限管理相关函数
-  const handleOpenPermissionModal = (record: KnowledgeBaseData) => {
+  const handleOpenPermissionModal = async (record: KnowledgeBaseData) => {
+    if (!userId) return;
+    const allowed = await checkKbPermission({
+      userId,
+      kbId: record.id,
+      permission: 'admin',
+    });
+    if (!allowed) {
+      message.warning('您没有管理该知识库权限');
+      return;
+    }
     setCurrentKnowledgeBase(record);
     setPermissionModalVisible(true);
   };
@@ -232,6 +262,10 @@ const KnowledgeManagementPage = () => {
 
   const handleCreateSubmit = async () => {
     try {
+      if (!canCreateKb) {
+        message.warning('您没有创建知识库的权限');
+        return;
+      }
       const values = await createForm.validateFields();
       setLoading(true);
       await request.post('/api/v1/knowledgebases', {
@@ -247,13 +281,33 @@ const KnowledgeManagementPage = () => {
     }
   };
 
-  const handleView = (record: KnowledgeBaseData) => {
+  const handleView = async (record: KnowledgeBaseData) => {
+    if (!userId) return;
+    const allowed = await checkKbPermission({
+      userId,
+      kbId: record.id,
+      permission: 'read',
+    });
+    if (!allowed) {
+      message.warning('您没有查看该知识库的权限');
+      return;
+    }
     setCurrentKnowledgeBase(record);
     setViewModalVisible(true);
     loadDocumentList(record.id);
   };
 
   const handleDelete = async (kbId: string) => {
+    if (!userId) return;
+    const allowed = await checkKbPermission({
+      userId,
+      kbId,
+      permission: 'admin',
+    });
+    if (!allowed) {
+      message.warning('您没有删除该知识库的权限');
+      return;
+    }
     setLoading(true);
     try {
       await request.delete(`/api/v1/knowledgebases/${kbId}`);
@@ -269,6 +323,10 @@ const KnowledgeManagementPage = () => {
   const handleBatchDelete = async () => {
     if (selectedRowKeys.length === 0) {
       message.warning('请选择要删除的知识库');
+      return;
+    }
+    if (!canCreateKb) {
+      message.warning('您没有批量删除知识库的权限');
       return;
     }
 
@@ -306,6 +364,11 @@ const KnowledgeManagementPage = () => {
   const handleParseDocument = async (doc: DocumentData) => {
     if (doc.progress === 1) {
       message.warning('文档已完成解析，无需再重复解析');
+      return;
+    }
+    const allowed = await canDo('write');
+    if (!allowed) {
+      message.warning('您没有解析文档的权限');
       return;
     }
     try {
@@ -383,6 +446,10 @@ const KnowledgeManagementPage = () => {
 
   // 分块规则弹窗
   const openChunkModal = (doc: DocumentData) => {
+    if (!canWrite) {
+      message.warning('您没有编辑分块规则的权限');
+      return;
+    }
     setChunkDocId(doc.id);
     setChunkDocName(doc.name);
     setChunkModalVisible(true);
@@ -409,6 +476,10 @@ const KnowledgeManagementPage = () => {
   };
   const handleChunkConfigSave = async () => {
     if (!chunkDocId) return;
+    if (!canWrite) {
+      message.warning('您没有保存分块配置的权限');
+      return;
+    }
     // 校验
     if (!chunkConfig.strategy) {
       message.error('请选择分块策略');
@@ -756,6 +827,7 @@ const KnowledgeManagementPage = () => {
               type="primary"
               icon={<PlusOutlined />}
               onClick={handleCreate}
+              disabled={!canCreateKb}
             >
               新建知识库
             </Button>
@@ -763,12 +835,12 @@ const KnowledgeManagementPage = () => {
               title={`确定删除选中的 ${selectedRowKeys.length} 个知识库吗？`}
               description="此操作不可恢复，且其中的所有文档也将被删除"
               onConfirm={handleBatchDelete}
-              disabled={selectedRowKeys.length === 0}
+              disabled={selectedRowKeys.length === 0 || !canCreateKb}
             >
               <Button
                 danger
                 icon={<DeleteOutlined />}
-                disabled={selectedRowKeys.length === 0}
+                disabled={selectedRowKeys.length === 0 || !canCreateKb}
               >
                 批量删除
               </Button>
@@ -931,6 +1003,7 @@ const KnowledgeManagementPage = () => {
                   type="primary"
                   icon={<PlusOutlined />}
                   onClick={openAddDocModal}
+                  disabled={!canWrite}
                 >
                   添加文档
                 </Button>
@@ -939,7 +1012,7 @@ const KnowledgeManagementPage = () => {
                   icon={<ThunderboltOutlined />}
                   loading={batchParsingLoading}
                   onClick={handleBatchParse}
-                  disabled={documentList.length === 0}
+                  disabled={documentList.length === 0 || !canWrite}
                 >
                   {batchParsingLoading ? '正在批量解析...' : '批量解析'}
                 </Button>

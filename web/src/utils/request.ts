@@ -75,9 +75,6 @@ const request: RequestMethod = extend({
   errorHandler,
   timeout: 300000,
   getResponse: true,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 request.interceptors.request.use((url: string, options: any) => {
@@ -111,22 +108,25 @@ request.interceptors.response.use(async (response: Response, options) => {
   }
 
   const data: ResponseType = await response?.clone()?.json();
-  if (data?.code === 100) {
-    message.error(data?.message);
-  } else if (data?.code === 401) {
-    notification.error({
-      message: data?.message,
-      description: data?.message,
-      duration: 3,
-    });
-    authorizationUtil.removeAll();
-    redirectToLogin();
-  } else if (data?.code !== 0) {
-    notification.error({
-      message: `${i18n.t('message.hint')} : ${data?.code}`,
-      description: data?.message,
-      duration: 3,
-    });
+  // 仅当后端返回含有 code 字段的统一响应时，才做通用提示处理
+  if (data && Object.prototype.hasOwnProperty.call(data, 'code')) {
+    if (data?.code === 100) {
+      message.error(data?.message);
+    } else if (data?.code === 401) {
+      notification.error({
+        message: data?.message,
+        description: data?.message,
+        duration: 3,
+      });
+      authorizationUtil.removeAll();
+      redirectToLogin();
+    } else if (data?.code !== 0) {
+      notification.error({
+        message: `${i18n.t('message.hint')} : ${data?.code}`,
+        description: data?.message,
+        duration: 3,
+      });
+    }
   }
   return response;
 });

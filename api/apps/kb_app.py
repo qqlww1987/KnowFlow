@@ -17,6 +17,11 @@ import json
 import os
 
 from flask import request
+try:
+    manager  # type: ignore
+except NameError:  # pragma: no cover
+    from flask import Blueprint
+    manager = Blueprint('kb', __name__)
 from flask_login import login_required, current_user
 
 from api.db.services import duplicate_name
@@ -35,6 +40,7 @@ from rag.nlp import search
 from api.constants import DATASET_NAME_LIMIT
 from rag.settings import PAGERANK_FLD
 from rag.utils.storage_factory import STORAGE_IMPL
+from api.utils.rbac_utils import kb_read_required, kb_write_required, kb_admin_required, check_rbac_permission, RBACResourceType, RBACPermissionType
 
 
 @manager.route('/create', methods=['post'])  # noqa: F821
@@ -68,6 +74,18 @@ def create():
         req["embd_id"] = t.embd_id
         if not KnowledgebaseService.save(**req):
             return get_data_error_result()
+        # 保持旧返回不变，同时在后台尝试为创建者授予该 KB 的 admin 角色（不影响返回）
+        try:
+            from api.utils.rbac_utils import grant_role_to_user, RBACResourceType
+            grant_role_to_user(
+                user_id=current_user.id,
+                role_code="kb_admin",
+                resource_type=RBACResourceType.KNOWLEDGEBASE,
+                resource_id=req["id"],
+                tenant_id=current_user.id,
+            )
+        except Exception:
+            pass
         return get_json_result(data={"kb_id": req["id"]})
     except Exception as e:
         return server_error_response(e)
@@ -75,6 +93,7 @@ def create():
 
 @manager.route('/update', methods=['post'])  # noqa: F821
 @login_required
+@kb_write_required(resource_id_param='kb_id')
 @validate_request("kb_id", "name", "description", "parser_id")
 @not_allowed_parameters("id", "tenant_id", "created_by", "create_time", "update_time", "create_date", "update_date", "created_by")
 def update():
@@ -138,6 +157,7 @@ def update():
 
 @manager.route('/detail', methods=['GET'])  # noqa: F821
 @login_required
+@kb_read_required(resource_id_param='kb_id')
 def detail():
     kb_id = request.args["kb_id"]
     try:
@@ -194,6 +214,7 @@ def list_kbs():
 
 @manager.route('/rm', methods=['post'])  # noqa: F821
 @login_required
+@kb_admin_required(resource_id_param='kb_id')
 @validate_request("kb_id")
 def rm():
     req = request.json
@@ -236,6 +257,7 @@ def rm():
 
 @manager.route('/<kb_id>/tags', methods=['GET'])  # noqa: F821
 @login_required
+@kb_read_required(resource_id_param='kb_id')
 def list_tags(kb_id):
     if not KnowledgebaseService.accessible(kb_id, current_user.id):
         return get_json_result(
@@ -253,7 +275,8 @@ def list_tags(kb_id):
 def list_tags_from_kbs():
     kb_ids = request.args.get("kb_ids", "").split(",")
     for kb_id in kb_ids:
-        if not KnowledgebaseService.accessible(kb_id, current_user.id):
+        # Only RBAC: 检查 kb_read 权限
+        if not check_rbac_permission(current_user.id, RBACResourceType.KNOWLEDGEBASE, kb_id, RBACPermissionType.KB_READ):
             return get_json_result(
                 data=False,
                 message='No authorization.',
@@ -266,6 +289,7 @@ def list_tags_from_kbs():
 
 @manager.route('/<kb_id>/rm_tags', methods=['POST'])  # noqa: F821
 @login_required
+@kb_write_required(resource_id_param='kb_id')
 def rm_tags(kb_id):
     req = request.json
     if not KnowledgebaseService.accessible(kb_id, current_user.id):
@@ -286,6 +310,7 @@ def rm_tags(kb_id):
 
 @manager.route('/<kb_id>/rename_tag', methods=['POST'])  # noqa: F821
 @login_required
+@kb_write_required(resource_id_param='kb_id')
 def rename_tags(kb_id):
     req = request.json
     if not KnowledgebaseService.accessible(kb_id, current_user.id):
@@ -305,6 +330,7 @@ def rename_tags(kb_id):
 
 @manager.route('/<kb_id>/knowledge_graph', methods=['GET'])  # noqa: F821
 @login_required
+@kb_read_required(resource_id_param='kb_id')
 def knowledge_graph(kb_id):
     if not KnowledgebaseService.accessible(kb_id, current_user.id):
         return get_json_result(
@@ -344,6 +370,7 @@ def knowledge_graph(kb_id):
 
 @manager.route('/<kb_id>/knowledge_graph', methods=['DELETE'])  # noqa: F821
 @login_required
+@kb_write_required(resource_id_param='kb_id')
 def delete_knowledge_graph(kb_id):
     if not KnowledgebaseService.accessible(kb_id, current_user.id):
         return get_json_result(
