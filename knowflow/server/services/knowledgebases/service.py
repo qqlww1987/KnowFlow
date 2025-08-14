@@ -90,7 +90,61 @@ class KnowledgebaseService:
         cursor.close()
         conn.close()
 
+        # 为每个知识库添加权限统计信息
+        for kb in results:
+            permission_stats = cls.get_knowledgebase_permission_stats(kb['id'])
+            kb['permission_stats'] = permission_stats
+
         return {"list": results, "total": total}
+
+    @classmethod
+    def get_knowledgebase_permission_stats(cls, kb_id):
+        """获取知识库的权限统计信息"""
+        conn = cls._get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        
+        try:
+            # 统计用户权限数量
+            user_count_query = """
+                SELECT COUNT(DISTINCT ur.user_id) as user_count
+                FROM rbac_user_roles ur
+                JOIN rbac_roles r ON ur.role_id = r.id
+                WHERE r.code IN ('kb_admin', 'kb_writer', 'kb_reader')
+                AND ur.resource_id = %s
+                AND ur.is_active = 1
+            """
+            cursor.execute(user_count_query, (kb_id,))
+            user_result = cursor.fetchone()
+            user_count = user_result['user_count'] if user_result else 0
+            
+            # 统计团队权限数量
+            team_count_query = """
+                SELECT COUNT(DISTINCT team_id) as team_count
+                FROM rbac_team_roles
+                WHERE role_code IN ('kb_admin', 'kb_writer', 'kb_reader')
+                AND resource_id = %s
+                AND is_active = 1
+            """
+            cursor.execute(team_count_query, (kb_id,))
+            team_result = cursor.fetchone()
+            team_count = team_result['team_count'] if team_result else 0
+            
+            return {
+                'user_count': user_count,
+                'team_count': team_count,
+                'total_count': user_count + team_count
+            }
+            
+        except Exception as e:
+            print(f"获取知识库权限统计失败: {e}")
+            return {
+                'user_count': 0,
+                'team_count': 0,
+                'total_count': 0
+            }
+        finally:
+            cursor.close()
+            conn.close()
 
     @classmethod
     def get_knowledgebase_detail(cls, kb_id):

@@ -49,6 +49,11 @@ interface KnowledgeBaseData {
   token_num: number;
   create_time: string;
   create_date: string;
+  permission_stats?: {
+    user_count: number;
+    team_count: number;
+    total_count: number;
+  };
 }
 
 interface LogItem {
@@ -509,15 +514,39 @@ const KnowledgeManagementPage = () => {
       ),
     },
     {
-      title: '权限',
-      dataIndex: 'permission',
-      key: 'permission',
-      width: 100,
-      render: (permission: string) => (
-        <Tag color={permission === 'me' ? 'green' : 'orange'}>
-          {permission === 'me' ? '个人' : '团队'}
-        </Tag>
-      ),
+      title: '权限配置',
+      dataIndex: 'permission_stats',
+      key: 'permission_stats',
+      width: 120,
+      render: (
+        stats:
+          | { user_count: number; team_count: number; total_count: number }
+          | undefined,
+      ) => {
+        if (!stats || stats.total_count === 0) {
+          return <Tag color="gray">未配置</Tag>;
+        }
+
+        const parts = [];
+        if (stats.user_count > 0) {
+          parts.push(`${stats.user_count}用户`);
+        }
+        if (stats.team_count > 0) {
+          parts.push(`${stats.team_count}团队`);
+        }
+
+        return (
+          <Tag
+            color="blue"
+            title={`权限分配详情：
+• ${stats.user_count}个直接用户权限
+• ${stats.team_count}个团队权限（影响团队内所有成员）
+• 点击"权限"按钮查看详细配置`}
+          >
+            {parts.join(' ')}
+          </Tag>
+        );
+      },
     },
     {
       title: '创建时间',

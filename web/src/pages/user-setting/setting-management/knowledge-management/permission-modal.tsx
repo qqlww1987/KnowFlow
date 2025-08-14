@@ -535,10 +535,14 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
         </ul>
         <div style={{ marginTop: 8, fontSize: '12px', color: '#666' }}>
           <p style={{ margin: '0 0 4px 0' }}>
-            <strong>说明：</strong>
+            <strong>权限配置说明：</strong>
           </p>
           <p style={{ margin: '0 0 4px 0' }}>
-            • 团队权限授予后，该团队的所有成员都将自动获得相应权限
+            • <strong>用户权限</strong>：直接为特定用户分配的权限
+          </p>
+          <p style={{ margin: '0 0 4px 0' }}>
+            • <strong>团队权限</strong>
+            ：为整个团队分配的权限，团队内所有成员自动继承
           </p>
           <p style={{ margin: '0', color: '#1890ff' }}>
             • 超级管理员自动拥有所有知识库的完全权限，无需单独分配
