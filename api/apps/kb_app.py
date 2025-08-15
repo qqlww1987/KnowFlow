@@ -196,12 +196,14 @@ def list_kbs():
         if not owner_ids:
             tenants = TenantService.get_joined_tenants_by_user_id(current_user.id)
             tenants = [m["tenant_id"] for m in tenants]
-            kbs, total = KnowledgebaseService.get_by_tenant_ids(
+            # Use RBAC-enabled method for permission checking
+            kbs, total = KnowledgebaseService.get_by_tenant_ids_with_rbac(
                 tenants, current_user.id, page_number,
                 items_per_page, orderby, desc, keywords, parser_id)
         else:
             tenants = owner_ids
-            kbs, total = KnowledgebaseService.get_by_tenant_ids(
+            # Use RBAC-enabled method for permission checking
+            kbs, total = KnowledgebaseService.get_by_tenant_ids_with_rbac(
                 tenants, current_user.id, 0,
                 0, orderby, desc, keywords, parser_id)
             kbs = [kb for kb in kbs if kb["tenant_id"] in tenants]

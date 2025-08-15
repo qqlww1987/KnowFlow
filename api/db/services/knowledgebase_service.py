@@ -127,6 +127,112 @@ class KnowledgebaseService(CommonService):
 
     @classmethod
     @DB.connection_context()
+    def get_by_tenant_ids_with_rbac(cls, joined_tenant_ids, user_id,
+                                   page_number, items_per_page,
+                                   orderby, desc, keywords,
+                                   parser_id=None
+                                   ):
+        # Get knowledge bases with RBAC permission checking
+        # Args:
+        #     joined_tenant_ids: List of tenant IDs
+        #     user_id: Current user ID
+        #     page_number: Page number for pagination
+        #     items_per_page: Number of items per page
+        #     orderby: Field to order by
+        #     desc: Boolean indicating descending order
+        #     keywords: Search keywords
+        #     parser_id: Optional parser ID filter
+        # Returns:
+        #     Tuple of (knowledge_base_list, total_count)
+        
+        # RBAC HTTP API integration
+        # Import RBAC utilities
+        from api.utils.rbac_utils import check_rbac_permission, RBACResourceType, RBACPermissionType
+        
+        print("Using unified RBAC utilities for permission checks")
+        
+        fields = [
+            cls.model.id,
+            cls.model.avatar,
+            cls.model.name,
+            cls.model.language,
+            cls.model.description,
+            cls.model.tenant_id,
+            cls.model.permission,
+            cls.model.doc_num,
+            cls.model.token_num,
+            cls.model.chunk_num,
+            cls.model.parser_id,
+            cls.model.embd_id,
+            User.nickname,
+            User.avatar.alias('tenant_avatar'),
+            cls.model.update_time
+        ]
+        
+        # Build base query
+        base_query = cls.model.select(*fields).join(User, on=(cls.model.tenant_id == User.id)).where(
+            cls.model.status == StatusEnum.VALID.value
+        )
+        
+        # Apply keyword filter
+        if keywords:
+            base_query = base_query.where(fn.LOWER(cls.model.name).contains(keywords.lower()))
+        
+        # Apply parser filter
+        if parser_id:
+            base_query = base_query.where(cls.model.parser_id == parser_id)
+        
+        # Get all knowledge bases first
+        all_kbs = list(base_query.dicts())
+        print(f"Found {len(all_kbs)} knowledge bases in database")
+        
+        # Filter by permissions
+        accessible_kbs = []
+        for kb in all_kbs:
+            kb_id = kb['id']
+            tenant_id = kb['tenant_id']
+            
+            # Check traditional tenant-based access
+            has_tenant_access = (
+                (tenant_id in joined_tenant_ids and kb['permission'] == TenantPermission.TEAM.value) or
+                (tenant_id == user_id)
+            )
+            print(f"KB {kb_id}: tenant_access={has_tenant_access}, tenant_id={tenant_id}, user_id={user_id}, joined_tenants={joined_tenant_ids}")
+            
+            # Check RBAC permissions using unified utilities
+            has_rbac_access = check_rbac_permission(
+                user_id=user_id,
+                resource_type=RBACResourceType.KNOWLEDGEBASE,
+                resource_id=kb_id,
+                permission_type=RBACPermissionType.KB_READ,
+                tenant_id='default'
+            )
+            print(f"KB {kb_id}: RBAC check result={has_rbac_access}")
+            
+            # Include KB if user has either tenant-based or RBAC access
+            if has_tenant_access or has_rbac_access:
+                accessible_kbs.append(kb)
+                print(f"KB {kb_id}: GRANTED access")
+            else:
+                print(f"KB {kb_id}: DENIED access")
+        
+        # Apply sorting
+        if orderby and hasattr(cls.model, orderby):
+            reverse_sort = desc if isinstance(desc, bool) else (desc == 'true' or desc == True)
+            accessible_kbs.sort(key=lambda x: x.get(orderby, ''), reverse=reverse_sort)
+        
+        total_count = len(accessible_kbs)
+        
+        # Apply pagination
+        if page_number and items_per_page:
+            start_idx = (page_number - 1) * items_per_page
+            end_idx = start_idx + items_per_page
+            accessible_kbs = accessible_kbs[start_idx:end_idx]
+        
+        return accessible_kbs, total_count
+    
+    @classmethod
+    @DB.connection_context()
     def get_by_tenant_ids(cls, joined_tenant_ids, user_id,
                           page_number, items_per_page,
                           orderby, desc, keywords,
