@@ -1,3 +1,4 @@
+# 背景
 1. 本项目是一个 RAG 系统，/Users/zxwei/zhishi/KnowFlow/knowflow 是独立的微服务，提供 rbac http server 端实现给到主项目使用，如果需要用到该目录下的服务，需要通过  source /Users/zxwei/zhishi/KnowFlow/knowflow/server/venv/bin/activate ，然后 python3.10 来执行脚本。
 
 
@@ -8,7 +9,9 @@
 3. 主项目提供了一个管理页面，只允许超级管理员可见和操作。
 
 
-我的需求如下，请帮我实现：
+# 需求
+我的需求如下，请帮我实现，注意 knowflow 的 /api/v1 下面的接口，不要做任何的权限检查，因为这是超级管理员可见的界面。权限的检查控制应该在主项目里。
+前端页面用户管理、团队管理、知识库管理都是有的，你需要再现有页面基础上在其列表上新增操作按钮进行实现。
 
 
 # RBAC 权限管理需求文档

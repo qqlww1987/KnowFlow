@@ -6,7 +6,9 @@ import {
   KeyOutlined,
   PlusOutlined,
   ReloadOutlined,
+  SafetyCertificateOutlined,
   SearchOutlined,
+  UserOutlined,
 } from '@ant-design/icons';
 import {
   Button,
@@ -16,6 +18,7 @@ import {
   Modal,
   Pagination,
   Popconfirm,
+  Select,
   Space,
   Table,
   message,
@@ -44,11 +47,17 @@ const UserManagementPage = () => {
   const [searchForm] = Form.useForm();
   const [userForm] = Form.useForm();
   const [passwordForm] = Form.useForm();
+  const [roleForm] = Form.useForm();
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: 10,
     total: 0,
   });
+  const [roleModalVisible, setRoleModalVisible] = useState(false);
+  const [permissionModalVisible, setPermissionModalVisible] = useState(false);
+  const [roles, setRoles] = useState([]);
+  const [userRoles, setUserRoles] = useState([]);
+  const [userPermissions, setUserPermissions] = useState([]);
 
   // 模拟用户数据
   // const mockUsers: UserData[] = [
@@ -182,6 +191,60 @@ const UserManagementPage = () => {
     setResetPasswordModalVisible(true);
   };
 
+  const handleAssignRole = async (user: UserData) => {
+    setEditingUser(user);
+    setCurrentUserId(user.id);
+    try {
+      // 获取所有角色
+      const rolesRes = await request.get('/api/v1/rbac/roles');
+      setRoles(rolesRes.data.data || []);
+
+      // 获取用户当前角色
+      const userRolesRes = await request.get(
+        `/api/v1/rbac/users/${user.id}/roles`,
+      );
+      setUserRoles(userRolesRes.data.data || []);
+
+      roleForm.setFieldsValue({
+        roleIds: (userRolesRes.data.data || []).map((role: any) => role.id),
+      });
+      setRoleModalVisible(true);
+    } catch (error) {
+      message.error('获取角色信息失败');
+    }
+  };
+
+  const handleViewPermissions = async (user: UserData) => {
+    setEditingUser(user);
+    setCurrentUserId(user.id);
+    try {
+      const res = await request.get(
+        `/api/permissions/user/${user.id}/effective`,
+      );
+      setUserPermissions(res.data.data || []);
+      setPermissionModalVisible(true);
+    } catch (error) {
+      message.error('获取用户权限失败');
+    }
+  };
+
+  const handleRoleSubmit = async () => {
+    try {
+      const values = await roleForm.validateFields();
+      setLoading(true);
+      await request.post(`/api/v1/rbac/users/${currentUserId}/roles`, {
+        roleIds: values.roleIds,
+      });
+      message.success('角色分配成功');
+      setRoleModalVisible(false);
+      await loadUserData();
+    } catch (error) {
+      message.error('角色分配失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleUserSubmit = async () => {
     try {
       const values = await userForm.validateFields();
@@ -266,6 +329,22 @@ const UserManagementPage = () => {
           >
             重置密码
           </Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<UserOutlined />}
+            onClick={() => handleAssignRole(record)}
+          >
+            分配角色
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<SafetyCertificateOutlined />}
+            onClick={() => handleViewPermissions(record)}
+          >
+            查看权限
+          </Button>
           <Popconfirm
             title="确定删除这个用户吗？"
             onConfirm={() => handleDeleteUser(record.id)}
@@ -313,7 +392,6 @@ const UserManagementPage = () => {
           </Form.Item>
         </Form>
       </Card>
-
       {/* 操作区域 */}
       <Card className={styles.tableCard}>
         <div className={styles.tableHeader}>
@@ -372,8 +450,83 @@ const UserManagementPage = () => {
           />
         </div>
       </Card>
-
-      {/* 用户编辑/创建模态框 */}
+      {/* 角色分配模态框 */}
+      <Modal
+        title="分配角色"
+        open={roleModalVisible}
+        onOk={handleRoleSubmit}
+        onCancel={() => setRoleModalVisible(false)}
+        confirmLoading={loading}
+      >
+        <Form form={roleForm} layout="vertical">
+          <Form.Item
+            name="roleIds"
+            label="选择角色"
+            rules={[{ required: true, message: '请选择至少一个角色' }]}
+          >
+            <Select
+              mode="multiple"
+              placeholder="请选择角色"
+              style={{ width: '100%' }}
+            >
+              {roles.map((role: any) => (
+                <Select.Option key={role.id} value={role.id}>
+                  {role.name} - {role.description}
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+        </Form>
+      </Modal>
+      {/* 权限查看模态框 */}
+      <Modal
+        title={`用户权限 - ${editingUser?.username}`}
+        open={permissionModalVisible}
+        onCancel={() => setPermissionModalVisible(false)}
+        footer={[
+          <Button key="close" onClick={() => setPermissionModalVisible(false)}>
+            关闭
+          </Button>,
+        ]}
+        width={800}
+      >
+        <Table
+          dataSource={userPermissions}
+          columns={[
+            {
+              title: '资源类型',
+              dataIndex: 'resource_type',
+              key: 'resource_type',
+            },
+            {
+              title: '资源ID',
+              dataIndex: 'resource_id',
+              key: 'resource_id',
+            },
+            {
+              title: '权限',
+              dataIndex: 'permission',
+              key: 'permission',
+            },
+            {
+              title: '来源',
+              dataIndex: 'source',
+              key: 'source',
+              render: (source: string) => {
+                const sourceMap: { [key: string]: string } = {
+                  user_role: '用户角色',
+                  team_role: '团队角色',
+                  direct: '直接分配',
+                };
+                return sourceMap[source] || source;
+              },
+            },
+          ]}
+          pagination={false}
+          size="small"
+        />
+      </Modal>
+      {/* 用户编辑/创建模态框 */}*/
       <Modal
         title={editingUser ? '编辑用户' : '新建用户'}
         open={userModalVisible}
@@ -412,7 +565,6 @@ const UserManagementPage = () => {
           )}
         </Form>
       </Modal>
-
       {/* 重置密码模态框 */}
       <Modal
         title="重置密码"

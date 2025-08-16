@@ -4,7 +4,9 @@ import {
   DeleteOutlined,
   PlusOutlined,
   ReloadOutlined,
+  SafetyCertificateOutlined,
   SearchOutlined,
+  SettingOutlined,
   TeamOutlined,
   UserOutlined,
 } from '@ant-design/icons';
@@ -65,13 +67,18 @@ const TeamManagementPage = () => {
 
   const [memberModalVisible, setMemberModalVisible] = useState(false);
   const [addMemberModalVisible, setAddMemberModalVisible] = useState(false);
+  const [roleModalVisible, setRoleModalVisible] = useState(false);
+  const [permissionModalVisible, setPermissionModalVisible] = useState(false);
   const [currentTeam, setCurrentTeam] = useState<TeamData | null>(null);
   const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
   const [selectedUser, setSelectedUser] = useState<string>('');
   const [selectedRole, setSelectedRole] = useState<string>('normal');
+  const [teamRoles, setTeamRoles] = useState([]);
+  const [teamPermissions, setTeamPermissions] = useState([]);
 
   const [searchForm] = Form.useForm();
   const [addMemberForm] = Form.useForm();
+  const [roleForm] = Form.useForm();
 
   const [pagination, setPagination] = useState({
     current: 1,
@@ -167,6 +174,50 @@ const TeamManagementPage = () => {
     loadTeamMembers(team.id);
   };
 
+  const handleTeamRoleManagement = async (team: TeamData) => {
+    setCurrentTeam(team);
+    try {
+      const res = await request.get(`/api/v1/rbac/teams/${team.id}/roles`);
+      setTeamRoles(res.data.data || []);
+      roleForm.setFieldsValue({
+        roleIds: (res.data.data || []).map((role: any) => role.id),
+      });
+      setRoleModalVisible(true);
+    } catch (error: any) {
+      message.error('获取团队角色失败');
+    }
+  };
+
+  const handleTeamPermissions = async (team: TeamData) => {
+    setCurrentTeam(team);
+    try {
+      const res = await request.get(
+        `/api/permissions/team/${team.id}/effective`,
+      );
+      setTeamPermissions(res.data.data || []);
+      setPermissionModalVisible(true);
+    } catch (error: any) {
+      message.error('获取团队权限失败');
+    }
+  };
+
+  const handleRoleSubmit = async () => {
+    try {
+      const values = await roleForm.validateFields();
+      setLoading(true);
+      await request.post(`/api/v1/rbac/teams/${currentTeam?.id}/roles`, {
+        roleIds: values.roleIds,
+      });
+      message.success('团队角色配置成功');
+      setRoleModalVisible(false);
+      await loadTeamData();
+    } catch (error: any) {
+      message.error('团队角色配置失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAddMember = () => {
     setSelectedUser('');
     setSelectedRole('normal');
@@ -223,7 +274,7 @@ const TeamManagementPage = () => {
     } catch (error) {
       console.error('添加成员错误:', error); // 调试日志
       message.error(
-        `添加团队成员失败: ${error.message || JSON.stringify(error)}`,
+        `添加团队成员失败: ${error instanceof Error ? error.message : JSON.stringify(error)}`,
       );
     } finally {
       setMemberLoading(false);
@@ -309,6 +360,22 @@ const TeamManagementPage = () => {
             onClick={() => handleManageMembers(record)}
           >
             成员管理
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<SettingOutlined />}
+            onClick={() => handleTeamRoleManagement(record)}
+          >
+            角色配置
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<SafetyCertificateOutlined />}
+            onClick={() => handleTeamPermissions(record)}
+          >
+            查看权限
           </Button>
           <Popconfirm
             title="确定删除这个团队吗？"
@@ -541,6 +608,83 @@ const TeamManagementPage = () => {
             </Radio.Group>
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* 团队角色配置模态框 */}
+      <Modal
+        title={`${currentTeam?.name || ''} - 角色配置`}
+        open={roleModalVisible}
+        onOk={handleRoleSubmit}
+        onCancel={() => setRoleModalVisible(false)}
+        confirmLoading={loading}
+      >
+        <Form form={roleForm} layout="vertical">
+          <Form.Item
+            name="roleIds"
+            label="选择角色"
+            rules={[{ required: true, message: '请选择至少一个角色' }]}
+          >
+            <Select
+              mode="multiple"
+              placeholder="请选择角色"
+              style={{ width: '100%' }}
+            >
+              {teamRoles.map((role: any) => (
+                <Select.Option key={role.id} value={role.id}>
+                  {role.name} - {role.description}
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 团队权限查看模态框 */}
+      <Modal
+        title={`${currentTeam?.name || ''} - 团队权限`}
+        open={permissionModalVisible}
+        onCancel={() => setPermissionModalVisible(false)}
+        footer={[
+          <Button key="close" onClick={() => setPermissionModalVisible(false)}>
+            关闭
+          </Button>,
+        ]}
+        width={800}
+      >
+        <Table
+          dataSource={teamPermissions}
+          columns={[
+            {
+              title: '资源类型',
+              dataIndex: 'resource_type',
+              key: 'resource_type',
+            },
+            {
+              title: '资源ID',
+              dataIndex: 'resource_id',
+              key: 'resource_id',
+            },
+            {
+              title: '权限',
+              dataIndex: 'permission',
+              key: 'permission',
+            },
+            {
+              title: '来源',
+              dataIndex: 'source',
+              key: 'source',
+              render: (source: string) => {
+                const sourceMap: { [key: string]: string } = {
+                  team_role: '团队角色',
+                  direct: '直接分配',
+                };
+                return sourceMap[source] || source;
+              },
+            },
+          ]}
+          pagination={false}
+          size="small"
+        />
       </Modal>
     </div>
   );

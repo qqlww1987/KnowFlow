@@ -109,7 +109,7 @@ class KnowledgebaseService:
                 SELECT COUNT(DISTINCT ur.user_id) as user_count
                 FROM rbac_user_roles ur
                 JOIN rbac_roles r ON ur.role_id = r.id
-                WHERE r.code IN ('kb_admin', 'kb_writer', 'kb_reader')
+                WHERE r.code IN ('admin', 'editor', 'viewer')
                 AND ur.resource_id = %s
                 AND ur.is_active = 1
             """
@@ -121,7 +121,7 @@ class KnowledgebaseService:
             team_count_query = """
                 SELECT COUNT(DISTINCT team_id) as team_count
                 FROM rbac_team_roles
-                WHERE role_code IN ('kb_admin', 'kb_writer', 'kb_reader')
+                WHERE role_code IN ('admin', 'editor', 'viewer')
                 AND resource_id = %s
                 AND is_active = 1
             """
@@ -1412,9 +1412,9 @@ class KnowledgebaseService:
                 ur.resource_id as kb_id,
                 r.code as role_code,
                 CASE 
-                    WHEN r.code = 'kb_admin' THEN 'admin'
-                    WHEN r.code = 'kb_writer' THEN 'write' 
-                    WHEN r.code = 'kb_reader' THEN 'read'
+                    WHEN r.code = 'admin' THEN 'admin'
+                    WHEN r.code = 'editor' THEN 'write' 
+                    WHEN r.code = 'viewer' THEN 'read'
                     ELSE r.code
                 END as permission_level,
                 ur.granted_at,
@@ -1423,7 +1423,7 @@ class KnowledgebaseService:
             JOIN rbac_roles r ON ur.role_id = r.id  
             WHERE ur.resource_id = %s 
                 AND ur.is_active = 1
-                AND r.code IN ('kb_admin', 'kb_writer', 'kb_reader')
+                AND r.code IN ('admin', 'editor', 'viewer')
             """
             
             cursor.execute(user_query, (kb_id,))
@@ -1436,9 +1436,9 @@ class KnowledgebaseService:
                 tr.resource_id as kb_id,
                 tr.role_code,
                 CASE 
-                    WHEN tr.role_code = 'kb_admin' THEN 'admin'
-                    WHEN tr.role_code = 'kb_writer' THEN 'write'
-                    WHEN tr.role_code = 'kb_reader' THEN 'read'
+                    WHEN tr.role_code = 'admin' THEN 'admin'
+                    WHEN tr.role_code = 'editor' THEN 'write'
+                    WHEN tr.role_code = 'viewer' THEN 'read'
                     ELSE tr.role_code
                 END as permission_level,
                 tr.granted_at,
@@ -1446,7 +1446,7 @@ class KnowledgebaseService:
             FROM rbac_team_roles tr
             WHERE tr.resource_id = %s 
                 AND tr.is_active = 1
-                AND tr.role_code IN ('kb_admin', 'kb_writer', 'kb_reader')
+                AND tr.role_code IN ('admin', 'editor', 'viewer')
             """
             
             cursor.execute(team_query, (kb_id,))
@@ -1520,9 +1520,9 @@ class KnowledgebaseService:
             
             # 权限级别映射到角色代码
             role_mapping = {
-                'read': 'kb_reader',
-                'write': 'kb_writer', 
-                'admin': 'kb_admin'
+                'read': 'viewer',
+                'write': 'editor', 
+                'admin': 'admin'
             }
             
             role_code = role_mapping.get(permission_level)

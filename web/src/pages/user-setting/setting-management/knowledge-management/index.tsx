@@ -16,6 +16,7 @@ import {
   ReloadOutlined,
   SearchOutlined,
   SettingOutlined,
+  TeamOutlined,
   ThunderboltOutlined,
   UserOutlined,
 } from '@ant-design/icons';
@@ -100,8 +101,17 @@ const KnowledgeManagementPage = () => {
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [viewModalVisible, setViewModalVisible] = useState(false);
   const [permissionModalVisible, setPermissionModalVisible] = useState(false);
+  const [userPermissionModalVisible, setUserPermissionModalVisible] =
+    useState(false);
+  const [teamPermissionModalVisible, setTeamPermissionModalVisible] =
+    useState(false);
   const [currentKnowledgeBase, setCurrentKnowledgeBase] =
     useState<KnowledgeBaseData | null>(null);
+  const [userPermissions, setUserPermissions] = useState<any[]>([]);
+  const [teamPermissions, setTeamPermissions] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [teams, setTeams] = useState<any[]>([]);
+  const [permissionForm] = Form.useForm();
   const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
   const [batchParsingLoading, setBatchParsingLoading] = useState(false);
   const [searchValue, setSearchValue] = useState('');
@@ -172,6 +182,126 @@ const KnowledgeManagementPage = () => {
     }
     setCurrentKnowledgeBase(record);
     setPermissionModalVisible(true);
+  };
+
+  const handleUserPermissionManagement = async (record: KnowledgeBaseData) => {
+    if (!userId) return;
+    const allowed = await checkKbPermission({
+      userId,
+      kbId: record.id,
+      permission: 'admin',
+    });
+    if (!allowed) {
+      message.warning('您没有管理该知识库权限');
+      return;
+    }
+    setCurrentKnowledgeBase(record);
+    try {
+      // 获取所有用户
+      const usersRes = await request.get('/api/v1/users');
+      setUsers(usersRes.data.data || []);
+
+      // 获取知识库用户权限
+      const permRes = await request.get(
+        `/api/v1/knowledgebases/${record.id}/permissions`,
+      );
+      setUserPermissions(permRes.data.user_permissions || []);
+
+      setUserPermissionModalVisible(true);
+    } catch (error) {
+      message.error('获取用户权限失败');
+    }
+  };
+
+  const handleTeamPermissionManagement = async (record: KnowledgeBaseData) => {
+    if (!userId) return;
+    const allowed = await checkKbPermission({
+      userId,
+      kbId: record.id,
+      permission: 'admin',
+    });
+    if (!allowed) {
+      message.warning('您没有管理该知识库权限');
+      return;
+    }
+    setCurrentKnowledgeBase(record);
+    try {
+      // 获取所有团队
+      const teamsRes = await request.get('/api/v1/teams');
+      setTeams(teamsRes.data.data || []);
+
+      // 获取知识库团队权限
+      const permRes = await request.get(
+        `/api/v1/knowledgebases/${record.id}/permissions`,
+      );
+      setTeamPermissions(permRes.data.team_permissions || []);
+
+      setTeamPermissionModalVisible(true);
+    } catch (error) {
+      message.error('获取团队权限失败');
+    }
+  };
+
+  const handleGrantUserPermission = async (values: any) => {
+    try {
+      setLoading(true);
+      await request.post(
+        `/api/v1/knowledgebases/${currentKnowledgeBase?.id}/permissions/users`,
+        values,
+      );
+      message.success('用户权限分配成功');
+      await handleUserPermissionManagement(currentKnowledgeBase!);
+    } catch (error) {
+      message.error('用户权限分配失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGrantTeamPermission = async (values: any) => {
+    try {
+      setLoading(true);
+      await request.post(
+        `/api/v1/knowledgebases/${currentKnowledgeBase?.id}/permissions/teams`,
+        values,
+      );
+      message.success('团队权限分配成功');
+      await handleTeamPermissionManagement(currentKnowledgeBase!);
+    } catch (error) {
+      message.error('团队权限分配失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRevokeUserPermission = async (userId: string) => {
+    try {
+      setLoading(true);
+      await request.delete(
+        `/api/v1/knowledgebases/${currentKnowledgeBase?.id}/permissions/users/${userId}`,
+      );
+      message.success('用户权限撤销成功');
+      await handleUserPermissionManagement(currentKnowledgeBase!);
+    } catch (error) {
+      message.error('用户权限撤销失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRevokeTeamPermission = async (teamId: string) => {
+    try {
+      setLoading(true);
+      await request.delete(
+        `/api/v1/knowledgebases/${currentKnowledgeBase?.id}/permissions/teams/${teamId}`,
+      );
+      message.success('团队权限撤销成功');
+      await handleTeamPermissionManagement(currentKnowledgeBase!);
+    } catch (error) {
+      message.error('团队权限撤销失败');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // 解析进度弹窗相关状态
@@ -647,6 +777,22 @@ const KnowledgeManagementPage = () => {
             onClick={() => handleOpenPermissionModal(record)}
           >
             权限
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<UserOutlined />}
+            onClick={() => handleUserPermissionManagement(record)}
+          >
+            用户权限
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<TeamOutlined />}
+            onClick={() => handleTeamPermissionManagement(record)}
+          >
+            团队权限
           </Button>
           <Popconfirm
             title={`确定要删除知识库 "${record.name}" 吗？`}
@@ -1175,6 +1321,160 @@ const KnowledgeManagementPage = () => {
         knowledgeBaseId={currentKnowledgeBase?.id || ''}
         knowledgeBaseName={currentKnowledgeBase?.name || ''}
       />
+
+      {/* 用户权限管理模态框 */}
+      <Modal
+        title={`用户权限管理 - ${currentKnowledgeBase?.name || ''}`}
+        open={userPermissionModalVisible}
+        onCancel={() => setUserPermissionModalVisible(false)}
+        width={800}
+        footer={[
+          <Button
+            key="close"
+            onClick={() => setUserPermissionModalVisible(false)}
+          >
+            关闭
+          </Button>,
+        ]}
+      >
+        <div>
+          <Form
+            form={permissionForm}
+            layout="inline"
+            onFinish={handleGrantUserPermission}
+            style={{ marginBottom: 16 }}
+          >
+            <Form.Item
+              name="userId"
+              rules={[{ required: true, message: '请选择用户' }]}
+            >
+              <Select placeholder="选择用户" style={{ width: 200 }}>
+                {users.map((user) => (
+                  <Option key={user.id} value={user.id}>
+                    {user.username}
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+            <Form.Item
+              name="permission"
+              rules={[{ required: true, message: '请选择权限' }]}
+            >
+              <Select placeholder="选择权限" style={{ width: 120 }}>
+                <Option value="read">只读</Option>
+                <Option value="write">读写</Option>
+                <Option value="admin">管理员</Option>
+              </Select>
+            </Form.Item>
+            <Form.Item>
+              <Button type="primary" htmlType="submit" loading={loading}>
+                分配权限
+              </Button>
+            </Form.Item>
+          </Form>
+
+          <Table
+            columns={[
+              { title: '用户名', dataIndex: 'username', key: 'username' },
+              { title: '权限', dataIndex: 'permission', key: 'permission' },
+              {
+                title: '操作',
+                key: 'action',
+                render: (_, record) => (
+                  <Button
+                    type="link"
+                    danger
+                    onClick={() => handleRevokeUserPermission(record.userId)}
+                  >
+                    撤销
+                  </Button>
+                ),
+              },
+            ]}
+            dataSource={userPermissions}
+            rowKey="userId"
+            size="small"
+            pagination={false}
+          />
+        </div>
+      </Modal>
+
+      {/* 团队权限管理模态框 */}
+      <Modal
+        title={`团队权限管理 - ${currentKnowledgeBase?.name || ''}`}
+        open={teamPermissionModalVisible}
+        onCancel={() => setTeamPermissionModalVisible(false)}
+        width={800}
+        footer={[
+          <Button
+            key="close"
+            onClick={() => setTeamPermissionModalVisible(false)}
+          >
+            关闭
+          </Button>,
+        ]}
+      >
+        <div>
+          <Form
+            form={permissionForm}
+            layout="inline"
+            onFinish={handleGrantTeamPermission}
+            style={{ marginBottom: 16 }}
+          >
+            <Form.Item
+              name="teamId"
+              rules={[{ required: true, message: '请选择团队' }]}
+            >
+              <Select placeholder="选择团队" style={{ width: 200 }}>
+                {teams.map((team) => (
+                  <Option key={team.id} value={team.id}>
+                    {team.name}
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+            <Form.Item
+              name="permission"
+              rules={[{ required: true, message: '请选择权限' }]}
+            >
+              <Select placeholder="选择权限" style={{ width: 120 }}>
+                <Option value="read">只读</Option>
+                <Option value="write">读写</Option>
+                <Option value="admin">管理员</Option>
+              </Select>
+            </Form.Item>
+            <Form.Item>
+              <Button type="primary" htmlType="submit" loading={loading}>
+                分配权限
+              </Button>
+            </Form.Item>
+          </Form>
+
+          <Table
+            columns={[
+              { title: '团队名', dataIndex: 'teamName', key: 'teamName' },
+              { title: '权限', dataIndex: 'permission', key: 'permission' },
+              {
+                title: '操作',
+                key: 'action',
+                render: (_, record) => (
+                  <Button
+                    type="link"
+                    danger
+                    onClick={() => handleRevokeTeamPermission(record.teamId)}
+                  >
+                    撤销
+                  </Button>
+                ),
+              },
+            ]}
+            dataSource={teamPermissions}
+            rowKey="teamId"
+            size="small"
+            pagination={false}
+          />
+        </div>
+      </Modal>
     </div>
   );
 };

@@ -91,6 +91,14 @@ def require_permission(permission_code: str,
                 logger.info(f"[PERMISSION] 权限检查开始，路径: {request.path}, 方法: {request.method}")
                 logger.info(f"[PERMISSION] 请求headers: {dict(request.headers)}")
                 
+                # 检查是否为/api/v1路径，如果是则跳过权限检查
+                if request.path.startswith('/api/v1/'):
+                    logger.info(f"[PERMISSION] /api/v1路径跳过权限检查，直接执行: {request.path}")
+                    # 设置默认的用户信息到g对象中
+                    g.current_user_id = "default_user"
+                    g.current_tenant_id = "default_tenant"
+                    return func(*args, **kwargs)
+                
                 # 1. 提取用户ID
                 user_id, tenant_id = extract_user_from_token()
                 logger.info(f"[PERMISSION] 提取用户信息 - user_id: {user_id}, tenant_id: {tenant_id}")

@@ -19,6 +19,8 @@ from models.rbac_models import (
     SYSTEM_ROLES, SYSTEM_PERMISSIONS, TeamRole
 )
 import uuid
+from .permission_calculator import permission_calculator, PermissionResult
+from .permission_cache import CachedPermissionService, permission_cache
 
 logger = logging.getLogger(__name__)
 
@@ -470,6 +472,62 @@ class PermissionService:
             logger.error(f"获取用户角色失败: {e}")
             return []
     
+    def get_all_roles(self, tenant_id: Optional[str] = None) -> List[Role]:
+        """
+        获取所有可用的角色
+        
+        Args:
+            tenant_id: 租户ID
+            
+        Returns:
+            List[Role]: 角色列表
+        """
+        try:
+            db = self._get_db_connection()
+            cursor = db.cursor()
+            
+            sql = """
+                 SELECT id, name, code, description, role_type,
+                        is_system, tenant_id, created_at, updated_at
+                 FROM rbac_roles
+             """
+            params = []
+            
+            if tenant_id:
+                sql += " WHERE (tenant_id = %s OR tenant_id IS NULL)"
+                params.append(tenant_id)
+            
+            sql += " ORDER BY name"
+            
+            cursor.execute(sql, params)
+            rows = cursor.fetchall()
+            
+            roles = []
+            for row in rows:
+                role = Role(
+                    id=row[0],
+                    name=row[1],
+                    code=row[2],
+                    description=row[3],
+                    role_type=RoleType(row[4]),
+                    is_system=bool(row[5]),
+                    tenant_id=row[6],
+                    created_at=row[7],
+                    updated_at=row[8]
+                )
+                roles.append(role)
+            
+            return roles
+            
+        except Exception as e:
+            logger.error(f"获取所有角色失败: {e}")
+            return []
+        finally:
+            if cursor:
+                cursor.close()
+            if db:
+                db.close()
+    
     def get_user_permissions(self, user_id: str, resource_type: Optional[ResourceType] = None,
                            tenant_id: Optional[str] = None) -> List[Permission]:
         """
@@ -853,6 +911,124 @@ class PermissionService:
                 cursor.close()
             if conn:
                 conn.close()
+
+    def check_permission_enhanced(self, user_id: str, resource_type: ResourceType, 
+                                 resource_id: str, permission_type: PermissionType,
+                                 tenant_id: Optional[str] = None, use_cache: bool = True) -> PermissionResult:
+        """
+        增强的权限检查方法，使用新的权限计算器和缓存机制
+        
+        Args:
+            user_id: 用户ID
+            resource_type: 资源类型
+            resource_id: 资源ID
+            permission_type: 权限类型
+            tenant_id: 租户ID
+            use_cache: 是否使用缓存
+            
+        Returns:
+            PermissionResult: 详细的权限检查结果
+        """
+        tenant_id = tenant_id or "default"
+        
+        # 使用缓存权限服务
+        cached_service = CachedPermissionService(permission_calculator, permission_cache)
+        return cached_service.check_permission(
+            user_id, resource_type, resource_id, permission_type, tenant_id, use_cache
+        )
+    
+    def get_user_effective_permissions(self, user_id: str, resource_type: ResourceType, 
+                                     resource_id: str, tenant_id: str = "default") -> Dict[str, PermissionResult]:
+        """
+        获取用户对特定资源的所有有效权限
+        
+        Args:
+            user_id: 用户ID
+            resource_type: 资源类型
+            resource_id: 资源ID
+            tenant_id: 租户ID
+            
+        Returns:
+            Dict[str, PermissionResult]: 权限名称到权限结果的映射
+        """
+        return permission_calculator.get_user_effective_permissions(
+            user_id, resource_type, resource_id, tenant_id
+        )
+    
+    def compare_user_permissions(self, user1_id: str, user2_id: str, 
+                               resource_type: ResourceType, resource_id: str,
+                               tenant_id: str = "default") -> Dict[str, any]:
+        """
+        比较两个用户的权限差异
+        
+        Args:
+            user1_id: 第一个用户ID
+            user2_id: 第二个用户ID
+            resource_type: 资源类型
+            resource_id: 资源ID
+            tenant_id: 租户ID
+            
+        Returns:
+            Dict[str, any]: 权限比较结果
+        """
+        return permission_calculator.compare_user_permissions(
+            user1_id, user2_id, resource_type, resource_id, tenant_id
+        )
+    
+    def invalidate_user_permissions(self, user_id: str) -> int:
+        """
+        使用户权限缓存失效
+        
+        Args:
+            user_id: 用户ID
+            
+        Returns:
+            int: 失效的缓存条目数
+        """
+        return permission_cache.invalidate_user(user_id)
+    
+    def invalidate_resource_permissions(self, resource_type: ResourceType, resource_id: str) -> int:
+        """
+        使资源权限缓存失效
+        
+        Args:
+            resource_type: 资源类型
+            resource_id: 资源ID
+            
+        Returns:
+            int: 失效的缓存条目数
+        """
+        return permission_cache.invalidate_resource(resource_type, resource_id)
+    
+    def invalidate_team_permissions(self, team_id: str) -> int:
+        """
+        使团队权限缓存失效
+        
+        Args:
+            team_id: 团队ID
+            
+        Returns:
+            int: 失效的缓存条目数
+        """
+        return permission_cache.invalidate_team(team_id)
+    
+    def get_permission_cache_stats(self) -> Dict[str, any]:
+        """
+        获取权限缓存统计信息
+        
+        Returns:
+            Dict[str, any]: 缓存统计信息
+        """
+        return permission_cache.get_stats()
+    
+    def cleanup_permission_cache(self) -> int:
+        """
+        清理过期的权限缓存
+        
+        Returns:
+            int: 清理的缓存条目数
+        """
+        return permission_cache.cleanup_expired()
 
 # 全局权限服务实例
 permission_service = PermissionService()

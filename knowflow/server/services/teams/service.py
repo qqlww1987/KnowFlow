@@ -107,6 +107,105 @@ def get_team_by_id(team_id):
         print(f"数据库错误: {err}")
         return None
 
+def create_team(name, owner_id, description=""):
+    """创建新团队"""
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG)
+        cursor = conn.cursor()
+        
+        # 生成团队ID
+        team_id = generate_uuid()
+        current_datetime = datetime.now()
+        create_time = int(current_datetime.timestamp() * 1000)
+        current_date = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
+        
+        # 创建团队记录
+        team_query = """
+        INSERT INTO tenant (
+            id, name, create_time, create_date, update_time, update_date, 
+            status, credit, description
+        ) VALUES (
+            %s, %s, %s, %s, %s, %s, %s, %s, %s
+        )
+        """
+        team_data = (
+            team_id, name, create_time, current_date, create_time, current_date,
+            1, 0, description
+        )
+        cursor.execute(team_query, team_data)
+        
+        # 添加创建者为团队所有者
+        member_query = """
+        INSERT INTO user_tenant (
+            id, create_time, create_date, update_time, update_date, user_id,
+            tenant_id, role, invited_by, status
+        ) VALUES (
+            %s, %s, %s, %s, %s, %s,
+            %s, %s, %s, %s
+        )
+        """
+        member_data = (
+            generate_uuid(), create_time, current_date, create_time, current_date, owner_id,
+            team_id, "owner", "system", 1
+        )
+        cursor.execute(member_query, member_data)
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return team_id
+        
+    except mysql.connector.Error as err:
+        print(f"创建团队错误: {err}")
+        return None
+
+
+def update_team(team_id, name=None, description=None):
+    """更新团队信息"""
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG)
+        cursor = conn.cursor()
+        
+        # 构建更新字段
+        update_fields = []
+        params = []
+        
+        if name is not None:
+            update_fields.append("name = %s")
+            params.append(name)
+            
+        if description is not None:
+            update_fields.append("description = %s")
+            params.append(description)
+            
+        if not update_fields:
+            return False
+            
+        # 添加更新时间
+        current_datetime = datetime.now()
+        update_time = int(current_datetime.timestamp() * 1000)
+        update_date = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
+        
+        update_fields.extend(["update_time = %s", "update_date = %s"])
+        params.extend([update_time, update_date, team_id])
+        
+        query = f"UPDATE tenant SET {', '.join(update_fields)} WHERE id = %s"
+        cursor.execute(query, params)
+        
+        affected_rows = cursor.rowcount
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return affected_rows > 0
+        
+    except mysql.connector.Error as err:
+        print(f"更新团队错误: {err}")
+        return False
+
+
 def delete_team(team_id):
     """删除指定ID的团队"""
     try:

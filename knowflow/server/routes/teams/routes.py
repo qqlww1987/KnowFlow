@@ -1,5 +1,10 @@
 from flask import jsonify, request
-from services.teams.service import get_teams_with_pagination, get_team_by_id, delete_team, get_team_members, add_team_member, remove_team_member
+from services.teams.service import (
+    get_teams_with_pagination, get_team_by_id, create_team, update_team, delete_team,
+    get_team_members, add_team_member, remove_team_member
+)
+from services.rbac.permission_service import permission_service
+from models.rbac_models import ResourceType, RoleType
 from .. import teams_bp
 
 @teams_bp.route('', methods=['GET'])
@@ -175,4 +180,109 @@ def remove_team_member_route(team_id, user_id):
         return jsonify({
             "code": 500,
             "message": f"移除团队成员失败: {str(e)}"
+        }), 500
+
+
+@teams_bp.route('/<string:team_id>/roles', methods=['GET'])
+def get_team_roles_route(team_id):
+    """获取团队角色列表"""
+    try:
+        roles = permission_service.get_team_roles(team_id)
+        return jsonify({
+            "code": 0,
+            "data": roles,
+            "message": "获取团队角色成功"
+        })
+    except Exception as e:
+        return jsonify({
+            "code": 500,
+            "message": f"获取团队角色失败: {str(e)}"
+        }), 500
+
+
+@teams_bp.route('/<string:team_id>/roles', methods=['POST'])
+def grant_team_role_route(team_id):
+    """为团队分配角色"""
+    try:
+        data = request.get_json()
+        role_code = data.get('role_code')
+        resource_type = data.get('resource_type')
+        resource_id = data.get('resource_id')
+        tenant_id = data.get('tenant_id')
+        granted_by = data.get('granted_by')
+        expires_at = data.get('expires_at')
+        
+        if not all([role_code, resource_type, granted_by]):
+            return jsonify({
+                "code": 400,
+                "message": "缺少必要参数: role_code, resource_type, granted_by"
+            }), 400
+        
+        success = permission_service.grant_team_role(
+            team_id=team_id,
+            role_code=role_code,
+            resource_type=ResourceType(resource_type),
+            resource_id=resource_id,
+            tenant_id=tenant_id,
+            granted_by=granted_by,
+            expires_at=expires_at
+        )
+        
+        if success:
+            return jsonify({
+                "code": 0,
+                "message": "团队角色分配成功"
+            })
+        else:
+            return jsonify({
+                "code": 400,
+                "message": "团队角色分配失败"
+            }), 400
+            
+    except Exception as e:
+        return jsonify({
+            "code": 500,
+            "message": f"团队角色分配失败: {str(e)}"
+        }), 500
+
+
+@teams_bp.route('/<string:team_id>/roles', methods=['DELETE'])
+def revoke_team_role_route(team_id):
+    """撤销团队角色"""
+    try:
+        data = request.get_json()
+        role_code = data.get('role_code')
+        resource_type = data.get('resource_type')
+        resource_id = data.get('resource_id')
+        tenant_id = data.get('tenant_id')
+        
+        if not all([role_code, resource_type]):
+            return jsonify({
+                "code": 400,
+                "message": "缺少必要参数: role_code, resource_type"
+            }), 400
+        
+        success = permission_service.revoke_team_role(
+            team_id=team_id,
+            role_code=role_code,
+            resource_type=ResourceType(resource_type),
+            resource_id=resource_id,
+            tenant_id=tenant_id
+        )
+        
+        if success:
+            return jsonify({
+                "code": 0,
+                "message": "团队角色撤销成功"
+            })
+        else:
+            return jsonify({
+                "code": 400,
+                "message": "团队角色撤销失败"
+            }), 400
+            
+    except Exception as e:
+        return jsonify({
+            "code": 500,
+            "message": f"团队角色撤销失败: {str(e)}"
         }), 500

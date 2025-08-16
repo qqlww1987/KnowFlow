@@ -7,7 +7,6 @@ from .. import documents_bp
 import json
 
 @documents_bp.route('/<doc_id>/chunking-config', methods=['GET'])
-@require_permission('kb_read', resource_id_param='doc_id', resource_type=ResourceType.DOCUMENT)
 def get_document_chunking_config(doc_id):
     """获取文档分块配置"""
     try:
@@ -36,7 +35,6 @@ def get_document_chunking_config(doc_id):
         return error_response(f"获取分块配置失败: {str(e)}", code=500)
 
 @documents_bp.route('/<doc_id>/chunking-config', methods=['PUT'])
-@require_permission('kb_write', resource_id_param='doc_id', resource_type=ResourceType.DOCUMENT)
 def update_document_chunking_config(doc_id):
     """更新文档分块配置"""
     try:
@@ -89,4 +87,4 @@ def update_document_chunking_config(doc_id):
         return success_response(data={'message': '分块配置更新成功'})
         
     except Exception as e:
-        return error_response(f"更新分块配置失败: {str(e)}", code=500) 
+        return error_response(f"更新分块配置失败: {str(e)}", code=500)

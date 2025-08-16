@@ -24,7 +24,6 @@ def get_knowledgebase_list():
         return error_response(str(e))
 
 @knowledgebase_bp.route('/<string:kb_id>', methods=['GET'])
-@require_permission('kb_read', resource_id_param='kb_id')
 def get_knowledgebase_detail(kb_id):
     """获取知识库详情"""
     try:
@@ -38,7 +37,7 @@ def get_knowledgebase_detail(kb_id):
         return error_response(str(e))
 
 @knowledgebase_bp.route('', methods=['POST'])
-@require_permission('kb_admin')
+@require_permission('admin')
 def create_knowledgebase():
     """创建知识库"""
     try:
@@ -53,7 +52,7 @@ def create_knowledgebase():
         return error_response(str(e))
 
 @knowledgebase_bp.route('/<string:kb_id>', methods=['PUT'])
-@require_permission('kb_write', resource_id_param='kb_id')
+@require_permission('editor', resource_id_param='kb_id')
 def update_knowledgebase(kb_id):
     """更新知识库"""
     try:
@@ -69,7 +68,7 @@ def update_knowledgebase(kb_id):
         return error_response(str(e))
 
 @knowledgebase_bp.route('/<string:kb_id>', methods=['DELETE'])
-@require_permission('kb_admin', resource_id_param='kb_id')
+@require_permission('admin', resource_id_param='kb_id')
 def delete_knowledgebase(kb_id):
     """删除知识库"""
     try:
@@ -83,7 +82,7 @@ def delete_knowledgebase(kb_id):
         return error_response(str(e))
 
 @knowledgebase_bp.route('/batch', methods=['DELETE'])
-@require_permission('kb_admin')
+@require_permission('admin')
 def batch_delete_knowledgebase():
     """批量删除知识库"""
     try:
@@ -100,7 +99,6 @@ def batch_delete_knowledgebase():
 
 # 权限管理相关接口
 @knowledgebase_bp.route('/<string:kb_id>/permissions', methods=['GET'])
-@require_permission('kb_admin', resource_id_param='kb_id')
 def get_knowledgebase_permissions(kb_id):
     """获取知识库权限列表"""
     try:
@@ -111,7 +109,6 @@ def get_knowledgebase_permissions(kb_id):
         return error_response(f"获取权限列表失败: {str(e)}", code=500)
 
 @knowledgebase_bp.route('/<string:kb_id>/permissions/users', methods=['POST'])
-@require_permission('kb_admin', resource_id_param='kb_id')
 def grant_user_permission(kb_id):
     """为用户授予知识库权限"""
     try:
@@ -131,9 +128,9 @@ def grant_user_permission(kb_id):
         
         # 映射权限级别到角色代码
         role_mapping = {
-            'admin': 'kb_admin',
-            'write': 'kb_writer', 
-            'read': 'kb_reader'
+            'admin': 'admin',
+            'write': 'editor', 
+            'read': 'viewer'
         }
         role_code = role_mapping[permission_level]
         
@@ -159,12 +156,12 @@ def grant_user_permission(kb_id):
         return error_response(f"授予权限失败: {str(e)}", code=500)
 
 @knowledgebase_bp.route('/<string:kb_id>/permissions/users/<string:user_id>', methods=['DELETE'])
-@require_permission('kb_admin', resource_id_param='kb_id')
+@require_permission('admin', resource_id_param='kb_id')
 def revoke_user_permission(kb_id, user_id):
     """撤销用户的知识库权限"""
     try:
-        # 直接撤销用户在该知识库的所有知识库相关权限
-        kb_roles = ['kb_admin', 'kb_writer', 'kb_reader']
+        # 直接撤销用户在该知识库的所有相关权限
+        kb_roles = ['admin', 'editor', 'viewer']
         revoked_count = 0
         
         for role_code in kb_roles:
@@ -192,7 +189,6 @@ def revoke_user_permission(kb_id, user_id):
         return error_response(f"撤销权限失败: {str(e)}", code=500)
 
 @knowledgebase_bp.route('/<string:kb_id>/permissions/teams', methods=['POST'])
-@require_permission('kb_admin', resource_id_param='kb_id')
 def grant_team_permission(kb_id):
     """为团队授予知识库权限"""
     try:
@@ -230,7 +226,7 @@ def grant_team_permission(kb_id):
         return error_response(f"授予团队权限失败: {str(e)}", code=500)
 
 @knowledgebase_bp.route('/<string:kb_id>/permissions/teams/<string:team_id>', methods=['DELETE'])
-@require_permission('kb_admin', resource_id_param='kb_id')
+@require_permission('admin', resource_id_param='kb_id')
 def revoke_team_permission(kb_id, team_id):
     """撤销团队的知识库权限"""
     try:
@@ -292,7 +288,6 @@ def check_knowledgebase_permission(kb_id):
         return error_response(f"权限检查失败: {str(e)}", code=500)
 
 @knowledgebase_bp.route('/<string:kb_id>/documents', methods=['GET'])
-@require_permission('kb_read', resource_id_param='kb_id')
 def get_knowledgebase_documents(kb_id):
     """获取知识库下的文档列表"""
     try:
@@ -310,7 +305,6 @@ def get_knowledgebase_documents(kb_id):
         return error_response(str(e))
 
 @knowledgebase_bp.route('/<string:kb_id>/documents', methods=['POST'])
-@require_permission('kb_write', resource_id_param='kb_id')
 def add_documents_to_knowledgebase(kb_id):
     """添加文档到知识库"""
     try:
@@ -346,7 +340,7 @@ def add_documents_to_knowledgebase(kb_id):
         return error_response(str(e), code=500)
 
 @knowledgebase_bp.route('/documents/<string:doc_id>', methods=['DELETE', 'OPTIONS'])
-@require_permission('kb_write', resource_id_param='doc_id', resource_type=ResourceType.DOCUMENT)
+@require_permission('editor', resource_id_param='doc_id', resource_type=ResourceType.DOCUMENT)
 def delete_document(doc_id):
     """删除文档"""
     # 处理 OPTIONS 预检请求

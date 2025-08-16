@@ -35,10 +35,6 @@ class RoleType(Enum):
     VIEWER = "viewer"
     USER = "user"
     GUEST = "guest"
-    # 知识库专用角色
-    KB_ADMIN = "kb_admin"
-    KB_WRITER = "kb_writer"
-    KB_READER = "kb_reader"
 
 @dataclass
 class Role:
@@ -147,23 +143,7 @@ SYSTEM_ROLES = {
     },
     RoleType.GUEST: {
         "name": "访客",
-        "description": "受限的查看权限",
-        "permissions": []
-    },
-    # 知识库专用角色
-    RoleType.KB_ADMIN: {
-        "name": "知识库管理员",
-        "description": "可以新增和删除知识库，管理知识库所有内容",
-        "permissions": [PermissionType.READ, PermissionType.WRITE, PermissionType.DELETE, PermissionType.ADMIN, PermissionType.SHARE]
-    },
-    RoleType.KB_WRITER: {
-        "name": "知识库编辑者",
-        "description": "可以上传文件以及文件解析，编辑知识库内容",
-        "permissions": [PermissionType.READ, PermissionType.WRITE, PermissionType.SHARE]
-    },
-    RoleType.KB_READER: {
-        "name": "知识库查看者",
-        "description": "可以查看知识库内的文档内容",
+        "description": "访客权限，只能查看公开资源",
         "permissions": [PermissionType.READ]
     }
 }

@@ -28,8 +28,8 @@
 ### 后端实现
 
 #### RBAC 模型
-- **角色 (Roles)**: `kb_admin`, `kb_writer`, `kb_reader`
-- **权限 (Permissions)**: `kb_read`, `kb_write`, `kb_delete`, `kb_admin`, `kb_share`
+- **角色 (Roles)**: `admin`, `editor`, `viewer`
+- **权限 (Permissions)**: `read`, `write`, `delete`, `admin`, `share`
 - **资源类型 (Resource Types)**: `knowledgebase`, `document`
 
 #### 核心服务
@@ -198,4 +198,4 @@ curl -X GET http://localhost:5000/api/v1/knowledgebases/kb_123/permissions
 
 1. 导入权限装饰器: `from services.rbac.permission_decorator import require_permission`
 2. 在需要权限验证的路由上添加装饰器
-3. 根据业务需求定义相应的权限代码 
+3. 根据业务需求定义相应的权限代码

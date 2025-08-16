@@ -103,7 +103,7 @@ def get_user_roles(user_id: str):
     获取用户的所有角色
     """
     try:
-        tenant_id = request.args.get('tenant_id', g.current_tenant_id)
+        tenant_id = request.args.get('tenant_id', 'default')
         roles = permission_service.get_user_roles(user_id, tenant_id)
         
         roles_data = []
@@ -140,7 +140,7 @@ def get_user_permissions(user_id: str):
     获取用户的所有权限
     """
     try:
-        tenant_id = request.args.get('tenant_id', g.current_tenant_id)
+        tenant_id = request.args.get('tenant_id', 'default')
         resource_type_param = request.args.get('resource_type')
         
         resource_type = None
@@ -206,7 +206,7 @@ def grant_role_to_user(user_id: str):
             }), 400
         
         role_code = data['role_code']
-        tenant_id = data.get('tenant_id', g.current_tenant_id)
+        tenant_id = data.get('tenant_id', 'default')
         resource_type = None
         resource_id = data.get('resource_id')
         expires_at = None
@@ -235,7 +235,7 @@ def grant_role_to_user(user_id: str):
         success = permission_service.grant_role_to_user(
             user_id=user_id,
             role_code=role_code,
-            granted_by=g.current_user_id,
+            granted_by='system',
             tenant_id=tenant_id,
             resource_type=resource_type,
             resource_id=resource_id,
@@ -247,7 +247,7 @@ def grant_role_to_user(user_id: str):
                 'message': f'成功为用户 {user_id} 授予角色 {role_code}',
                 'user_id': user_id,
                 'role_code': role_code,
-                'granted_by': g.current_user_id,
+                'granted_by': 'system',
                 'tenant_id': tenant_id,
                 'resource_type': resource_type.value if resource_type else None,
                 'resource_id': resource_id,
@@ -273,7 +273,7 @@ def revoke_role_from_user(user_id: str, role_code: str):
     撤销用户角色
     """
     try:
-        tenant_id = request.args.get('tenant_id', g.current_tenant_id)
+        tenant_id = request.args.get('tenant_id', 'default')
         resource_id = request.args.get('resource_id')
         
         success = permission_service.revoke_role_from_user(
@@ -357,6 +357,43 @@ def simple_permission_check():
         logger.error(f"简化权限检查失败: {e}")
         return jsonify({
             'error': '权限检查失败',
+            'message': str(e),
+            'code': 500
+        }), 500
+
+@rbac_bp.route('/roles', methods=['GET'])
+def get_all_roles():
+    """
+    获取所有角色列表
+    """
+    try:
+        roles = permission_service.get_all_roles()
+        
+        roles_data = []
+        for role in roles:
+            roles_data.append({
+                'id': role.id,
+                'name': role.name,
+                'code': role.code,
+                'description': role.description,
+                'role_type': role.role_type.value,
+                'is_system': role.is_system,
+                'tenant_id': role.tenant_id,
+                'created_at': role.created_at.isoformat() if role.created_at else None,
+                'updated_at': role.updated_at.isoformat() if role.updated_at else None
+            })
+        
+        return jsonify({
+            'success': True,
+            'data': roles_data,
+            'total': len(roles_data)
+        })
+        
+    except Exception as e:
+        logger.error(f"获取角色列表失败: {e}")
+        return jsonify({
+            'success': False,
+            'error': '获取角色列表失败',
             'message': str(e),
             'code': 500
         }), 500

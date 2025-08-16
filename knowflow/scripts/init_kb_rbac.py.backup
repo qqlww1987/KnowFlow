@@ -209,9 +209,9 @@ def init_role_permissions():
                 
                 # 创建角色权限关联
                 cursor.execute("""
-                    INSERT INTO rbac_role_permissions (role_id, permission_id, is_active, created_at)
-                    VALUES (%s, %s, %s, %s)
-                """, (role_id, perm_id, 1, datetime.now()))
+                    INSERT INTO rbac_role_permissions (role_id, permission_id, created_at)
+                    VALUES (%s, %s, %s)
+                """, (role_id, perm_id, datetime.now()))
                 
                 print(f"关联角色 {role_code} 与权限 {perm_code}")
         
@@ -299,4 +299,4 @@ if __name__ == "__main__":
     init_kb_permissions()
     init_role_permissions()
     
-    print("知识库RBAC系统初始化完成！") 
+    print("知识库RBAC系统初始化完成！")
