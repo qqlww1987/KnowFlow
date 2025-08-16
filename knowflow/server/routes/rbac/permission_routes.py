@@ -57,9 +57,23 @@ def get_user_effective_permissions(user_id):
     获取用户的有效权限
     """
     try:
-        resource_type = ResourceType(request.args.get('resource_type'))
+        resource_type_str = request.args.get('resource_type')
         resource_id = request.args.get('resource_id')
         tenant_id = request.args.get('tenant_id', 'default')
+        
+        if not resource_type_str:
+            return jsonify({
+                'success': False,
+                'message': 'resource_type参数不能为空'
+            }), 400
+        
+        try:
+            resource_type = ResourceType(resource_type_str)
+        except ValueError:
+            return jsonify({
+                'success': False,
+                'message': f'无效的resource_type: {resource_type_str}'
+            }), 400
         
         permissions = permission_service.get_user_effective_permissions(
             user_id, resource_type, resource_id, tenant_id

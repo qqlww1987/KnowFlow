@@ -62,12 +62,36 @@ def create_team_route():
     """创建团队的API端点"""
     try:
         data = request.json
-        team_id = create_team(team_data=data)
-        return jsonify({
-            "code": 0,
-            "data": {"id": team_id},
-            "message": "团队创建成功"
-        })
+        if not data:
+            return jsonify({
+                "code": 400,
+                "message": "请求数据不能为空"
+            }), 400
+        
+        name = data.get('name')
+        owner_id = data.get('owner_id')
+        description = data.get('description', '')
+        
+        if not name or not owner_id:
+            return jsonify({
+                "code": 400,
+                "message": "团队名称和所有者ID不能为空"
+            }), 400
+        
+        team_id = create_team(name=name, owner_id=owner_id, description=description)
+        
+        if team_id:
+            return jsonify({
+                "code": 0,
+                "data": {"id": team_id},
+                "message": "团队创建成功"
+            })
+        else:
+            return jsonify({
+                "code": 500,
+                "message": "创建团队失败"
+            }), 500
+            
     except Exception as e:
         return jsonify({
             "code": 500,
@@ -188,9 +212,27 @@ def get_team_roles_route(team_id):
     """获取团队角色列表"""
     try:
         roles = permission_service.get_team_roles(team_id)
+        
+        # 序列化角色数据
+        serialized_roles = []
+        for role in roles:
+            serialized_role = {
+                "id": role.id,
+                "team_id": role.team_id,
+                "role_code": role.role_code,
+                "resource_type": role.resource_type.value if role.resource_type else None,
+                "resource_id": role.resource_id,
+                "tenant_id": role.tenant_id,
+                "granted_by": role.granted_by,
+                "granted_at": role.granted_at,
+                "expires_at": role.expires_at,
+                "is_active": role.is_active
+            }
+            serialized_roles.append(serialized_role)
+        
         return jsonify({
             "code": 0,
-            "data": roles,
+            "data": serialized_roles,
             "message": "获取团队角色成功"
         })
     except Exception as e:
@@ -224,8 +266,7 @@ def grant_team_role_route(team_id):
             resource_type=ResourceType(resource_type),
             resource_id=resource_id,
             tenant_id=tenant_id,
-            granted_by=granted_by,
-            expires_at=expires_at
+            granted_by=granted_by
         )
         
         if success:

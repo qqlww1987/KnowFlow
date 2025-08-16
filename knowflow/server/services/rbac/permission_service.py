@@ -911,6 +911,87 @@ class PermissionService:
                 cursor.close()
             if conn:
                 conn.close()
+    
+    def get_all_permissions(self) -> List[Dict]:
+        """获取所有权限列表"""
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor(dictionary=True)
+            
+            query = """
+            SELECT id, code, name, description, resource_type, permission_type, 
+                   created_at, updated_at
+            FROM rbac_permissions 
+            ORDER BY resource_type, permission_type
+            """
+            
+            cursor.execute(query)
+            permissions = cursor.fetchall()
+            
+            # 转换为更友好的格式
+            result = []
+            for perm in permissions:
+                result.append({
+                    'id': perm['id'],
+                    'code': perm['code'],
+                    'name': perm['name'],
+                    'description': perm['description'],
+                    'resource_type': perm['resource_type'],
+                    'permission_type': perm['permission_type'],
+                    'created_at': perm['created_at'].isoformat() if perm['created_at'] else None,
+                    'updated_at': perm['updated_at'].isoformat() if perm['updated_at'] else None
+                })
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"获取所有权限失败: {str(e)}")
+            return []
+        finally:
+            if conn:
+                conn.close()
+    
+    def get_role_permissions(self, role_code: str) -> List[Dict]:
+        """获取角色权限映射"""
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor(dictionary=True)
+            
+            query = """
+            SELECT p.id, p.code, p.name, p.description, p.resource_type, p.permission_type,
+                   r.name as role_name, rp.created_at
+            FROM rbac_role_permissions rp
+            JOIN rbac_roles r ON rp.role_id = r.id
+            JOIN rbac_permissions p ON rp.permission_id = p.id
+            WHERE r.code = %s
+            ORDER BY p.resource_type, p.permission_type
+            """
+            
+            cursor.execute(query, (role_code,))
+            permissions = cursor.fetchall()
+            
+            # 转换为更友好的格式
+            result = []
+            for perm in permissions:
+                result.append({
+                    'permission_id': perm['id'],
+                    'permission_code': perm['code'],
+                    'permission_name': perm['name'],
+                    'description': perm['description'],
+                    'resource_type': perm['resource_type'],
+                    'permission_type': perm['permission_type'],
+                    'role_name': perm['role_name'],
+                    'granted_at': perm['created_at'].isoformat() if perm['created_at'] else None
+                })
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"获取角色权限映射失败: {str(e)}")
+            return []
+        finally:
+            if conn:
+                conn.close()
 
     def check_permission_enhanced(self, user_id: str, resource_type: ResourceType, 
                                  resource_id: str, permission_type: PermissionType,

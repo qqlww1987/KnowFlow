@@ -123,14 +123,14 @@ def create_team(name, owner_id, description=""):
         team_query = """
         INSERT INTO tenant (
             id, name, create_time, create_date, update_time, update_date, 
-            status, credit, description
+            status, credit, llm_id, embd_id, asr_id, img2txt_id, rerank_id, tts_id, parser_ids
         ) VALUES (
-            %s, %s, %s, %s, %s, %s, %s, %s, %s
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
         )
         """
         team_data = (
             team_id, name, create_time, current_date, create_time, current_date,
-            1, 0, description
+            '1', 0, '', '', '', '', '', '', ''
         )
         cursor.execute(team_query, team_data)
         
@@ -157,7 +157,12 @@ def create_team(name, owner_id, description=""):
         return team_id
         
     except mysql.connector.Error as err:
-        print(f"创建团队错误: {err}")
+        print(f"创建团队数据库错误: {err}")
+        print(f"错误代码: {err.errno}")
+        print(f"SQL状态: {err.sqlstate}")
+        return None
+    except Exception as e:
+        print(f"创建团队其他错误: {e}")
         return None
 
 

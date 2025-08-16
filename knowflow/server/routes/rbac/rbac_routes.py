@@ -211,6 +211,14 @@ def grant_role_to_user(user_id: str):
         resource_id = data.get('resource_id')
         expires_at = None
         
+        # 验证角色代码是否有效
+        valid_roles = ['super_admin', 'admin', 'editor', 'viewer', 'user']
+        if role_code not in valid_roles:
+            return jsonify({
+                'error': f'无效的角色代码: {role_code}',
+                'code': 400
+            }), 400
+        
         # 解析资源类型
         if 'resource_type' in data:
             try:
@@ -491,6 +499,32 @@ def get_my_permissions():
         return jsonify({
             'error': '获取权限失败',
             'message': str(e),
+            'code': 500
+        }), 500
+
+@rbac_bp.route('/permissions', methods=['GET'])
+def get_all_permissions():
+    """获取所有权限列表"""
+    try:
+        permissions = permission_service.get_all_permissions()
+        return jsonify(permissions)
+    except Exception as e:
+        logger.error(f"获取权限列表失败: {str(e)}")
+        return jsonify({
+            'error': f'获取权限列表失败: {str(e)}',
+            'code': 500
+        }), 500
+
+@rbac_bp.route('/roles/<role_code>/permissions', methods=['GET'])
+def get_role_permissions(role_code: str):
+    """获取角色权限映射"""
+    try:
+        permissions = permission_service.get_role_permissions(role_code)
+        return jsonify(permissions)
+    except Exception as e:
+        logger.error(f"获取角色权限映射失败: {str(e)}")
+        return jsonify({
+            'error': f'获取角色权限映射失败: {str(e)}',
             'code': 500
         }), 500
 
