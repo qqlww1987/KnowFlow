@@ -627,7 +627,7 @@ const KnowledgeManagementPage = () => {
       title: '操作',
       key: 'action',
       fixed: 'right' as const,
-      width: 180,
+      width: 220,
       render: (_: any, record: KnowledgeBaseData) => (
         <Space size="small">
           <Button
@@ -646,6 +646,18 @@ const KnowledgeManagementPage = () => {
           >
             角色
           </Button>
+          <Popconfirm
+            title="确定删除该知识库吗？"
+            description="此操作不可恢复，且其中的所有文档也将被删除"
+            okText="删除"
+            cancelText="取消"
+            okButtonProps={{ danger: true }}
+            onConfirm={() => handleDelete(record.id)}
+          >
+            <Button type="link" size="small" danger icon={<DeleteOutlined />}>
+              删除
+            </Button>
+          </Popconfirm>
         </Space>
       ),
     },

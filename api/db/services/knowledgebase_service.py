@@ -205,7 +205,7 @@ class KnowledgebaseService(CommonService):
                 resource_type=RBACResourceType.KNOWLEDGEBASE,
                 resource_id=kb_id,
                 permission_type=RBACPermissionType.KB_READ,
-                tenant_id='default'
+                tenant_id=tenant_id  # use KB's tenant to match granted roles/permissions
             )
             print(f"KB {kb_id}: RBAC check result={has_rbac_access}")
             
