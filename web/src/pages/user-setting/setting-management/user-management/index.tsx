@@ -6,7 +6,6 @@ import {
   KeyOutlined,
   PlusOutlined,
   ReloadOutlined,
-  SafetyCertificateOutlined,
   SearchOutlined,
   UserOutlined,
 } from '@ant-design/icons';
@@ -21,6 +20,7 @@ import {
   Select,
   Space,
   Table,
+  Tag,
   message,
 } from 'antd';
 import React, { useEffect, useState } from 'react';
@@ -32,6 +32,20 @@ interface UserData {
   email: string;
   createTime: string;
   updateTime: string;
+}
+
+interface Role {
+  id: string;
+  name: string;
+  code: string;
+  description: string;
+}
+
+interface UserRole {
+  id: string;
+  name: string;
+  code: string;
+  description: string;
 }
 
 const UserManagementPage = () => {
@@ -54,11 +68,33 @@ const UserManagementPage = () => {
     total: 0,
   });
   const [roleModalVisible, setRoleModalVisible] = useState(false);
-  const [permissionModalVisible, setPermissionModalVisible] = useState(false);
-  const [roles, setRoles] = useState([]);
-  const [userRoles, setUserRoles] = useState([]);
-  const [userPermissions, setUserPermissions] = useState([]);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [userRoles, setUserRoles] = useState<UserRole[]>([]);
+  const [userRolesMap, setUserRolesMap] = useState<Record<string, UserRole>>(
+    {},
+  );
 
+  // 角色优先级映射
+  const rolePriorityMap: Record<string, { priority: number; color: string }> = {
+    super_admin: { priority: 1, color: '#f50' }, // 超级管理员 - 红色
+    admin: { priority: 2, color: '#722ed1' }, // 管理员 - 紫色
+    editor: { priority: 3, color: '#1890ff' }, // 编辑者 - 蓝色
+    viewer: { priority: 4, color: '#52c41a' }, // 查看者 - 绿色
+    user: { priority: 5, color: '#d9d9d9' }, // 用户 - 灰色
+  };
+
+  // 获取最高优先级角色
+  const getHighestPriorityRole = (
+    userRolesList: UserRole[],
+  ): UserRole | null => {
+    if (!userRolesList || userRolesList.length === 0) return null;
+
+    return userRolesList.reduce((highest, current) => {
+      const currentPriority = rolePriorityMap[current.code]?.priority || 999;
+      const highestPriority = rolePriorityMap[highest.code]?.priority || 999;
+      return currentPriority < highestPriority ? current : highest;
+    });
+  };
   // 模拟用户数据
   // const mockUsers: UserData[] = [
   //   {
@@ -120,8 +156,27 @@ const UserManagementPage = () => {
         },
       });
       const data = res?.data?.data || {};
-      setUserData(data.list || []);
+      const list = data.list || [];
+      setUserData(list);
       setPagination((prev) => ({ ...prev, total: data.total || 0 }));
+
+      // 拉取每个用户的角色，构建映射
+      const rolesMap: Record<string, UserRole> = {};
+      await Promise.all(
+        (list as UserData[]).map(async (u) => {
+          try {
+            const r = await request.get(`/api/v1/rbac/users/${u.id}/roles`);
+            const rolesList = r?.data?.data ?? r?.data?.roles ?? [];
+            const highestRole = getHighestPriorityRole(rolesList);
+            if (highestRole) {
+              rolesMap[u.id] = highestRole;
+            }
+          } catch (e) {
+            // 错误情况下不设置角色
+          }
+        }),
+      );
+      setUserRolesMap(rolesMap);
     } catch (error) {
       message.error('加载用户数据失败');
     } finally {
@@ -199,14 +254,16 @@ const UserManagementPage = () => {
       const rolesRes = await request.get('/api/v1/rbac/roles');
       setRoles(rolesRes.data.data || []);
 
-      // 获取用户当前角色
+      // 获取用户当前角色（兼容不同返回结构）
       const userRolesRes = await request.get(
         `/api/v1/rbac/users/${user.id}/roles`,
       );
-      setUserRoles(userRolesRes.data.data || []);
+      const rolesList =
+        userRolesRes?.data?.data ?? userRolesRes?.data?.roles ?? [];
+      setUserRoles(rolesList);
 
       roleForm.setFieldsValue({
-        roleIds: (userRolesRes.data.data || []).map((role: any) => role.id),
+        roleId: (rolesList || []).map((role: any) => role.id)[0],
       });
       setRoleModalVisible(true);
     } catch (error) {
@@ -214,30 +271,31 @@ const UserManagementPage = () => {
     }
   };
 
-  const handleViewPermissions = async (user: UserData) => {
-    setEditingUser(user);
-    setCurrentUserId(user.id);
-    try {
-      const res = await request.get(
-        `/api/permissions/user/${user.id}/effective`,
-      );
-      setUserPermissions(res.data.data || []);
-      setPermissionModalVisible(true);
-    } catch (error) {
-      message.error('获取用户权限失败');
-    }
-  };
+  // 移除查看权限相关逻辑（handleViewPermissions 已删除）
 
   const handleRoleSubmit = async () => {
     try {
       const values = await roleForm.validateFields();
       setLoading(true);
-      await request.post(`/api/v1/rbac/users/${currentUserId}/roles`, {
-        roleIds: values.roleIds,
-      });
-      message.success('角色分配成功');
-      setRoleModalVisible(false);
-      await loadUserData();
+
+      // 修复：将选择的角色转换为后端需要的 role_code 字段，并通过 data 提交
+      if (values.roleId) {
+        const selectedRole = roles.find((role) => role.id === values.roleId);
+        if (selectedRole) {
+          await request.post(`/api/v1/rbac/users/${currentUserId}/roles`, {
+            data: {
+              role_code: selectedRole.code,
+            },
+          });
+          message.success('角色分配成功');
+          setRoleModalVisible(false);
+          await loadUserData();
+        } else {
+          message.error('选择的角色不存在');
+        }
+      } else {
+        message.warning('请选择要分配的角色');
+      }
     } catch (error) {
       message.error('角色分配失败');
     } finally {
@@ -307,6 +365,21 @@ const UserManagementPage = () => {
       key: 'updateTime',
     },
     {
+      title: '角色',
+      key: 'roles',
+      render: (_: any, record: UserData) => {
+        const role = userRolesMap[record.id];
+        if (role === undefined) return <Tag color="#d9d9d9">加载中</Tag>;
+        if (!role) return <Tag color="#d9d9d9">无角色</Tag>;
+
+        const roleConfig = rolePriorityMap[role.code] || {
+          priority: 999,
+          color: '#d9d9d9',
+        };
+        return <Tag color={roleConfig.color}>{role.name || role.code}</Tag>;
+      },
+    },
+    {
       title: '操作',
       key: 'action',
       fixed: 'right' as const,
@@ -337,14 +410,7 @@ const UserManagementPage = () => {
           >
             分配角色
           </Button>
-          <Button
-            type="link"
-            size="small"
-            icon={<SafetyCertificateOutlined />}
-            onClick={() => handleViewPermissions(record)}
-          >
-            查看权限
-          </Button>
+          {/* 移除查看权限按钮 */}
           <Popconfirm
             title="确定删除这个用户吗？"
             onConfirm={() => handleDeleteUser(record.id)}
@@ -460,15 +526,11 @@ const UserManagementPage = () => {
       >
         <Form form={roleForm} layout="vertical">
           <Form.Item
-            name="roleIds"
+            name="roleId"
             label="选择角色"
-            rules={[{ required: true, message: '请选择至少一个角色' }]}
+            rules={[{ required: true, message: '请选择一个角色' }]}
           >
-            <Select
-              mode="multiple"
-              placeholder="请选择角色"
-              style={{ width: '100%' }}
-            >
+            <Select placeholder="请选择角色" style={{ width: '100%' }}>
               {roles.map((role: any) => (
                 <Select.Option key={role.id} value={role.id}>
                   {role.name} - {role.description}
@@ -478,55 +540,8 @@ const UserManagementPage = () => {
           </Form.Item>
         </Form>
       </Modal>
-      {/* 权限查看模态框 */}
-      <Modal
-        title={`用户权限 - ${editingUser?.username}`}
-        open={permissionModalVisible}
-        onCancel={() => setPermissionModalVisible(false)}
-        footer={[
-          <Button key="close" onClick={() => setPermissionModalVisible(false)}>
-            关闭
-          </Button>,
-        ]}
-        width={800}
-      >
-        <Table
-          dataSource={userPermissions}
-          columns={[
-            {
-              title: '资源类型',
-              dataIndex: 'resource_type',
-              key: 'resource_type',
-            },
-            {
-              title: '资源ID',
-              dataIndex: 'resource_id',
-              key: 'resource_id',
-            },
-            {
-              title: '权限',
-              dataIndex: 'permission',
-              key: 'permission',
-            },
-            {
-              title: '来源',
-              dataIndex: 'source',
-              key: 'source',
-              render: (source: string) => {
-                const sourceMap: { [key: string]: string } = {
-                  user_role: '用户角色',
-                  team_role: '团队角色',
-                  direct: '直接分配',
-                };
-                return sourceMap[source] || source;
-              },
-            },
-          ]}
-          pagination={false}
-          size="small"
-        />
-      </Modal>
-      {/* 用户编辑/创建模态框 */}*/
+
+      {/* 用户编辑/创建模态框 */}
       <Modal
         title={editingUser ? '编辑用户' : '新建用户'}
         open={userModalVisible}

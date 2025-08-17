@@ -291,7 +291,7 @@ class PermissionService:
                           resource_id: Optional[str] = None,
                           expires_at: Optional[datetime] = None) -> bool:
         """
-        为用户授予角色
+        为用户授予角色（单一角色语义：同一作用域内仅保留一个角色，重复分配直接替换）
         
         Args:
             user_id: 用户ID
@@ -320,53 +320,46 @@ class PermissionService:
             
             role_id = role_result[0]
             
-            # 检查是否已存在相同的角色授权
-            check_sql = """
-                SELECT id FROM rbac_user_roles
-                WHERE user_id = %s AND role_id = %s
-            """
-            check_params = [user_id, role_id]
+            # 单一角色语义：先删除同一作用域下已有的角色，再插入新的角色
+            delete_sql = "DELETE FROM rbac_user_roles WHERE user_id = %s"
+            delete_params = [user_id]
             
             if tenant_id:
-                check_sql += " AND tenant_id = %s"
-                check_params.append(tenant_id)
-            if resource_type:
-                check_sql += " AND resource_type = %s"
-                check_params.append(resource_type.value)
-            if resource_id:
-                check_sql += " AND resource_id = %s"
-                check_params.append(resource_id)
-            
-            cursor.execute(check_sql, check_params)
-            existing = cursor.fetchone()
-            
-            if existing:
-                # 更新现有记录
-                update_sql = """
-                    UPDATE rbac_user_roles SET
-                    is_active = 1, granted_by = %s, granted_at = NOW(),
-                    expires_at = %s, updated_at = NOW()
-                    WHERE id = %s
-                """
-                cursor.execute(update_sql, (granted_by, expires_at, existing[0]))
+                delete_sql += " AND tenant_id = %s"
+                delete_params.append(tenant_id)
+            if resource_type is not None:
+                delete_sql += " AND resource_type = %s"
+                delete_params.append(resource_type.value)
             else:
-                # 插入新记录
-                insert_sql = """
-                    INSERT INTO rbac_user_roles
-                    (user_id, role_id, tenant_id, resource_type, resource_id,
-                     granted_by, granted_at, expires_at, is_active, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, NOW(), %s, 1, NOW())
-                """
-                cursor.execute(insert_sql, (
-                    user_id, role_id, tenant_id,
-                    resource_type.value if resource_type else None,
-                    resource_id, granted_by, expires_at
-                ))
+                delete_sql += " AND resource_type IS NULL"
+            if resource_id is not None:
+                delete_sql += " AND resource_id = %s"
+                delete_params.append(resource_id)
+            else:
+                delete_sql += " AND resource_id IS NULL"
             
-            logger.info(f"成功为用户 {user_id} 授予角色 {role_code}")
+            cursor.execute(delete_sql, delete_params)
+            
+            # 插入新记录
+            insert_sql = """
+                INSERT INTO rbac_user_roles
+                (user_id, role_id, tenant_id, resource_type, resource_id,
+                 granted_by, granted_at, expires_at, is_active, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, NOW(), %s, 1, NOW())
+            """
+            cursor.execute(insert_sql, (
+                user_id, role_id, tenant_id,
+                resource_type.value if resource_type else None,
+                resource_id, granted_by, expires_at
+            ))
+            
+            db.commit()
+            logger.info(f"成功为用户 {user_id} 授予角色 {role_code}（替换同域已有角色）")
             return True
             
         except Exception as e:
+            if db:
+                db.rollback()
             logger.error(f"授予角色失败: {e}")
             return False
         finally:
@@ -421,14 +414,14 @@ class PermissionService:
     
     def get_user_roles(self, user_id: str, tenant_id: Optional[str] = None) -> List[Role]:
         """
-        获取用户的所有角色
+        获取用户的角色列表（遵循单一角色语义：返回优先级最高的一个）
         
         Args:
             user_id: 用户ID
             tenant_id: 租户ID
             
         Returns:
-            List[Role]: 角色列表
+            List[Role]: 角色列表（长度最多为1）
         """
         try:
             db = self._get_db_connection()
@@ -447,6 +440,19 @@ class PermissionService:
             if tenant_id:
                 sql += " AND ur.tenant_id = %s"
                 params.append(tenant_id)
+            
+            # 仅返回一个：按角色优先级排序
+            sql += """
+                ORDER BY CASE r.code
+                    WHEN 'super_admin' THEN 1
+                    WHEN 'admin' THEN 2
+                    WHEN 'editor' THEN 3
+                    WHEN 'viewer' THEN 4
+                    WHEN 'user' THEN 5
+                    ELSE 999
+                END
+                LIMIT 1
+            """
             
             cursor.execute(sql, params)
             rows = cursor.fetchall()
@@ -726,7 +732,7 @@ class PermissionService:
                        resource_id: str = None, tenant_id: str = "default", 
                        granted_by: str = None) -> bool:
         """
-        为团队授予角色
+        为团队授予角色（单一角色语义：同一作用域内仅保留一个角色，重复分配直接替换）
         
         Args:
             team_id: 团队ID
@@ -747,6 +753,21 @@ class PermissionService:
             if not self._role_exists(role_code, tenant_id):
                 logger.error(f"角色不存在: {role_code}")
                 return False
+            
+            # 单一角色语义：删除同一作用域下已有的团队角色
+            delete_query = "DELETE FROM rbac_team_roles WHERE team_id = %s AND tenant_id = %s"
+            delete_params = [team_id, tenant_id]
+            if resource_type is not None:
+                delete_query += " AND resource_type = %s"
+                delete_params.append(resource_type.value)
+            else:
+                delete_query += " AND resource_type IS NULL"
+            if resource_id is not None:
+                delete_query += " AND resource_id = %s"
+                delete_params.append(resource_id)
+            else:
+                delete_query += " AND resource_id IS NULL"
+            cursor.execute(delete_query, delete_params)
             
             # 生成ID
             team_role_id = str(uuid.uuid4()).replace('-', '')
@@ -769,7 +790,7 @@ class PermissionService:
             ))
             
             conn.commit()
-            logger.info(f"团队角色授权成功: team_id={team_id}, role={role_code}, resource={resource_id}")
+            logger.info(f"团队角色授权成功(替换同域已有角色): team_id={team_id}, role={role_code}, resource={resource_id}")
             return True
             
         except Exception as e:
