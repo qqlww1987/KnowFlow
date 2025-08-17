@@ -84,6 +84,8 @@ const TeamManagementPage = () => {
   const [searchForm] = Form.useForm();
   const [addMemberForm] = Form.useForm();
   const [roleForm] = Form.useForm();
+  const [teamForm] = Form.useForm();
+  const [teamModalVisible, setTeamModalVisible] = useState(false);
 
   // 角色优先级映射
   const rolePriorityMap: Record<string, { priority: number; color: string }> = {
@@ -222,6 +224,35 @@ const TeamManagementPage = () => {
   const handleReset = () => {
     searchForm.resetFields();
     loadTeamData();
+  };
+
+  const handleCreateTeam = () => {
+    // 默认将当前登录用户设为团队负责人（若存在）
+    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+    teamForm.resetFields();
+    teamForm.setFieldsValue({ owner_id: userInfo?.id });
+    setTeamModalVisible(true);
+  };
+
+  const handleTeamSubmit = async () => {
+    try {
+      const values = await teamForm.validateFields();
+      setLoading(true);
+      await request.post('/api/v1/teams', {
+        data: {
+          name: values.name,
+          owner_id: values.owner_id,
+          description: values.description || '',
+        },
+      });
+      message.success('创建团队成功');
+      setTeamModalVisible(false);
+      await loadTeamData();
+    } catch (error) {
+      message.error('创建团队失败');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleManageMembers = (team: TeamData) => {
@@ -395,6 +426,26 @@ const TeamManagementPage = () => {
     }
   };
 
+  const handleBatchDelete = async () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning('请选择要删除的团队');
+      return;
+    }
+    setLoading(true);
+    try {
+      await Promise.all(
+        selectedRowKeys.map((id) => request.delete(`/api/v1/teams/${id}`)),
+      );
+      setSelectedRowKeys([]);
+      message.success(`成功删除 ${selectedRowKeys.length} 个团队`);
+      await loadTeamData();
+    } catch (error) {
+      message.error('批量删除失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const columns = [
     {
       title: '团队名称',
@@ -433,9 +484,9 @@ const TeamManagementPage = () => {
       title: '角色',
       key: 'roles',
       render: (_: any, record: TeamData) => {
-        const role = teamRolesMap[record.id];
-        if (role === undefined) return <Tag color="#d9d9d9">加载中</Tag>;
-        if (!role) return <Tag color="#d9d9d9">无角色</Tag>;
+        const role =
+          teamRolesMap[record.id] ||
+          ({ id: '', name: '用户', code: 'user', description: '' } as Role);
 
         const roleConfig = rolePriorityMap[role.code] || {
           priority: 999,
@@ -567,10 +618,30 @@ const TeamManagementPage = () => {
       <Card className={styles.tableCard}>
         <div className={styles.tableHeader}>
           <Space>
-            <Button icon={<ReloadOutlined />} onClick={loadTeamData}>
-              刷新
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={handleCreateTeam}
+            >
+              新建团队
             </Button>
+            <Popconfirm
+              title={`确定删除选中的 ${selectedRowKeys.length} 个团队吗？`}
+              onConfirm={handleBatchDelete}
+              disabled={selectedRowKeys.length === 0}
+            >
+              <Button
+                danger
+                icon={<DeleteOutlined />}
+                disabled={selectedRowKeys.length === 0}
+              >
+                批量删除
+              </Button>
+            </Popconfirm>
           </Space>
+          <Button icon={<ReloadOutlined />} onClick={loadTeamData}>
+            刷新
+          </Button>
         </div>
 
         <Table
@@ -721,6 +792,47 @@ const TeamManagementPage = () => {
                 </Select.Option>
               ))}
             </Select>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 新建团队模态框 */}
+      <Modal
+        title="新建团队"
+        open={teamModalVisible}
+        onOk={handleTeamSubmit}
+        onCancel={() => setTeamModalVisible(false)}
+        confirmLoading={loading}
+        destroyOnClose
+        width={500}
+      >
+        <Form form={teamForm} layout="vertical">
+          <Form.Item
+            name="name"
+            label="团队名称"
+            rules={[{ required: true, message: '请输入团队名称' }]}
+          >
+            <Input placeholder="请输入团队名称" />
+          </Form.Item>
+          <Form.Item
+            name="owner_id"
+            label="负责人"
+            rules={[{ required: true, message: '请选择负责人' }]}
+          >
+            <Select
+              placeholder="请选择负责人"
+              showSearch
+              optionFilterProp="children"
+            >
+              {userList.map((u) => (
+                <Option key={u.id} value={u.id}>
+                  {u.username} ({u.email || '无邮箱'})
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item name="description" label="团队描述">
+            <Input.TextArea placeholder="请输入团队描述（可选）" rows={3} />
           </Form.Item>
         </Form>
       </Modal>
