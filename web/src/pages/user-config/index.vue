@@ -5,6 +5,7 @@ import { getTableDataApi, updateTableDataApi } from "@@/apis/configs"
 import { usePagination } from "@@/composables/usePagination"
 import { CirclePlus, Delete, Refresh, RefreshRight, Search } from "@element-plus/icons-vue"
 import { cloneDeep } from "lodash-es"
+import { getRealModelName, getLlmNameAndFIdByLlmId } from "@/utils/llm-util"
 
 defineOptions({
   // 命名当前组件
@@ -27,6 +28,14 @@ const formData = ref<CreateOrUpdateTableRequestData>(cloneDeep(DEFAULT_FORM_DATA
 // 删除响应
 function handleDelete() {
   ElMessage.success("如需删除租户配置，可直接删除负责人账号")
+}
+
+// 解析显示名称
+function displayModelName(model?: string) {
+  if (!model) return "未设置"
+  const { llmName } = getLlmNameAndFIdByLlmId(model)
+  const real = getRealModelName(llmName || model)
+  return real || model
 }
 
 // 改
@@ -133,8 +142,16 @@ onActivated(() => {
         <el-table :data="tableData" @selection-change="handleSelectionChange">
           <el-table-column type="selection" width="50" align="center" />
           <el-table-column prop="username" label="用户名" align="center" />
-          <el-table-column prop="chatModel" label="聊天模型" align="center" />
-          <el-table-column prop="embeddingModel" label="嵌入模型" align="center" />
+          <el-table-column prop="chatModel" label="聊天模型" align="center">
+            <template #default="scope">
+              <el-tag type="success">{{ displayModelName(scope.row.chatModel) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="embeddingModel" label="嵌入模型" align="center">
+            <template #default="scope">
+              <el-tag type="warning">{{ displayModelName(scope.row.embeddingModel) }}</el-tag>
+            </template>
+          </el-table-column>
           <el-table-column prop="updateTime" label="更新时间" align="center" />
           <el-table-column fixed="right" label="操作" width="150" align="center">
             <template #default="scope">
@@ -169,10 +186,10 @@ onActivated(() => {
           <el-input v-model="formData.username" disabled />
         </el-form-item>
         <el-form-item label="聊天模型">
-          <el-input v-model="formData.chatModel" />
+          <el-input v-model="formData.chatModel" :placeholder="displayModelName(formData.chatModel)" />
         </el-form-item>
         <el-form-item label="嵌入模型">
-          <el-input v-model="formData.embeddingModel" />
+          <el-input v-model="formData.embeddingModel" :placeholder="displayModelName(formData.embeddingModel)" />
         </el-form-item>
       </el-form>
       <template #footer>

@@ -68,7 +68,7 @@ const errorHandler = (error: {
       });
     }
   }
-  return response ?? { data: { code: 1999 } };
+  return response ?? ({ data: { code: 1999 } } as any);
 };
 
 const request: RequestMethod = extend({
@@ -78,8 +78,14 @@ const request: RequestMethod = extend({
 });
 
 request.interceptors.request.use((url: string, options: any) => {
-  const data = convertTheKeysOfTheObjectToSnake(options.data);
-  const params = convertTheKeysOfTheObjectToSnake(options.params);
+  // Allow skipping snake_case conversion per-request
+  const shouldConvert = !options?.skipSnakeCase;
+  const data = shouldConvert
+    ? convertTheKeysOfTheObjectToSnake(options.data)
+    : options.data;
+  const params = shouldConvert
+    ? convertTheKeysOfTheObjectToSnake(options.params)
+    : options.params;
 
   return {
     url,
@@ -103,7 +109,7 @@ request.interceptors.response.use(async (response: Response, options) => {
     message.error(RetcodeMessage[response?.status as ResultCode]);
   }
 
-  if (options.responseType === 'blob') {
+  if ((options as any).responseType === 'blob') {
     return response;
   }
 
