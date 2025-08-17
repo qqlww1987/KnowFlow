@@ -70,54 +70,54 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
   const [addUserForm] = Form.useForm();
   const [addTeamForm] = Form.useForm();
 
-  // 权限级别配置
+  // 角色级别配置（对应 RBAC 角色：read=viewer, write=editor, admin=admin）
   const permissionLevels = [
-    { value: 'read', label: '读取', color: 'blue' },
-    { value: 'write', label: '写入', color: 'orange' },
-    { value: 'admin', label: '管理', color: 'red' },
+    { value: 'read', label: '查看者（viewer）', color: 'blue' },
+    { value: 'write', label: '编辑者（editor）', color: 'orange' },
+    { value: 'admin', label: '管理员（admin）', color: 'red' },
   ];
 
-  // 获取权限列表
+  // 获取角色列表
   const fetchPermissions = async () => {
     if (!knowledgeBaseId) return;
 
     setLoading(true);
     try {
-      console.log('开始获取权限列表，知识库ID:', knowledgeBaseId);
+      console.log('开始获取角色列表，知识库ID:', knowledgeBaseId);
       const result = await request.get(
         `/api/v1/knowledgebases/${knowledgeBaseId}/permissions`,
       );
 
-      console.log('权限API响应状态:', result.response?.status);
-      console.log('权限API响应类型:', typeof result);
-      console.log('权限API原始响应:', result);
+      console.log('角色API响应状态:', result.response?.status);
+      console.log('角色API响应类型:', typeof result);
+      console.log('角色API原始响应:', result);
 
       const data = result.data;
-      console.log('权限API解析后数据:', data);
+      console.log('角色API解析后数据:', data);
 
       if (data.code === 0) {
-        console.log('权限数据解析成功');
-        console.log('用户权限:', data.data?.user_permissions);
-        console.log('团队权限:', data.data?.team_permissions);
+        console.log('角色数据解析成功');
+        console.log('直接用户角色:', data.data?.user_permissions);
+        console.log('团队角色:', data.data?.team_permissions);
 
         setUserPermissions(data.data?.user_permissions || []);
         setTeamPermissions(data.data?.team_permissions || []);
       } else {
-        console.error('权限API返回错误:', data);
-        message.error(`获取权限列表失败: ${data.message || '未知错误'}`);
+        console.error('角色API返回错误:', data);
+        message.error(`获取角色列表失败: ${data.message || '未知错误'}`);
       }
     } catch (error) {
-      console.error('权限API调用异常:', error);
-      message.error('获取权限列表失败');
+      console.error('角色API调用异常:', error);
+      message.error('获取角色列表失败');
     } finally {
       setLoading(false);
     }
   };
 
-  // 获取可分配权限的用户列表（排除超级管理员）
+  // 获取可分配角色的用户列表（排除超级管理员）
   const fetchUsers = async () => {
     try {
-      console.log('开始获取可分配权限的用户列表...');
+      console.log('开始获取可分配角色的用户列表...');
       const result = await request.get('/api/v1/users/assignable', {
         params: { currentPage: 1, size: 100 },
       });
@@ -160,65 +160,65 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
     }
   };
 
-  // 添加用户权限
+  // 分配用户角色
   const handleAddUserPermission = async (values: {
     user_id: string;
     permission_level: string;
   }) => {
     try {
-      console.log('添加用户权限，数据:', values);
+      console.log('分配用户角色，数据:', values);
       const result = await request.post(
         `/api/v1/knowledgebases/${knowledgeBaseId}/permissions/users`,
         {
           data: values,
         },
       );
-      console.log('用户权限添加响应:', result);
+      console.log('用户角色分配响应:', result);
 
       const data = result.data;
       if (data.code === 0) {
-        message.success('用户权限添加成功');
+        message.success('用户角色分配成功');
         addUserForm.resetFields();
         fetchPermissions();
       } else {
-        message.error(data.message || '添加权限失败');
+        message.error(data.message || '角色分配失败');
       }
     } catch (error) {
-      console.error('添加用户权限失败:', error);
-      message.error('添加权限失败');
+      console.error('分配用户角色失败:', error);
+      message.error('角色分配失败');
     }
   };
 
-  // 添加团队权限
+  // 分配团队角色
   const handleAddTeamPermission = async (values: {
     team_id: string;
     permission_level: string;
   }) => {
     try {
-      console.log('添加团队权限，数据:', values);
+      console.log('分配团队角色，数据:', values);
       const result = await request.post(
         `/api/v1/knowledgebases/${knowledgeBaseId}/permissions/teams`,
         {
           data: values,
         },
       );
-      console.log('团队权限添加响应:', result);
+      console.log('团队角色分配响应:', result);
 
       const data = result.data;
       if (data.code === 0) {
-        message.success('团队权限添加成功');
+        message.success('团队角色分配成功');
         addTeamForm.resetFields();
         fetchPermissions();
       } else {
-        message.error(data.message || '添加团队权限失败');
+        message.error(data.message || '分配团队角色失败');
       }
     } catch (error) {
-      console.error('添加团队权限失败:', error);
-      message.error('添加团队权限失败');
+      console.error('分配团队角色失败:', error);
+      message.error('分配团队角色失败');
     }
   };
 
-  // 撤销用户权限
+  // 撤销用户角色
   const handleRevokeUserPermission = async (userId: string) => {
     try {
       const result = await request.delete(
@@ -226,17 +226,17 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
       );
       const data = result.data;
       if (data.code === 0) {
-        message.success('权限撤销成功');
+        message.success('角色撤销成功');
         fetchPermissions();
       } else {
-        message.error('权限撤销失败');
+        message.error('角色撤销失败');
       }
     } catch (error) {
-      message.error('权限撤销失败');
+      message.error('角色撤销失败');
     }
   };
 
-  // 撤销团队权限
+  // 撤销团队角色
   const handleRevokeTeamPermission = async (teamId: string) => {
     try {
       const result = await request.delete(
@@ -244,13 +244,13 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
       );
       const data = result.data;
       if (data.code === 0) {
-        message.success('团队权限撤销成功');
+        message.success('团队角色撤销成功');
         fetchPermissions();
       } else {
-        message.error('团队权限撤销失败');
+        message.error('团队角色撤销失败');
       }
     } catch (error) {
-      message.error('团队权限撤销失败');
+      message.error('团队角色撤销失败');
     }
   };
 
@@ -262,7 +262,7 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
     }
   }, [visible, knowledgeBaseId]);
 
-  // 用户权限表格列
+  // 用户角色表格列
   const userColumns = [
     {
       title: '用户',
@@ -275,7 +275,7 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
       ),
     },
     {
-      title: '权限级别',
+      title: '角色',
       dataIndex: 'permission_level',
       key: 'permission_level',
       render: (level: string) => {
@@ -294,7 +294,7 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
       key: 'action',
       render: (_: any, record: UserPermission) => (
         <Popconfirm
-          title="确定要撤销该用户的权限吗？"
+          title="确定要撤销该用户的角色吗？"
           onConfirm={() => handleRevokeUserPermission(record.user_id)}
           okText="确定"
           cancelText="取消"
@@ -307,7 +307,7 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
     },
   ];
 
-  // 团队权限表格列
+  // 团队角色表格列
   const teamColumns = [
     {
       title: '团队',
@@ -320,7 +320,7 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
       ),
     },
     {
-      title: '权限级别',
+      title: '角色',
       dataIndex: 'permission_level',
       key: 'permission_level',
       render: (level: string) => {
@@ -339,7 +339,7 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
       key: 'action',
       render: (_: any, record: TeamPermission) => (
         <Popconfirm
-          title="确定要撤销该团队的权限吗？"
+          title="确定要撤销该团队的角色吗？"
           onConfirm={() => handleRevokeTeamPermission(record.team_id)}
           okText="确定"
           cancelText="取消"
@@ -354,7 +354,7 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
 
   return (
     <Modal
-      title={`权限管理 - ${knowledgeBaseName}`}
+      title={`角色管理 - ${knowledgeBaseName}`}
       visible={visible}
       onCancel={onCancel}
       width={900}
@@ -366,12 +366,12 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
           tab={
             <span>
               <UserOutlined />
-              用户权限 ({userPermissions.length})
+              用户角色 ({userPermissions.length})
             </span>
           }
           key="users"
         >
-          {/* 添加用户权限表单 */}
+          {/* 分配用户角色表单 */}
           <div style={{ marginBottom: 16 }}>
             <Form
               form={addUserForm}
@@ -402,9 +402,9 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
               </Form.Item>
               <Form.Item
                 name="permission_level"
-                rules={[{ required: true, message: '请选择权限级别' }]}
+                rules={[{ required: true, message: '请选择角色' }]}
               >
-                <Select placeholder="权限级别" style={{ width: 120 }}>
+                <Select placeholder="选择角色" style={{ width: 120 }}>
                   {permissionLevels.map((level) => (
                     <Option key={level.value} value={level.value}>
                       {level.label}
@@ -418,13 +418,13 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
                   htmlType="submit"
                   icon={<PlusOutlined />}
                 >
-                  添加权限
+                  分配角色
                 </Button>
               </Form.Item>
             </Form>
           </div>
 
-          {/* 用户权限列表 */}
+          {/* 用户角色列表 */}
           <Table
             columns={userColumns}
             dataSource={userPermissions}
@@ -439,12 +439,12 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
           tab={
             <span>
               <TeamOutlined />
-              团队权限 ({teamPermissions.length})
+              团队角色 ({teamPermissions.length})
             </span>
           }
           key="teams"
         >
-          {/* 添加团队权限表单 */}
+          {/* 分配团队角色表单 */}
           <div style={{ marginBottom: 16 }}>
             <Form
               form={addTeamForm}
@@ -476,9 +476,9 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
               </Form.Item>
               <Form.Item
                 name="permission_level"
-                rules={[{ required: true, message: '请选择权限级别' }]}
+                rules={[{ required: true, message: '请选择角色' }]}
               >
-                <Select placeholder="权限级别" style={{ width: 120 }}>
+                <Select placeholder="选择角色" style={{ width: 120 }}>
                   {permissionLevels.map((level) => (
                     <Option key={level.value} value={level.value}>
                       {level.label}
@@ -492,13 +492,13 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
                   htmlType="submit"
                   icon={<PlusOutlined />}
                 >
-                  添加团队权限
+                  分配团队角色
                 </Button>
               </Form.Item>
             </Form>
           </div>
 
-          {/* 团队权限列表 */}
+          {/* 团队角色列表 */}
           <Table
             columns={teamColumns}
             dataSource={teamPermissions}
@@ -510,7 +510,7 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
         </TabPane>
       </Tabs>
 
-      {/* 权限说明 */}
+      {/* 角色说明 */}
       <div
         style={{
           marginTop: 16,
@@ -519,30 +519,26 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
           borderRadius: 4,
         }}
       >
-        <h4>权限说明：</h4>
+        <h4>角色说明：</h4>
         <ul style={{ margin: 0, paddingLeft: 20 }}>
           <li>
-            <Tag color="red">管理</Tag>
+            <Tag color="red">管理员</Tag>
             ：可以新增和删除知识库，管理知识库的所有内容和权限
           </li>
           <li>
-            <Tag color="orange">写入</Tag>
+            <Tag color="orange">编辑者</Tag>
             ：可以上传文件以及文件解析，编辑知识库内容
           </li>
           <li>
-            <Tag color="blue">读取</Tag>：可以查看知识库内的文档内容
+            <Tag color="blue">查看者</Tag>：可以查看知识库内的文档内容
           </li>
         </ul>
         <div style={{ marginTop: 8, fontSize: '12px', color: '#666' }}>
           <p style={{ margin: '0 0 4px 0' }}>
-            <strong>权限配置说明：</strong>
+            <strong>角色配置说明：</strong>
           </p>
           <p style={{ margin: '0 0 4px 0' }}>
-            • <strong>用户权限</strong>：直接为特定用户分配的权限
-          </p>
-          <p style={{ margin: '0 0 4px 0' }}>
-            • <strong>团队权限</strong>
-            ：为整个团队分配的权限，团队内所有成员自动继承
+            • 角色映射：查看者→viewer，编辑者→editor，管理员→admin
           </p>
           <p style={{ margin: '0', color: '#1890ff' }}>
             • 超级管理员自动拥有所有知识库的完全权限，无需单独分配
