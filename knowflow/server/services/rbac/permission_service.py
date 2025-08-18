@@ -176,6 +176,92 @@ class PermissionService:
             logger.error(f"检查直接权限失败: {e}")
             return False
     
+    def check_global_permission(self, user_id: str, permission_type: PermissionType, 
+                               tenant_id: Optional[str] = None) -> 'PermissionCheck':
+        """
+        检查全局权限（用于全局操作如创建知识库、创建文件等）
+        
+        Args:
+            user_id: 用户ID
+            permission_type: 权限类型
+            tenant_id: 租户ID
+            
+        Returns:
+            PermissionCheck: 权限检查结果
+        """
+        try:
+            # 1. 超级管理员检查
+            if self._is_super_admin(user_id):
+                return PermissionCheck(
+                    has_permission=True,
+                    user_id=user_id,
+                    resource_type=ResourceType.SYSTEM,
+                    resource_id=None,
+                    permission_type=permission_type,
+                    granted_roles=["超级管理员"],
+                    reason="超级管理员权限"
+                )
+            
+            # 2. 检查全局角色权限（resource_id为NULL的角色）
+            db = self._get_db_connection()
+            cursor = db.cursor()
+            
+            user_sql = """
+                SELECT DISTINCT r.code, r.name FROM rbac_user_roles ur
+                JOIN rbac_roles r ON ur.role_id = r.id
+                JOIN rbac_role_permissions rp ON r.id = rp.role_id
+                JOIN rbac_permissions p ON rp.permission_id = p.id
+                WHERE ur.user_id = %s AND ur.is_active = 1
+                AND p.resource_type = 'system' AND p.permission_type = %s
+                AND (ur.expires_at IS NULL OR ur.expires_at > NOW())
+                AND ur.resource_id IS NULL
+            """
+            params = [user_id, permission_type.value]
+            
+            if tenant_id:
+                user_sql += " AND ur.tenant_id = %s"
+                params.append(tenant_id)
+            
+            cursor.execute(user_sql, params)
+            user_roles = cursor.fetchall()
+            
+            if user_roles:
+                role_names = [role[1] for role in user_roles]
+                return PermissionCheck(
+                    has_permission=True,
+                    user_id=user_id,
+                    resource_type=ResourceType.SYSTEM,
+                    resource_id=None,
+                    permission_type=permission_type,
+                    granted_roles=role_names,
+                    reason="全局角色权限授权"
+                )
+            
+            return PermissionCheck(
+                has_permission=False,
+                user_id=user_id,
+                resource_type=ResourceType.SYSTEM,
+                resource_id=None,
+                permission_type=permission_type,
+                reason="无相关全局权限"
+            )
+            
+        except Exception as e:
+            logger.error(f"检查全局权限失败: {e}")
+            return PermissionCheck(
+                has_permission=False,
+                user_id=user_id,
+                resource_type=ResourceType.SYSTEM,
+                resource_id=None,
+                permission_type=permission_type,
+                reason=f"全局权限检查异常: {str(e)}"
+            )
+        finally:
+            if 'cursor' in locals() and cursor:
+                cursor.close()
+            if 'db' in locals() and db:
+                db.close()
+    
     def _check_role_permission(self, user_id: str, resource_type: ResourceType,
                              resource_id: str, permission_type: PermissionType,
                              tenant_id: Optional[str] = None) -> Tuple[bool, List[str]]:
@@ -195,7 +281,7 @@ class PermissionService:
                 WHERE ur.user_id = %s AND ur.is_active = 1
                 AND p.resource_type = %s AND p.permission_type = %s
                 AND (ur.expires_at IS NULL OR ur.expires_at > NOW())
-                AND (ur.resource_id IS NULL OR ur.resource_id = %s)
+                AND ur.resource_id = %s
             """
             user_params = [user_id, resource_type.value, permission_type.value, resource_id]
             
@@ -216,7 +302,7 @@ class PermissionService:
                 WHERE ut.user_id = %s AND ut.status = 1 AND tr.is_active = 1
                 AND p.resource_type = %s AND p.permission_type = %s
                 AND (tr.expires_at IS NULL OR tr.expires_at > NOW())
-                AND (tr.resource_id IS NULL OR tr.resource_id = %s)
+                AND tr.resource_id = %s
             """
             team_params = [user_id, resource_type.value, permission_type.value, resource_id]
             

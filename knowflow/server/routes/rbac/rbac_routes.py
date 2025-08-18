@@ -97,6 +97,70 @@ def check_permission():
             'code': 500
         }), 500
 
+@rbac_bp.route('/permissions/check-global', methods=['POST'])
+def check_global_permission():
+    """
+    检查用户全局权限
+    
+    Request Body:
+    {
+        "user_id": "user123",
+        "permission_type": "write",
+        "tenant_id": "tenant123"  // 可选
+    }
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'error': '请求数据不能为空',
+                'code': 400
+            }), 400
+        
+        user_id = data.get('user_id')
+        permission_type = data.get('permission_type')
+        tenant_id = data.get('tenant_id', 'default')
+        
+        if not user_id or not permission_type:
+            return jsonify({
+                'error': '缺少必需参数: user_id, permission_type',
+                'code': 400
+            }), 400
+        
+        # 解析权限类型
+        try:
+            perm_type = PermissionType(permission_type)
+        except ValueError:
+            return jsonify({
+                'error': f'无效的权限类型: {permission_type}',
+                'code': 400
+            }), 400
+        
+        # 执行全局权限检查
+        permission_check = permission_service.check_global_permission(
+            user_id=user_id,
+            permission_type=perm_type,
+            tenant_id=tenant_id
+        )
+        
+        return jsonify({
+            'has_permission': permission_check.has_permission,
+            'user_id': permission_check.user_id,
+            'resource_type': permission_check.resource_type.value,
+            'resource_id': permission_check.resource_id,
+            'permission_type': permission_check.permission_type.value,
+            'granted_roles': permission_check.granted_roles,
+            'reason': permission_check.reason
+        })
+        
+    except Exception as e:
+        logger.error(f"全局权限检查失败: {e}")
+        return jsonify({
+            'error': '全局权限检查失败',
+            'message': str(e),
+            'code': 500
+        }), 500
+
 @rbac_bp.route('/users/<user_id>/roles', methods=['GET'])
 def get_user_roles(user_id: str):
     """
