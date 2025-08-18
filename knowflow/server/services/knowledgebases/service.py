@@ -1560,7 +1560,7 @@ class KnowledgebaseService:
                 team_id=team_id,
                 resource_type=ResourceType.KNOWLEDGEBASE,
                 resource_id=kb_id,
-                tenant_id='default_tenant'
+                tenant_id='default'
             )
             
             if success:
