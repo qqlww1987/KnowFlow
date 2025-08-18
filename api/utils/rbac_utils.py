@@ -145,7 +145,7 @@ def rbac_permission_required(
     resource_id_param='kb_id',
     fallback_check=None,
     deny_code=RetCode.AUTHENTICATION_ERROR,
-    deny_message="No authorization."
+    deny_message="权限不足，请联系系统管理员进行授权"
 ):
     """
     RBAC资源权限检查装饰器（只检查资源级别权限，不涉及全局角色）
