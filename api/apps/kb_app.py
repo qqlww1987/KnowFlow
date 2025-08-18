@@ -40,11 +40,12 @@ from rag.nlp import search
 from api.constants import DATASET_NAME_LIMIT
 from rag.settings import PAGERANK_FLD
 from rag.utils.storage_factory import STORAGE_IMPL
-from api.utils.rbac_utils import kb_read_required, kb_write_required, kb_admin_required, check_rbac_permission, RBACResourceType, RBACPermissionType
+from api.utils.rbac_utils import kb_read_required, kb_write_required, kb_admin_required, check_rbac_permission, RBACResourceType, RBACPermissionType, global_kb_admin_required
 
 
 @manager.route('/create', methods=['post'])  # noqa: F821
 @login_required
+@global_kb_admin_required()
 @validate_request("name")
 def create():
     req = request.json

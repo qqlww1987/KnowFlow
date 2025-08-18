@@ -506,6 +506,10 @@ const TeamManagementPage = () => {
       key: 'action',
       fixed: 'right' as const,
       width: 280,
+      align: 'right' as const,
+      onHeaderCell: () => ({
+        style: { paddingRight: '30px' },
+      }),
       render: (_: any, record: TeamData) => (
         <Space
           size="small"

@@ -256,6 +256,108 @@ def kb_read_required(resource_id_param='kb_id', fallback_check=None):
         fallback_check=fallback_check
     )
 
+def check_global_kb_admin_permission(user_id, tenant_id=None):
+    """
+    检查用户是否具有全局知识库管理员权限
+    
+    Args:
+        user_id: 用户ID
+        tenant_id: 租户ID
+        
+    Returns:
+        bool: 是否有全局kb_admin权限
+    """
+    if not RBAC_ENABLED:
+        logger.info("RBAC未启用，跳过全局权限检查")
+        return True
+        
+    if not user_id:
+        logger.warning("用户ID为空，全局权限检查失败")
+        return False
+        
+    try:
+        # 检查全局kb_admin角色
+        payload = {
+            "user_id": user_id,
+            "tenant_id": tenant_id or "default"
+        }
+        
+        response = requests.get(
+            f"{RBAC_SERVICE_URL}/users/{user_id}/roles",
+            params={"tenant_id": tenant_id or "default"},
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            roles = result.get('roles', [])
+            
+            # 检查是否有全局管理权限（kb_admin、admin或super_admin）
+            for role in roles:
+                role_code = role.get('code')
+                # 全局角色（没有resource_id）且是管理员类型
+                if not role.get('resource_id') and role_code in ['kb_admin', 'admin', 'super_admin']:
+                    logger.debug(f"用户 {user_id} 具有全局管理权限: {role_code}")
+                    return True
+            
+            logger.debug(f"用户 {user_id} 没有全局管理权限")
+            return False
+        else:
+            logger.error(f"获取用户角色失败: {response.status_code} - {response.text}")
+            return False
+            
+    except requests.RequestException as e:
+        logger.error(f"全局权限检查网络错误: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"全局权限检查异常: {e}")
+        return False
+
+def global_kb_admin_required(deny_message="您没有创建知识库的权限，请联系管理员"):
+    """
+    全局知识库管理员权限装饰器
+    用于需要全局kb_admin权限的操作，如创建知识库
+    """
+    def decorator(func):
+        @login_required
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                # 获取用户和租户信息
+                user_id, tenant_id = get_user_tenant_info()
+                if not user_id:
+                    return get_json_result(
+                        data=False, 
+                        message="用户认证失败", 
+                        code=RetCode.AUTHENTICATION_ERROR
+                    )
+                
+                # 检查全局kb_admin权限
+                has_permission = check_global_kb_admin_permission(user_id, tenant_id)
+                
+                if not has_permission:
+                    logger.warning(f"用户 {user_id} 缺少全局kb_admin权限")
+                    return get_json_result(
+                        data=False,
+                        message=deny_message,
+                        code=RetCode.AUTHENTICATION_ERROR
+                    )
+                
+                # 权限验证通过，执行原函数
+                logger.debug(f"全局kb_admin权限检查通过: user={user_id}")
+                return func(*args, **kwargs)
+                
+            except Exception as e:
+                logger.error(f"全局权限检查异常: {e}")
+                return get_json_result(
+                    data=False, 
+                    message="权限检查服务异常", 
+                    code=RetCode.EXCEPTION_ERROR
+                )
+        
+        return wrapper
+    return decorator
+
 # 为文档权限提供便捷方法（基于知识库权限）
 def doc_read_required(fallback_check=None):
     """文档读取权限装饰器（基于知识库权限）"""

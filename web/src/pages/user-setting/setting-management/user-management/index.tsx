@@ -389,6 +389,10 @@ const UserManagementPage = () => {
       key: 'action',
       fixed: 'right' as const,
       width: 320,
+      align: 'right' as const,
+      onHeaderCell: () => ({
+        style: { paddingRight: '30px' },
+      }),
       render: (_: any, record: UserData) => (
         <Space
           size="small"
