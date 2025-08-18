@@ -88,7 +88,7 @@ def get_user_tenant_info():
 
 def check_rbac_permission(user_id, resource_type, resource_id, permission_type, tenant_id=None):
     """
-    调用RBAC服务检查权限
+    检查用户是否具有特定资源的权限（只检查资源级别权限，不涉及全局角色）
     
     Args:
         user_id: 用户ID
@@ -126,17 +126,17 @@ def check_rbac_permission(user_id, resource_type, resource_id, permission_type, 
         if response.status_code == 200:
             result = response.json()
             has_permission = result.get('has_permission', False)
-            logger.debug(f"RBAC权限检查结果: user={user_id}, resource={resource_id}, permission={permission_type}, result={has_permission}")
+            logger.debug(f"资源权限检查结果: user={user_id}, resource={resource_id}, permission={permission_type}, result={has_permission}")
             return has_permission
         else:
-            logger.error(f"RBAC权限检查服务错误: {response.status_code} - {response.text}")
+            logger.error(f"资源权限检查失败: {response.status_code} - {response.text}")
             return False
             
     except requests.RequestException as e:
-        logger.error(f"RBAC权限检查网络错误: {e}")
+        logger.error(f"资源权限检查网络错误: {e}")
         return False
     except Exception as e:
-        logger.error(f"RBAC权限检查异常: {e}")
+        logger.error(f"资源权限检查异常: {e}")
         return False
 
 def rbac_permission_required(
@@ -148,7 +148,7 @@ def rbac_permission_required(
     deny_message="No authorization."
 ):
     """
-    RBAC权限检查装饰器
+    RBAC资源权限检查装饰器（只检查资源级别权限，不涉及全局角色）
     
     Args:
         permission_type: 权限类型 (kb_read, kb_write, kb_admin)
@@ -194,7 +194,7 @@ def rbac_permission_required(
                         code=RetCode.ARGUMENT_ERROR
                     )
                 
-                # 3. 执行RBAC权限检查
+                # 3. 只检查资源级别的RBAC权限，不检查全局角色
                 has_permission = check_rbac_permission(
                     user_id=user_id,
                     resource_type=resource_type,
@@ -205,12 +205,12 @@ def rbac_permission_required(
                 
                 # 4. 如果RBAC检查失败且有回退检查，执行回退逻辑
                 if not has_permission and fallback_check:
-                    logger.info(f"RBAC检查失败，执行回退检查: {fallback_check.__name__}")
+                    logger.info(f"资源权限检查失败，执行回退检查: {fallback_check.__name__}")
                     has_permission = fallback_check(resource_id, user_id)
                 
                 # 5. 权限验证失败
                 if not has_permission:
-                    logger.warning(f"权限不足: user={user_id}, resource={resource_id}, permission={permission_type}")
+                    logger.warning(f"资源权限不足: user={user_id}, resource={resource_id}, permission={permission_type}")
                     return get_json_result(
                         data=False,
                         message=deny_message,
@@ -218,7 +218,7 @@ def rbac_permission_required(
                     )
                 
                 # 6. 权限验证通过，执行原函数
-                logger.debug(f"权限检查通过: user={user_id}, resource={resource_id}, permission={permission_type}")
+                logger.debug(f"资源权限检查通过: user={user_id}, resource={resource_id}, permission={permission_type}")
                 return func(*args, **kwargs)
                 
             except Exception as e:

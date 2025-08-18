@@ -278,7 +278,7 @@ def list_tags(kb_id):
 def list_tags_from_kbs():
     kb_ids = request.args.get("kb_ids", "").split(",")
     for kb_id in kb_ids:
-        # Only RBAC: 检查 kb_read 权限
+        # 只检查知识库级别权限，不涉及全局角色
         if not check_rbac_permission(current_user.id, RBACResourceType.KNOWLEDGEBASE, kb_id, RBACPermissionType.KB_READ):
             return get_json_result(
                 data=False,

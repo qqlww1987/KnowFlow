@@ -132,7 +132,7 @@ class KnowledgebaseService(CommonService):
                                    orderby, desc, keywords,
                                    parser_id=None
                                    ):
-        # Get knowledge bases with RBAC permission checking
+        # Get knowledge bases with RBAC permission checking only
         # Args:
         #     joined_tenant_ids: List of tenant IDs
         #     user_id: Current user ID
@@ -186,33 +186,22 @@ class KnowledgebaseService(CommonService):
         all_kbs = list(base_query.dicts())
         print(f"Found {len(all_kbs)} knowledge bases in database")
         
-        # Filter by permissions
+        # Filter by permissions - only check RBAC permissions
         accessible_kbs = []
         for kb in all_kbs:
             kb_id = kb['id']
-            tenant_id = kb['tenant_id']
             
-            # Check traditional tenant-based access
-            has_tenant_access = (
-                (tenant_id in joined_tenant_ids and kb['permission'] == TenantPermission.TEAM.value) or
-                (tenant_id == user_id)
-            )
-            print(f"KB {kb_id}: tenant_access={has_tenant_access}, tenant_id={tenant_id}, user_id={user_id}, joined_tenants={joined_tenant_ids}")
-            
-            # Check RBAC permissions using unified utilities
-            # Use user's tenant_id for RBAC check, not KB's tenant_id
-            user_tenant_id = user_id  # In most cases, user_id equals user's tenant_id
-            has_rbac_access = check_rbac_permission(
+            # Only check knowledge base level RBAC permissions, no tenant mixing
+            has_kb_permission = check_rbac_permission(
                 user_id=user_id,
                 resource_type=RBACResourceType.KNOWLEDGEBASE,
                 resource_id=kb_id,
-                permission_type=RBACPermissionType.KB_READ,
-                tenant_id=user_tenant_id  # use user's tenant_id for RBAC permission check
+                permission_type=RBACPermissionType.KB_READ
             )
-            print(f"KB {kb_id}: RBAC check result={has_rbac_access}")
+            print(f"KB {kb_id}: RBAC check result={has_kb_permission}")
             
-            # Include KB if user has either tenant-based or RBAC access
-            if has_tenant_access or has_rbac_access:
+            # Only include KB if user has explicit knowledge base permission
+            if has_kb_permission:
                 accessible_kbs.append(kb)
                 print(f"KB {kb_id}: GRANTED access")
             else:
