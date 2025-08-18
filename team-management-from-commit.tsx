@@ -451,7 +451,6 @@ const TeamManagementPage = () => {
       title: '团队名称',
       dataIndex: 'name',
       key: 'name',
-      width: 150,
       render: (text: string) => (
         <Space>
           <TeamOutlined />
@@ -463,32 +462,27 @@ const TeamManagementPage = () => {
       title: '负责人',
       dataIndex: 'ownerName',
       key: 'ownerName',
-      width: 120,
       render: (text: string) => <Tag color="blue">{text}</Tag>,
     },
     {
       title: '成员数量',
       dataIndex: 'memberCount',
       key: 'memberCount',
-      width: 100,
       render: (count: number) => <Tag color="green">{count}人</Tag>,
     },
     {
       title: '创建时间',
       dataIndex: 'createTime',
       key: 'createTime',
-      width: 150,
     },
     {
       title: '更新时间',
       dataIndex: 'updateTime',
       key: 'updateTime',
-      width: 150,
     },
     {
       title: '角色',
       key: 'roles',
-      width: 100,
       render: (_: any, record: TeamData) => {
         const role =
           teamRolesMap[record.id] ||
@@ -505,12 +499,9 @@ const TeamManagementPage = () => {
       title: '操作',
       key: 'action',
       fixed: 'right' as const,
-      width: 280,
+      width: 160,
       render: (_: any, record: TeamData) => (
-        <Space
-          size="small"
-          style={{ justifyContent: 'flex-end', display: 'flex' }}
-        >
+        <Space size="small">
           <Button
             type="link"
             size="small"
@@ -659,7 +650,7 @@ const TeamManagementPage = () => {
           rowKey="id"
           loading={loading}
           pagination={false}
-          scroll={{ x: 970 }}
+          scroll={{ x: 1000 }}
           rowSelection={{
             selectedRowKeys,
             onChange: (selectedRowKeys: React.Key[]) =>

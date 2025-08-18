@@ -348,30 +348,25 @@ const UserManagementPage = () => {
       title: '用户名',
       dataIndex: 'username',
       key: 'username',
-      width: 120,
     },
     {
       title: '邮箱',
       dataIndex: 'email',
       key: 'email',
-      width: 200,
     },
     {
       title: '创建时间',
       dataIndex: 'createTime',
       key: 'createTime',
-      width: 150,
     },
     {
       title: '更新时间',
       dataIndex: 'updateTime',
       key: 'updateTime',
-      width: 150,
     },
     {
       title: '角色',
       key: 'roles',
-      width: 100,
       render: (_: any, record: UserData) => {
         const role = userRolesMap[record.id];
         if (role === undefined) return <Tag color="#d9d9d9">加载中</Tag>;
@@ -388,12 +383,9 @@ const UserManagementPage = () => {
       title: '操作',
       key: 'action',
       fixed: 'right' as const,
-      width: 320,
+      width: 280,
       render: (_: any, record: UserData) => (
-        <Space
-          size="small"
-          style={{ justifyContent: 'flex-end', display: 'flex' }}
-        >
+        <Space size="small">
           <Button
             type="link"
             size="small"
@@ -418,6 +410,7 @@ const UserManagementPage = () => {
           >
             分配角色
           </Button>
+          {/* 移除查看权限按钮 */}
           <Popconfirm
             title="确定删除这个用户吗？"
             onConfirm={() => handleDeleteUser(record.id)}
@@ -501,7 +494,7 @@ const UserManagementPage = () => {
           rowKey="id"
           loading={loading}
           pagination={false}
-          scroll={{ x: 1040 }}
+          scroll={{ x: 1200 }}
           rowSelection={{
             selectedRowKeys,
             onChange: (selectedRowKeys: React.Key[]) =>
