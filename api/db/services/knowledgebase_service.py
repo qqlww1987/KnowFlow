@@ -200,12 +200,14 @@ class KnowledgebaseService(CommonService):
             print(f"KB {kb_id}: tenant_access={has_tenant_access}, tenant_id={tenant_id}, user_id={user_id}, joined_tenants={joined_tenant_ids}")
             
             # Check RBAC permissions using unified utilities
+            # Use user's tenant_id for RBAC check, not KB's tenant_id
+            user_tenant_id = user_id  # In most cases, user_id equals user's tenant_id
             has_rbac_access = check_rbac_permission(
                 user_id=user_id,
                 resource_type=RBACResourceType.KNOWLEDGEBASE,
                 resource_id=kb_id,
                 permission_type=RBACPermissionType.KB_READ,
-                tenant_id=tenant_id  # use KB's tenant to match granted roles/permissions
+                tenant_id=user_tenant_id  # use user's tenant_id for RBAC permission check
             )
             print(f"KB {kb_id}: RBAC check result={has_rbac_access}")
             
