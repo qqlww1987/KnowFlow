@@ -24,12 +24,17 @@ from api.db.services.user_service import UserTenantService, UserService
 
 from api.utils import get_uuid, delta_seconds
 from api.utils.api_utils import get_json_result, validate_request, server_error_response, get_data_error_result
+from api.utils.rbac_utils import check_global_permission
 
 
 @manager.route("/<tenant_id>/user/list", methods=["GET"])  # noqa: F821
 @login_required
 def user_list(tenant_id):
-    if current_user.id != tenant_id:
+    # 检查权限：租户拥有者或具有全局团队管理权限
+    is_tenant_owner = current_user.id == tenant_id
+    has_global_admin = check_global_permission(current_user.id, "admin", "default")
+    
+    if not is_tenant_owner and not has_global_admin:
         return get_json_result(
             data=False,
             message='No authorization.',
@@ -48,7 +53,11 @@ def user_list(tenant_id):
 @login_required
 @validate_request("email")
 def create(tenant_id):
-    if current_user.id != tenant_id:
+    # 检查权限：租户拥有者或具有全局团队管理权限
+    is_tenant_owner = current_user.id == tenant_id
+    has_global_admin = check_global_permission(current_user.id, "admin", "default")
+    
+    if not is_tenant_owner and not has_global_admin:
         return get_json_result(
             data=False,
             message='No authorization.',
@@ -87,7 +96,12 @@ def create(tenant_id):
 @manager.route('/<tenant_id>/user/<user_id>', methods=['DELETE'])  # noqa: F821
 @login_required
 def rm(tenant_id, user_id):
-    if current_user.id != tenant_id and current_user.id != user_id:
+    # 检查权限：租户拥有者、用户自己或具有全局团队管理权限
+    is_tenant_owner = current_user.id == tenant_id
+    is_self_removal = current_user.id == user_id
+    has_global_admin = check_global_permission(current_user.id, "admin", "default")
+    
+    if not is_tenant_owner and not is_self_removal and not has_global_admin:
         return get_json_result(
             data=False,
             message='No authorization.',

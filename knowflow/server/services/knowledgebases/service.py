@@ -1535,7 +1535,7 @@ class KnowledgebaseService:
                 role_code=role_code,
                 resource_type=ResourceType.KNOWLEDGEBASE,
                 resource_id=kb_id,
-                tenant_id='default_tenant',  # 使用默认租户
+                tenant_id='default',  # 保持与权限检查时一致
                 granted_by=granted_by
             )
             
