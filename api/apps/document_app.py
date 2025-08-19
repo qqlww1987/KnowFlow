@@ -198,12 +198,7 @@ def list_docs():
     kb_id = request.args.get("kb_id")
     if not kb_id:
         return get_json_result(data=False, message='Lack of "KB ID"', code=settings.RetCode.ARGUMENT_ERROR)
-    tenants = UserTenantService.query(user_id=current_user.id)
-    for tenant in tenants:
-        if KnowledgebaseService.query(tenant_id=tenant.tenant_id, id=kb_id):
-            break
-    else:
-        return get_json_result(data=False, message="Only owner of knowledgebase authorized for this operation.", code=settings.RetCode.OPERATING_ERROR)
+    # RBAC权限检查已经在装饰器中完成，无需额外的租户检查
     keywords = request.args.get("keywords", "")
 
     page_number = int(request.args.get("page", 0))

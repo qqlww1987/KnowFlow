@@ -162,15 +162,7 @@ def update():
 def detail():
     kb_id = request.args["kb_id"]
     try:
-        tenants = UserTenantService.query(user_id=current_user.id)
-        for tenant in tenants:
-            if KnowledgebaseService.query(
-                    tenant_id=tenant.tenant_id, id=kb_id):
-                break
-        else:
-            return get_json_result(
-                data=False, message='Only owner of knowledgebase authorized for this operation.',
-                code=settings.RetCode.OPERATING_ERROR)
+        # RBAC权限检查已经在装饰器中完成，无需额外的租户检查
         kb = KnowledgebaseService.get_detail(kb_id)
         if not kb:
             return get_data_error_result(
@@ -262,12 +254,7 @@ def rm():
 @login_required
 @kb_read_required(resource_id_param='kb_id')
 def list_tags(kb_id):
-    if not KnowledgebaseService.accessible(kb_id, current_user.id):
-        return get_json_result(
-            data=False,
-            message='No authorization.',
-            code=settings.RetCode.AUTHENTICATION_ERROR
-        )
+    # RBAC权限检查已经在装饰器中完成，无需额外的访问权限检查
 
     tags = settings.retrievaler.all_tags(current_user.id, [kb_id])
     return get_json_result(data=tags)
@@ -295,12 +282,7 @@ def list_tags_from_kbs():
 @kb_write_required(resource_id_param='kb_id')
 def rm_tags(kb_id):
     req = request.json
-    if not KnowledgebaseService.accessible(kb_id, current_user.id):
-        return get_json_result(
-            data=False,
-            message='No authorization.',
-            code=settings.RetCode.AUTHENTICATION_ERROR
-        )
+    # RBAC权限检查已经在装饰器中完成，无需额外的访问权限检查
     e, kb = KnowledgebaseService.get_by_id(kb_id)
 
     for t in req["tags"]:
@@ -316,12 +298,7 @@ def rm_tags(kb_id):
 @kb_write_required(resource_id_param='kb_id')
 def rename_tags(kb_id):
     req = request.json
-    if not KnowledgebaseService.accessible(kb_id, current_user.id):
-        return get_json_result(
-            data=False,
-            message='No authorization.',
-            code=settings.RetCode.AUTHENTICATION_ERROR
-        )
+    # RBAC权限检查已经在装饰器中完成，无需额外的访问权限检查
     e, kb = KnowledgebaseService.get_by_id(kb_id)
 
     settings.docStoreConn.update({"tag_kwd": req["from_tag"], "kb_id": [kb_id]},
@@ -335,12 +312,7 @@ def rename_tags(kb_id):
 @login_required
 @kb_read_required(resource_id_param='kb_id')
 def knowledge_graph(kb_id):
-    if not KnowledgebaseService.accessible(kb_id, current_user.id):
-        return get_json_result(
-            data=False,
-            message='No authorization.',
-            code=settings.RetCode.AUTHENTICATION_ERROR
-        )
+    # RBAC权限检查已经在装饰器中完成，无需额外的访问权限检查
     _, kb = KnowledgebaseService.get_by_id(kb_id)
     req = {
         "kb_id": [kb_id],
@@ -375,12 +347,7 @@ def knowledge_graph(kb_id):
 @login_required
 @kb_write_required(resource_id_param='kb_id')
 def delete_knowledge_graph(kb_id):
-    if not KnowledgebaseService.accessible(kb_id, current_user.id):
-        return get_json_result(
-            data=False,
-            message='No authorization.',
-            code=settings.RetCode.AUTHENTICATION_ERROR
-        )
+    # RBAC权限检查已经在装饰器中完成，无需额外的访问权限检查
     _, kb = KnowledgebaseService.get_by_id(kb_id)
     settings.docStoreConn.delete({"knowledge_graph_kwd": ["graph", "subgraph", "entity", "relation"]}, search.index_name(kb.tenant_id), kb_id)
 

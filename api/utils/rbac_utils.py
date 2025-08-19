@@ -108,36 +108,64 @@ def check_rbac_permission(user_id, resource_type, resource_id, permission_type, 
         logger.warning("用户ID为空，权限检查失败")
         return False
         
-    try:
-        payload = {
-            "user_id": user_id,
-            "resource_type": resource_type,
-            "resource_id": resource_id,
-            "permission_type": permission_type,
-            "tenant_id": tenant_id or "default"
-        }
-        
-        response = requests.post(
-            f"{RBAC_SERVICE_URL}/permissions/check",
-            json=payload,
-            timeout=5
-        )
-        
-        if response.status_code == 200:
-            result = response.json()
-            has_permission = result.get('has_permission', False)
-            logger.debug(f"资源权限检查结果: user={user_id}, resource={resource_id}, permission={permission_type}, result={has_permission}")
-            return has_permission
-        else:
-            logger.error(f"资源权限检查失败: {response.status_code} - {response.text}")
-            return False
+    def _check_permission_for_user(check_user_id):
+        """内部函数：检查指定用户ID的权限"""
+        try:
+            payload = {
+                "user_id": check_user_id,
+                "resource_type": resource_type,
+                "resource_id": resource_id,
+                "permission_type": permission_type,
+                "tenant_id": tenant_id or "default"
+            }
             
-    except requests.RequestException as e:
-        logger.error(f"资源权限检查网络错误: {e}")
-        return False
-    except Exception as e:
-        logger.error(f"资源权限检查异常: {e}")
-        return False
+            response = requests.post(
+                f"{RBAC_SERVICE_URL}/permissions/check",
+                json=payload,
+                timeout=5
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                has_permission = result.get('has_permission', False)
+                logger.debug(f"资源权限检查结果: user={check_user_id}, resource={resource_id}, permission={permission_type}, result={has_permission}")
+                return has_permission
+            else:
+                logger.debug(f"资源权限检查失败: {response.status_code} - {response.text}")
+                return False
+                
+        except Exception as e:
+            logger.debug(f"资源权限检查异常: {e}")
+            return False
+    
+    # 首先检查原始用户ID
+    has_permission = _check_permission_for_user(user_id)
+    
+    # 如果权限检查失败，尝试回退机制：根据当前用户查找真实用户ID
+    if not has_permission:
+        try:
+            from flask_login import current_user
+            if hasattr(current_user, 'email') and current_user.email:
+                # 根据邮箱查找真实的用户ID
+                import mysql.connector
+                from database import get_db_connection
+                
+                db = get_db_connection()
+                cursor = db.cursor()
+                cursor.execute("SELECT id FROM user WHERE email = %s", (current_user.email,))
+                result = cursor.fetchone()
+                cursor.close()
+                db.close()
+                
+                if result and result[0] != user_id:
+                    real_user_id = result[0]
+                    logger.info(f"Token用户ID不匹配，尝试使用真实用户ID: {user_id} -> {real_user_id}")
+                    has_permission = _check_permission_for_user(real_user_id)
+                    
+        except Exception as e:
+            logger.debug(f"回退权限检查失败: {e}")
+    
+    return has_permission
 
 def rbac_permission_required(
     permission_type,

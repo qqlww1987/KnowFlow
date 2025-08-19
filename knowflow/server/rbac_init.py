@@ -335,6 +335,63 @@ class RBACInitializer:
         self.db.commit()
         logger.info("角色权限关联建立完成")
     
+    def _create_admin_tenant(self, admin_user_id, admin_email):
+        """为管理员创建租户记录"""
+        try:
+            # 检查是否已存在该租户
+            self.cursor.execute("SELECT id FROM tenant WHERE id = %s", (admin_user_id,))
+            existing_tenant = self.cursor.fetchone()
+            
+            if existing_tenant:
+                logger.info(f"管理员租户已存在: {admin_user_id}")
+            else:
+                # 创建租户记录
+                current_time = datetime.now()
+                create_time = int(current_time.timestamp() * 1000)
+                create_date = current_time.strftime("%Y-%m-%d %H:%M:%S")
+                
+                self.cursor.execute("""
+                    INSERT INTO tenant (
+                        id, name, llm_id, embd_id, asr_id, img2txt_id, rerank_id, 
+                        parser_ids, credit, status, create_time, create_date, update_time, update_date
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    admin_user_id, '系统管理员', 'qwen-plus', 'BAAI/bge-large-zh-v1.5', 'local',
+                    'local', 'BAAI/bge-reranker-v2-m3', 'manual,naive,qa,table,resume,laws,book,presentation,picture,one,knowledge_graph',
+                    1000000, '1', create_time, create_date, create_time, create_date
+                ))
+                
+                logger.info(f"创建管理员租户: {admin_user_id}")
+                
+            # 创建用户-租户关联记录
+            self.cursor.execute("SELECT id FROM user_tenant WHERE user_id = %s AND tenant_id = %s", 
+                               (admin_user_id, admin_user_id))
+            existing_user_tenant = self.cursor.fetchone()
+            
+            if not existing_user_tenant:
+                current_time = datetime.now()
+                create_time = int(current_time.timestamp() * 1000)
+                create_date = current_time.strftime("%Y-%m-%d %H:%M:%S")
+                
+                user_tenant_id = str(uuid.uuid4()).replace('-', '')
+                self.cursor.execute("""
+                    INSERT INTO user_tenant (
+                        id, user_id, tenant_id, role, invited_by, status,
+                        create_time, create_date, update_time, update_date
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    user_tenant_id, admin_user_id, admin_user_id, 'owner', admin_user_id, '1',
+                    create_time, create_date, create_time, create_date
+                ))
+                
+                logger.info(f"创建用户-租户关联: {admin_user_id}")
+            else:
+                logger.info(f"用户-租户关联已存在: {admin_user_id}")
+                
+        except Exception as e:
+            logger.error(f"创建管理员租户失败: {e}")
+            raise
+
     def _create_default_admin(self):
         """创建默认超级管理员账户"""
         logger.info("创建默认超级管理员账户...")
@@ -377,6 +434,9 @@ class RBACInitializer:
                 ))
                 
                 logger.info(f"创建管理员用户: {admin_email} (ID: {admin_user_id})")
+            
+            # 创建管理员对应的租户记录
+            self._create_admin_tenant(admin_user_id, admin_email)
             
             # 为管理员分配super_admin角色
             self.cursor.execute("SELECT id FROM rbac_roles WHERE code = 'super_admin'")
