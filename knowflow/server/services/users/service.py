@@ -99,7 +99,7 @@ def delete_user(user_id):
 
 def create_user(user_data):
     """
-    创建新用户，并加入最早用户的团队，并使用相同的模型配置。
+    创建新用户，并加入超级管理员的团队，并使用超级管理员的模型配置。
     时间将以 UTC+8 (Asia/Shanghai) 存储。
     """
     try:
@@ -111,35 +111,38 @@ def create_user(user_data):
         cursor.execute(check_users_query)
         user_count = cursor.fetchone()['user_count']
         
-        # 如果有用户，则查询最早的tenant和用户配置
+        # 如果有用户，则查询超级管理员的tenant和用户配置
         if user_count > 0:
-            # 查询最早创建的tenant配置
-            query_earliest_tenant = """
-            SELECT id, llm_id, embd_id, asr_id, img2txt_id, rerank_id, tts_id, parser_ids, credit
-            FROM tenant 
-            WHERE create_time = (SELECT MIN(create_time) FROM tenant)
+            # 查询超级管理员的tenant配置
+            query_admin_tenant = """
+            SELECT t.id, t.llm_id, t.embd_id, t.asr_id, t.img2txt_id, t.rerank_id, t.tts_id, t.parser_ids, t.credit
+            FROM tenant t
+            JOIN user u ON t.id = u.id 
+            WHERE u.is_superuser = 1 OR u.email = 'admin@gmail.com'
+            ORDER BY u.create_time ASC
             LIMIT 1
             """
-            cursor.execute(query_earliest_tenant)
-            earliest_tenant = cursor.fetchone()
+            cursor.execute(query_admin_tenant)
+            admin_tenant = cursor.fetchone()
             
-            # 查询最早创建的用户ID
-            query_earliest_user = """
+            # 查询超级管理员的用户ID
+            query_admin_user = """
             SELECT id FROM user 
-            WHERE create_time = (SELECT MIN(create_time) FROM user)
+            WHERE is_superuser = 1 OR email = 'admin@gmail.com'
+            ORDER BY create_time ASC
             LIMIT 1
             """
-            cursor.execute(query_earliest_user)
-            earliest_user = cursor.fetchone()
+            cursor.execute(query_admin_user)
+            admin_user = cursor.fetchone()
             
-            # 查询最早用户的所有tenant_llm配置
-            query_earliest_user_tenant_llms = """
+            # 查询超级管理员的所有tenant_llm配置
+            query_admin_user_tenant_llms = """
             SELECT llm_factory, model_type, llm_name, api_key, api_base, max_tokens, used_tokens
             FROM tenant_llm 
             WHERE tenant_id = %s
             """
-            cursor.execute(query_earliest_user_tenant_llms, (earliest_user['id'],))
-            earliest_user_tenant_llms = cursor.fetchall()
+            cursor.execute(query_admin_user_tenant_llms, (admin_user['id'],))
+            admin_user_tenant_llms = cursor.fetchall()
         
         # 开始插入
         user_id = generate_uuid()
@@ -199,13 +202,13 @@ def create_user(user_data):
         """
 
         if user_count > 0:
-            # 如果有现有用户，复制其模型配置
+            # 如果有现有用户，复制超级管理员的模型配置
             tenant_data = (
                 user_id, create_time, current_date, create_time, current_date, username + "'s Kingdom", # 使用修改后的时间
-                None, str(earliest_tenant['llm_id']), str(earliest_tenant['embd_id']),
-                str(earliest_tenant['asr_id']), str(earliest_tenant['img2txt_id']),
-                str(earliest_tenant['rerank_id']), str(earliest_tenant['tts_id']),
-                str(earliest_tenant['parser_ids']), str(earliest_tenant['credit']), 1
+                None, str(admin_tenant['llm_id']), str(admin_tenant['embd_id']),
+                str(admin_tenant['asr_id']), str(admin_tenant['img2txt_id']),
+                str(admin_tenant['rerank_id']), str(admin_tenant['tts_id']),
+                str(admin_tenant['parser_ids']), str(admin_tenant['credit']), 1
             )
         else:
             # 如果是第一个用户，模型ID使用空字符串
@@ -232,7 +235,7 @@ def create_user(user_data):
         )
         cursor.execute(user_tenant_insert_owner_query, user_tenant_data_owner)
 
-        # 只有在存在其他用户时，才加入最早用户的团队
+        # 只有在存在其他用户时，才加入超级管理员的团队
         if user_count > 0:
             # 插入用户租户关系表（normal角色）
             user_tenant_insert_normal_query = """
@@ -246,11 +249,11 @@ def create_user(user_data):
             """
             user_tenant_data_normal = (
                 generate_uuid(), create_time, current_date, create_time, current_date, user_id, # 使用修改后的时间
-                earliest_tenant['id'], "normal", earliest_tenant['id'], 1
+                admin_tenant['id'], "normal", admin_tenant['id'], 1
             )
             cursor.execute(user_tenant_insert_normal_query, user_tenant_data_normal)
 
-            # 为新用户复制最早用户的所有tenant_llm配置
+            # 为新用户复制超级管理员的所有tenant_llm配置
             tenant_llm_insert_query = """
             INSERT INTO tenant_llm (
                 create_time, create_date, update_time, update_date, tenant_id,
@@ -261,8 +264,8 @@ def create_user(user_data):
             )
             """
 
-            # 遍历最早用户的所有tenant_llm配置并复制给新用户
-            for tenant_llm in earliest_user_tenant_llms:
+            # 遍历超级管理员的所有tenant_llm配置并复制给新用户
+            for tenant_llm in admin_user_tenant_llms:
                 tenant_llm_data = (
                     create_time, current_date, create_time, current_date, user_id, # 使用修改后的时间
                     str(tenant_llm['llm_factory']), str(tenant_llm['model_type']), str(tenant_llm['llm_name']),
