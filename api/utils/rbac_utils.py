@@ -21,6 +21,7 @@ RBAC集成工具模块
 
 import requests
 import logging
+import os
 from functools import wraps
 from flask import request as flask_request, jsonify, current_app
 from flask_login import login_required, current_user
@@ -31,7 +32,8 @@ from api.settings import RetCode
 logger = logging.getLogger(__name__)
 
 # RBAC服务配置
-RBAC_SERVICE_URL = "http://localhost:5000/api/v1/rbac"
+KNOWFLOW_API_URL = os.getenv("KNOWFLOW_API_URL", "http://localhost:5000")
+RBAC_SERVICE_URL = f"{KNOWFLOW_API_URL}/api/v1/rbac"
 RBAC_ENABLED = True  # 全局开关，可通过环境变量控制
 
 class RBACPermissionType:
