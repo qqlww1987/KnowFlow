@@ -12,7 +12,7 @@ def get_knowledgebase_list():
     """获取知识库列表"""
     try:
         params = {
-            'page': int(request.args.get('currentPage', 1)),
+            'page': int(request.args.get('current_page', 1)),
             'size': int(request.args.get('size', 10)),
             'name': request.args.get('name', '')
         }
@@ -290,7 +290,7 @@ def get_knowledgebase_documents(kb_id):
     try:
         params = {
             'kb_id': kb_id,
-            'page': int(request.args.get('currentPage', 1)),
+            'page': int(request.args.get('current_page', 1)),
             'size': int(request.args.get('size', 10)),
             'name': request.args.get('name', '')
         }

@@ -120,6 +120,9 @@ const KnowledgeManagementPage = () => {
     total: 0,
   });
 
+  // 文档搜索状态
+  const [docSearchValue, setDocSearchValue] = useState('');
+
   // 1. 添加文档弹窗相关状态
   const [addDocModalVisible, setAddDocModalVisible] = useState(false);
   const [fileList, setFileList] = useState<FileData[]>([]);
@@ -184,12 +187,19 @@ const KnowledgeManagementPage = () => {
     loadUserList();
   }, [pagination.current, pagination.pageSize, searchValue]);
 
+  // 监听文档分页变化
+  useEffect(() => {
+    if (currentKnowledgeBase?.id) {
+      loadDocumentList(currentKnowledgeBase.id);
+    }
+  }, [docPagination.current, docPagination.pageSize, docSearchValue]);
+
   const loadKnowledgeData = async () => {
     setLoading(true);
     try {
       const res = await request.get('/api/v1/knowledgebases', {
         params: {
-          currentPage: pagination.current,
+          current_page: pagination.current, // 修正参数名
           size: pagination.pageSize,
           name: searchValue,
         },
@@ -208,7 +218,7 @@ const KnowledgeManagementPage = () => {
     try {
       const res = await request.get('/api/v1/users', {
         params: {
-          currentPage: 1,
+          current_page: 1, // 修正参数名
           size: 1000,
         },
       });
@@ -226,14 +236,15 @@ const KnowledgeManagementPage = () => {
   const loadDocumentList = async (kbId: string) => {
     setDocumentLoading(true);
     try {
+      const params = {
+        current_page: docPagination.current, // 修正参数名
+        size: docPagination.pageSize,
+        name: docSearchValue, // 添加搜索参数
+      };
+
       const res = await request.get(
         `/api/v1/knowledgebases/${kbId}/documents`,
-        {
-          params: {
-            currentPage: docPagination.current,
-            size: docPagination.pageSize,
-          },
-        },
+        { params },
       );
       const data = res?.data?.data || {};
       setDocumentList(data.list || []);
@@ -295,7 +306,26 @@ const KnowledgeManagementPage = () => {
     }
     setCurrentKnowledgeBase(record);
     setViewModalVisible(true);
+    // 重置文档搜索和分页
+    setDocSearchValue('');
+    setDocPagination({ current: 1, pageSize: 10, total: 0 });
     loadDocumentList(record.id);
+  };
+
+  // 文档搜索处理
+  const handleDocSearch = () => {
+    setDocPagination((prev) => ({ ...prev, current: 1 }));
+    if (currentKnowledgeBase) {
+      loadDocumentList(currentKnowledgeBase.id);
+    }
+  };
+
+  const handleDocReset = () => {
+    setDocSearchValue('');
+    setDocPagination((prev) => ({ ...prev, current: 1 }));
+    if (currentKnowledgeBase) {
+      loadDocumentList(currentKnowledgeBase.id);
+    }
   };
 
   const handleDelete = async (kbId: string) => {
@@ -746,7 +776,7 @@ const KnowledgeManagementPage = () => {
     setFileLoading(true);
     try {
       const res = await request.get('/api/v1/files', {
-        params: { currentPage: page, size: pageSize },
+        params: { current_page: page, size: pageSize }, // 修正参数名
       });
       const data = res?.data?.data || {};
       setFileList(data.list || []);
@@ -1016,6 +1046,34 @@ const KnowledgeManagementPage = () => {
                   {batchParsingLoading ? '正在批量解析...' : '批量解析'}
                 </Button>
               </Space>
+
+              {/* 文档搜索区域 */}
+              <Space>
+                <Input
+                  placeholder="搜索文档名称"
+                  value={docSearchValue}
+                  onChange={(e) => setDocSearchValue(e.target.value)}
+                  onPressEnter={handleDocSearch}
+                  style={{ width: 200 }}
+                  allowClear
+                />
+                <Button
+                  type="primary"
+                  icon={<SearchOutlined />}
+                  onClick={handleDocSearch}
+                  loading={documentLoading}
+                  size="small"
+                >
+                  搜索
+                </Button>
+                <Button
+                  icon={<ReloadOutlined />}
+                  onClick={handleDocReset}
+                  size="small"
+                >
+                  重置
+                </Button>
+              </Space>
             </div>
 
             {batchParsingLoading && (
@@ -1040,6 +1098,29 @@ const KnowledgeManagementPage = () => {
                   emptyText: <Empty description="暂无文档数据" />,
                 }}
               />
+
+              {/* 文档列表分页 */}
+              <div className={styles.documentPaginationWrapper}>
+                <Pagination
+                  current={docPagination.current}
+                  pageSize={docPagination.pageSize}
+                  total={docPagination.total}
+                  onChange={(page, pageSize) => {
+                    setDocPagination((prev) => ({
+                      ...prev,
+                      current: page,
+                      pageSize: pageSize || prev.pageSize,
+                    }));
+                  }}
+                  showSizeChanger
+                  showQuickJumper
+                  showTotal={(total, range) =>
+                    `第 ${range[0]}-${range[1]} 条/共 ${total} 条文档`
+                  }
+                  pageSizeOptions={['10', '20', '50', '100']}
+                  size="small"
+                />
+              </div>
             </div>
           </div>
         )}

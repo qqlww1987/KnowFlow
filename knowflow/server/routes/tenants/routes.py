@@ -7,7 +7,7 @@ def get_tenants():
     """获取租户列表的API端点，支持分页和条件查询"""
     try:
         # 获取查询参数
-        current_page = int(request.args.get('currentPage', 1))
+        current_page = int(request.args.get('current_page', request.args.get('currentPage', 1)))
         page_size = int(request.args.get('size', 10))
         username = request.args.get('username', '')
         

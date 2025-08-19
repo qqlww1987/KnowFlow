@@ -9,7 +9,7 @@ def get_users():
     """获取用户的API端点,支持分页和条件查询"""
     try:
         # 获取查询参数
-        current_page = int(request.args.get('currentPage', 1))
+        current_page = int(request.args.get('current_page', request.args.get('currentPage', 1)))
         page_size = int(request.args.get('size', 10))
         username = request.args.get('username', '')
         email = request.args.get('email', '')
@@ -38,7 +38,7 @@ def get_assignable_users():
     """获取可分配权限的用户列表（排除超级管理员）"""
     try:
         # 获取查询参数
-        current_page = int(request.args.get('currentPage', 1))
+        current_page = int(request.args.get('current_page', request.args.get('currentPage', 1)))
         page_size = int(request.args.get('size', 10))
         username = request.args.get('username', '')
         email = request.args.get('email', '')
