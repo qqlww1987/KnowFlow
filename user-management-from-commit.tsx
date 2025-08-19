@@ -369,7 +369,7 @@ const UserManagementPage = () => {
       key: 'roles',
       render: (_: any, record: UserData) => {
         const role = userRolesMap[record.id];
-        if (role === undefined) return <Tag color="#d9d9d9">加载中</Tag>;
+        if (role === undefined) return <Tag color="#d9d9d9">未配置</Tag>;
         if (!role) return <Tag color="#d9d9d9">无角色</Tag>;
 
         const roleConfig = rolePriorityMap[role.code] || {

@@ -45,10 +45,6 @@ def get_users_with_pagination(current_page, page_size, username='', email=''):
         cursor.execute(query, params + [page_size, offset])
         results = cursor.fetchall()
         
-        # 关闭连接
-        cursor.close()
-        conn.close()
-        
         # 格式化结果
         formatted_users = []
         for user in results:
@@ -59,6 +55,10 @@ def get_users_with_pagination(current_page, page_size, username='', email=''):
                 "createTime": user["create_date"].strftime("%Y-%m-%d %H:%M:%S") if user["create_date"] else "",
                 "updateTime": user["update_date"].strftime("%Y-%m-%d %H:%M:%S") if user["update_date"] else "",
             })
+        
+        # 关闭连接
+        cursor.close()
+        conn.close()
         
         return formatted_users, total
         
@@ -425,10 +425,6 @@ def get_assignable_users_with_pagination(current_page, page_size, username='', e
         cursor.execute(query, params + [page_size, offset])
         results = cursor.fetchall()
         
-        # 关闭连接
-        cursor.close()
-        conn.close()
-        
         # 格式化结果
         formatted_users = []
         for user in results:
@@ -439,6 +435,10 @@ def get_assignable_users_with_pagination(current_page, page_size, username='', e
                 "createTime": user["create_date"].strftime("%Y-%m-%d %H:%M:%S") if user["create_date"] else "",
                 "updateTime": user["update_date"].strftime("%Y-%m-%d %H:%M:%S") if user["update_date"] else "",
             })
+        
+        # 关闭连接
+        cursor.close()
+        conn.close()
         
         return formatted_users, total
         
