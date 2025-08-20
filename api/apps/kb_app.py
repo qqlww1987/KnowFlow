@@ -14,7 +14,6 @@
 #  limitations under the License.
 #
 import json
-import os
 
 from flask import request
 try:
@@ -52,11 +51,11 @@ def create():
     dataset_name = req["name"]
     if not isinstance(dataset_name, str):
         return get_data_error_result(message="Dataset name must be string.")
-    if dataset_name == "":
+    if dataset_name.strip() == "":
         return get_data_error_result(message="Dataset name can't be empty.")
-    if len(dataset_name) >= DATASET_NAME_LIMIT:
+    if len(dataset_name.encode("utf-8")) > DATASET_NAME_LIMIT:
         return get_data_error_result(
-            message=f"Dataset name length is {len(dataset_name)} which is large than {DATASET_NAME_LIMIT}")
+            message=f"Dataset name length is {len(dataset_name)} which is larger than {DATASET_NAME_LIMIT}")
 
     dataset_name = dataset_name.strip()
     dataset_name = duplicate_name(
@@ -99,7 +98,15 @@ def create():
 @not_allowed_parameters("id", "tenant_id", "created_by", "create_time", "update_time", "create_date", "update_date", "created_by")
 def update():
     req = request.json
+    if not isinstance(req["name"], str):
+        return get_data_error_result(message="Dataset name must be string.")
+    if req["name"].strip() == "":
+        return get_data_error_result(message="Dataset name can't be empty.")
+    if len(req["name"].encode("utf-8")) > DATASET_NAME_LIMIT:
+        return get_data_error_result(
+            message=f"Dataset name length is {len(req['name'])} which is large than {DATASET_NAME_LIMIT}")
     req["name"] = req["name"].strip()
+
     if not KnowledgebaseService.accessible4deletion(req["kb_id"], current_user.id):
         return get_json_result(
             data=False,
@@ -118,16 +125,9 @@ def update():
             return get_data_error_result(
                 message="Can't find this knowledgebase!")
 
-        if req.get("parser_id", "") == "tag" and os.environ.get('DOC_ENGINE', "elasticsearch") == "infinity":
-            return get_json_result(
-                data=False,
-                message='The chunking method Tag has not been supported by Infinity yet.',
-                code=settings.RetCode.OPERATING_ERROR
-            )
-
         if req["name"].lower() != kb.name.lower() \
                 and len(
-            KnowledgebaseService.query(name=req["name"], tenant_id=current_user.id, status=StatusEnum.VALID.value)) > 1:
+            KnowledgebaseService.query(name=req["name"], tenant_id=current_user.id, status=StatusEnum.VALID.value)) >= 1:
             return get_data_error_result(
                 message="Duplicated knowledgebase name.")
 
@@ -181,7 +181,10 @@ def list_kbs():
     items_per_page = int(request.args.get("page_size", 0))
     parser_id = request.args.get("parser_id")
     orderby = request.args.get("orderby", "create_time")
-    desc = request.args.get("desc", True)
+    if request.args.get("desc", "true").lower() == "false":
+        desc = False
+    else:
+        desc = True
 
     req = request.get_json()
     owner_ids = req.get("owner_ids", [])
@@ -200,9 +203,9 @@ def list_kbs():
                 tenants, current_user.id, 0,
                 0, orderby, desc, keywords, parser_id)
             kbs = [kb for kb in kbs if kb["tenant_id"] in tenants]
+            total = len(kbs)
             if page_number and items_per_page:
                 kbs = kbs[(page_number-1)*items_per_page:page_number*items_per_page]
-            total = len(kbs)
         return get_json_result(data={"kbs": kbs, "total": total})
     except Exception as e:
         return server_error_response(e)
@@ -256,7 +259,10 @@ def rm():
 def list_tags(kb_id):
     # RBAC权限检查已经在装饰器中完成，无需额外的访问权限检查
 
-    tags = settings.retrievaler.all_tags(current_user.id, [kb_id])
+    tenants = UserTenantService.get_tenants_by_user_id(current_user.id)
+    tags = []
+    for tenant in tenants:
+        tags += settings.retrievaler.all_tags(tenant["tenant_id"], [kb_id])
     return get_json_result(data=tags)
 
 
@@ -273,7 +279,10 @@ def list_tags_from_kbs():
                 code=settings.RetCode.AUTHENTICATION_ERROR
             )
 
-    tags = settings.retrievaler.all_tags(current_user.id, kb_ids)
+    tenants = UserTenantService.get_tenants_by_user_id(current_user.id)
+    tags = []
+    for tenant in tenants:
+        tags += settings.retrievaler.all_tags(tenant["tenant_id"], kb_ids)
     return get_json_result(data=tags)
 
 

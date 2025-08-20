@@ -53,11 +53,10 @@ class RAGFlow:
         name: str,
         avatar: Optional[str] = None,
         description: Optional[str] = None,
-        embedding_model: Optional[str] = "BAAI/bge-large-zh-v1.5@BAAI",
+        embedding_model: Optional[str] = None,
         permission: str = "me",
         chunk_method: str = "naive",
-        pagerank: int = 0,
-        parser_config: DataSet.ParserConfig = None,
+        parser_config: Optional[DataSet.ParserConfig] = None,
     ) -> DataSet:
         payload = {
             "name": name,
@@ -66,7 +65,6 @@ class RAGFlow:
             "embedding_model": embedding_model,
             "permission": permission,
             "chunk_method": chunk_method,
-            "pagerank": pagerank,
         }
         if parser_config is not None:
             payload["parser_config"] = parser_config.to_json()
@@ -199,6 +197,7 @@ class RAGFlow:
         top_k=1024,
         rerank_id: str | None = None,
         keyword: bool = False,
+        cross_languages: list[str]|None = None
     ):
         if document_ids is None:
             document_ids = []
@@ -213,6 +212,7 @@ class RAGFlow:
             "question": question,
             "dataset_ids": dataset_ids,
             "document_ids": document_ids,
+            "cross_languages": cross_languages
         }
         # Send a POST request to the backend service (using requests library as an example, actual implementation may vary)
         res = self.post("/retrieval", json=data_json)
@@ -246,10 +246,7 @@ class RAGFlow:
         raise Exception(res["message"])
 
     def create_agent(self, title: str, dsl: dict, description: str | None = None) -> None:
-        req = {
-            "title": title,
-            "dsl": dsl
-        }
+        req = {"title": title, "dsl": dsl}
 
         if description is not None:
             req["description"] = description
@@ -260,13 +257,7 @@ class RAGFlow:
         if res.get("code") != 0:
             raise Exception(res["message"])
 
-    def update_agent(
-        self,
-        agent_id: str,
-        title: str | None = None,
-        description: str | None = None,
-        dsl: dict | None = None
-    ) -> None:
+    def update_agent(self, agent_id: str, title: str | None = None, description: str | None = None, dsl: dict | None = None) -> None:
         req = {}
 
         if title is not None:

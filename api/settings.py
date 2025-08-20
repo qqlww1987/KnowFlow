@@ -15,17 +15,17 @@
 #
 import json
 import os
+import secrets
 from datetime import date
 from enum import Enum, IntEnum
 
 import rag.utils
 import rag.utils.es_conn
 import rag.utils.infinity_conn
-import rag.utils.opensearch_coon
+import rag.utils.opensearch_conn
 from api.constants import RAG_FLOW_SERVICE_NAME
 from api.utils import decrypt_database_config, get_base_config
 from api.utils.file_utils import get_project_base_directory
-from graphrag import search as kg_search
 from rag.nlp import search
 
 LIGHTEN = int(os.environ.get("LIGHTEN", "0"))
@@ -70,8 +70,28 @@ REGISTER_ENABLED = 1
 # sandbox-executor-manager
 SANDBOX_ENABLED = 0
 SANDBOX_HOST = None
+STRONG_TEST_COUNT = int(os.environ.get("STRONG_TEST_COUNT", "8"))
 
 BUILTIN_EMBEDDING_MODELS = ["BAAI/bge-large-zh-v1.5@BAAI", "maidalun1020/bce-embedding-base_v1@Youdao"]
+
+def get_or_create_secret_key():
+    secret_key = os.environ.get("RAGFLOW_SECRET_KEY")
+    if secret_key and len(secret_key) >= 32:
+        return secret_key
+    
+    # Check if there's a configured secret key
+    configured_key = get_base_config(RAG_FLOW_SERVICE_NAME, {}).get("secret_key")
+    if configured_key and configured_key != str(date.today()) and len(configured_key) >= 32:
+        return configured_key
+    
+    # Generate a new secure key and warn about it
+    import logging
+    new_key = secrets.token_hex(32)
+    logging.warning(
+        "SECURITY WARNING: Using auto-generated SECRET_KEY. "
+        f"Generated key: {new_key}"
+    )
+    return new_key
 
 
 def init_settings():
@@ -121,7 +141,7 @@ def init_settings():
     HOST_IP = get_base_config(RAG_FLOW_SERVICE_NAME, {}).get("host", "127.0.0.1")
     HOST_PORT = get_base_config(RAG_FLOW_SERVICE_NAME, {}).get("http_port")
 
-    SECRET_KEY = get_base_config(RAG_FLOW_SERVICE_NAME, {}).get("secret_key", str(date.today()))
+    SECRET_KEY = get_or_create_secret_key()
 
     global AUTHENTICATION_CONF, CLIENT_AUTHENTICATION, HTTP_APP_KEY, GITHUB_OAUTH, FEISHU_OAUTH, OAUTH_CONFIG
     # authentication
@@ -144,11 +164,12 @@ def init_settings():
     elif lower_case_doc_engine == "infinity":
         docStoreConn = rag.utils.infinity_conn.InfinityConnection()
     elif lower_case_doc_engine == "opensearch":
-        docStoreConn = rag.utils.opensearch_coon.OSConnection()
+        docStoreConn = rag.utils.opensearch_conn.OSConnection()
     else:
         raise Exception(f"Not supported doc engine: {DOC_ENGINE}")
 
     retrievaler = search.Dealer(docStoreConn)
+    from graphrag import search as kg_search
     kg_retrievaler = kg_search.KGSearch(docStoreConn)
 
     if int(os.environ.get("SANDBOX_ENABLED", "0")):
