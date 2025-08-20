@@ -555,6 +555,7 @@ General：实体和关系提取提示来自 GitHub - microsoft/graphrag：基于
       userManagement: '用户管理',
       teamManagement: '团队管理',
       knowledgeManagement: '知识库管理',
+      fileManagement: '文件管理',
       userConfig: '用户配置',
       logout: '登出',
       username: '用户名',

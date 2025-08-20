@@ -2,7 +2,10 @@ import { Domain } from '@/constants/common';
 import { useTranslate } from '@/hooks/common-hooks';
 import { useLogout } from '@/hooks/login-hooks';
 import { useSecondPathName } from '@/hooks/route-hook';
-import { useFetchSystemVersion } from '@/hooks/user-setting-hooks';
+import {
+  useFetchSystemVersion,
+  useFetchUserInfo,
+} from '@/hooks/user-setting-hooks';
 import type { MenuProps } from 'antd';
 import { Flex, Menu } from 'antd';
 import React, { useEffect, useMemo } from 'react';
@@ -22,6 +25,7 @@ const SideBar = () => {
   const { logout } = useLogout();
   const { t } = useTranslate('setting');
   const { version, fetchSystemVersion } = useFetchSystemVersion();
+  const { data: userInfo } = useFetchUserInfo();
 
   useEffect(() => {
     if (location.host !== Domain) {
@@ -52,9 +56,24 @@ const SideBar = () => {
     } as MenuItem;
   }
 
-  const items: MenuItem[] = Object.values(UserSettingRouteKey).map((value) =>
-    getItem(value, value, UserSettingIconMap[value]),
-  );
+  const items: MenuItem[] = useMemo(() => {
+    return Object.values(UserSettingRouteKey)
+      .filter((x) => {
+        // 移除 file-management、knowledge-management、user-config 菜单项
+        if (
+          x === UserSettingRouteKey.FileManagement ||
+          x === UserSettingRouteKey.KnowledgeManagement ||
+          x === UserSettingRouteKey.UserConfig
+        ) {
+          return false;
+        }
+        if (x === UserSettingRouteKey.Management) {
+          return userInfo?.is_superuser;
+        }
+        return true;
+      })
+      .map((value) => getItem(value, value, UserSettingIconMap[value]));
+  }, [userInfo?.is_superuser]);
 
   const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
     if (key === UserSettingRouteKey.Logout) {

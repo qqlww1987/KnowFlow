@@ -1,6 +1,7 @@
 import {
   ApiIcon,
   LogOutIcon,
+  ManagementIcon,
   ModelProviderIcon,
   PasswordIcon,
   ProfileIcon,
@@ -22,6 +23,7 @@ export const UserSettingIconMap = {
   [UserSettingRouteKey.MCP]: (
     <IconFont name="mcp" className="size-6"></IconFont>
   ),
+  [UserSettingRouteKey.Management]: <ManagementIcon />,
 };
 
 export * from '@/constants/setting';

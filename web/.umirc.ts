@@ -42,7 +42,7 @@ export default defineConfig({
       changeOrigin: true,
     },
     '/v1': {
-      target: 'http://8.134.177.47:15003',
+      target: 'http://127.0.0.1:9380',
       changeOrigin: true,
     },
     '/minio': {
