@@ -548,6 +548,7 @@ General：实体和关系提取提示来自 GitHub - microsoft/graphrag：基于
       model: '模型提供商',
       modelDescription: '在此设置模型参数和 API KEY。',
       team: '团队',
+      mcp: 'MCP',
       system: '系统',
       management: '管理',
       managementDescription: '系统管理功能，仅超级管理员可见。',

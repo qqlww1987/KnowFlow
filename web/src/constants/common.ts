@@ -48,8 +48,9 @@ export const LanguageList = [
   'Vietnamese',
   'Japanese',
   'Portuguese BR',
+  'German',
+  'French',
 ];
-
 export const LanguageMap = {
   English: 'English',
   Chinese: '简体中文',
@@ -59,6 +60,8 @@ export const LanguageMap = {
   Vietnamese: 'Tiếng việt',
   Japanese: '日本語',
   'Portuguese BR': 'Português BR',
+  German: 'German',
+  French: 'Français',
 };
 
 export enum LanguageAbbreviation {
@@ -70,6 +73,8 @@ export enum LanguageAbbreviation {
   Es = 'es',
   Vi = 'vi',
   PtBr = 'pt-BR',
+  De = 'de',
+  Fr = 'fr',
 }
 
 export const LanguageAbbreviationMap = {
@@ -81,6 +86,8 @@ export const LanguageAbbreviationMap = {
   [LanguageAbbreviation.Vi]: 'Tiếng việt',
   [LanguageAbbreviation.Ja]: '日本語',
   [LanguageAbbreviation.PtBr]: 'Português BR',
+  [LanguageAbbreviation.De]: 'Deutsch',
+  [LanguageAbbreviation.Fr]: 'Français',
 };
 
 export const LanguageTranslationMap = {
@@ -92,6 +99,8 @@ export const LanguageTranslationMap = {
   Vietnamese: 'vi',
   Japanese: 'ja',
   'Portuguese BR': 'pt-br',
+  German: 'de',
+  French: 'fr',
 };
 
 export enum FileMimeType {
@@ -144,4 +153,10 @@ export enum Platform {
   Dify = 'Dify',
   FastGPT = 'FastGPT',
   Coze = 'Coze',
+}
+
+export enum ThemeEnum {
+  Dark = 'dark',
+  Light = 'light',
+  System = 'system',
 }

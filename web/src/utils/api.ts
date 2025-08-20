@@ -1,4 +1,5 @@
 let api_host = `/v1`;
+const ExternalApi = `/api`;
 
 export { api_host };
 
@@ -11,6 +12,8 @@ export default {
   user_info: `${api_host}/user/info`,
   tenant_info: `${api_host}/user/tenant_info`,
   set_tenant_info: `${api_host}/user/set_tenant_info`,
+  login_channels: `${api_host}/user/login/channels`,
+  login_channel: (channel: string) => `${api_host}/user/login/${channel}`,
 
   // team
   addTenantUser: (tenantId: string) => `${api_host}/tenant/${tenantId}/user`,
@@ -29,6 +32,9 @@ export default {
   add_llm: `${api_host}/llm/add_llm`,
   delete_llm: `${api_host}/llm/delete_llm`,
   deleteFactory: `${api_host}/llm/delete_factory`,
+
+  // plugin
+  llm_tools: `${api_host}/plugin/llm_tools`,
 
   // knowledge base
   kb_list: `${api_host}/kb/list`,
@@ -72,12 +78,8 @@ export default {
   document_infos: `${api_host}/document/infos`,
   upload_and_parse: `${api_host}/document/upload_and_parse`,
   parse: `${api_host}/document/parse`,
-
-  // knowflow mineru parser
-  knowflow_document_parse: `/api/v1/knowledgebases/documents`,
-  knowflow_parse_progress: `/api/v1/knowledgebases/documents`,
-  knowflow_parse_cancel: `/api/v1/knowledgebases/documents`,
   setMeta: `${api_host}/document/set_meta`,
+  get_dataset_filter: `${api_host}/document/filter`,
 
   // chat
   setDialog: `${api_host}/dialog/set`,
@@ -106,6 +108,9 @@ export default {
   completeExternalConversation: `${api_host}/api/completion`,
   uploadAndParseExternal: `${api_host}/api/document/upload_and_parse`,
 
+  // next chat
+  listNextDialog: `${api_host}/dialog/next`,
+
   // file manager
   listFile: `${api_host}/file/list`,
   uploadFile: `${api_host}/file/upload`,
@@ -124,17 +129,49 @@ export default {
   createSystemToken: `${api_host}/system/new_token`,
   listSystemToken: `${api_host}/system/token_list`,
   removeSystemToken: `${api_host}/system/token`,
+  getSystemConfig: `${api_host}/system/config`,
+  setLangfuseConfig: `${api_host}/langfuse/api_key`,
 
   // flow
   listTemplates: `${api_host}/canvas/templates`,
   listCanvas: `${api_host}/canvas/list`,
+  listCanvasTeam: `${api_host}/canvas/listteam`,
   getCanvas: `${api_host}/canvas/get`,
   getCanvasSSE: `${api_host}/canvas/getsse`,
   removeCanvas: `${api_host}/canvas/rm`,
   setCanvas: `${api_host}/canvas/set`,
+  settingCanvas: `${api_host}/canvas/setting`,
+  getListVersion: `${api_host}/canvas/getlistversion`,
+  getVersion: `${api_host}/canvas/getversion`,
   resetCanvas: `${api_host}/canvas/reset`,
   runCanvas: `${api_host}/canvas/completion`,
   testDbConnect: `${api_host}/canvas/test_db_connect`,
   getInputElements: `${api_host}/canvas/input_elements`,
   debug: `${api_host}/canvas/debug`,
+  uploadCanvasFile: `${api_host}/canvas/upload`,
+  trace: `${api_host}/canvas/trace`,
+  // agent
+  inputForm: `${api_host}/canvas/input_form`,
+  fetchVersionList: (id: string) => `${api_host}/canvas/getlistversion/${id}`,
+  fetchVersion: (id: string) => `${api_host}/canvas/getversion/${id}`,
+  fetchCanvas: (id: string) => `${api_host}/canvas/get/${id}`,
+  fetchAgentAvatar: (id: string) => `${api_host}/canvas/getsse/${id}`,
+  uploadAgentFile: (id?: string) => `${api_host}/canvas/upload/${id}`,
+  fetchAgentLogs: (canvasId: string) =>
+    `${api_host}/canvas/${canvasId}/sessions`,
+  fetchExternalAgentInputs: (canvasId: string) =>
+    `${ExternalApi}${api_host}/agentbots/${canvasId}/inputs`,
+
+  // mcp server
+  listMcpServer: `${api_host}/mcp_server/list`,
+  getMcpServer: `${api_host}/mcp_server/detail`,
+  createMcpServer: `${api_host}/mcp_server/create`,
+  updateMcpServer: `${api_host}/mcp_server/update`,
+  deleteMcpServer: `${api_host}/mcp_server/rm`,
+  importMcpServer: `${api_host}/mcp_server/import`,
+  exportMcpServer: `${api_host}/mcp_server/export`,
+  listMcpServerTools: `${api_host}/mcp_server/list_tools`,
+  testMcpServerTool: `${api_host}/mcp_server/test_tool`,
+  cacheMcpServerTool: `${api_host}/mcp_server/cache_tools`,
+  testMcpServer: `${api_host}/mcp_server/test_mcp`,
 };

@@ -16,6 +16,7 @@ export default defineConfig({
   icons: {},
   hash: true,
   favicons: ['/logo1.svg'],
+  headScripts: [{ src: '/iconfont.js', defer: true }],
   clickToComponent: {},
   history: {
     type: 'browser',
@@ -41,7 +42,7 @@ export default defineConfig({
       changeOrigin: true,
     },
     '/v1': {
-      target: 'http://127.0.0.1:9380',
+      target: 'http://8.134.177.47:15003',
       changeOrigin: true,
     },
     '/minio': {

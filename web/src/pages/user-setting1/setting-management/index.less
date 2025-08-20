@@ -1,0 +1,194 @@
+.managementWrapper {
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: none !important;
+  margin: -32px 0 0;
+  padding: 0;
+}
+
+.tabsContainer {
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.managementTabs {
+  .ant-tabs-nav {
+    padding: 0;
+    background: linear-gradient(135deg, #fafbfc 0%, #f8f9fa 100%);
+    border-bottom: 2px solid #e8ecf0;
+
+    &::before {
+      display: none;
+    }
+  }
+
+  .ant-tabs-tab {
+    padding: 18px 20px !important;
+    margin: 0 4px 0 4px !important;
+    border-radius: 12px 12px 0 0 !important;
+    background: transparent;
+    border: none !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    font-weight: 500;
+
+    &::before {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #1890ff 0%, #40a9ff 100%);
+      border-radius: 2px;
+      transition: width 0.3s ease;
+    }
+
+    &:hover {
+      background: rgba(24, 144, 255, 0.06);
+      color: #1890ff;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(24, 144, 255, 0.15);
+
+      .tabIcon {
+        color: #1890ff;
+        transform: scale(1.1) rotate(5deg);
+      }
+
+      &::before {
+        width: 60%;
+      }
+    }
+
+    &.ant-tabs-tab-active {
+      background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
+      color: #1890ff;
+      font-weight: 600;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(24, 144, 255, 0.2);
+      border: 1px solid rgba(24, 144, 255, 0.2) !important;
+      border-bottom: none !important;
+
+      &::before {
+        width: 80%;
+        height: 4px;
+        background: linear-gradient(
+          90deg,
+          #1890ff 0%,
+          #40a9ff 50%,
+          #69c0ff 100%
+        );
+        box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3);
+      }
+
+      .tabIcon {
+        color: #1890ff;
+        transform: scale(1.15);
+      }
+    }
+  }
+
+  .ant-tabs-ink-bar {
+    display: none;
+  }
+}
+
+.tabLabel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: inherit;
+}
+
+.tabIcon {
+  font-size: 16px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #666;
+}
+
+.managementContent {
+  flex: 1;
+  background: #f8f9fa;
+  padding: 32px 32px 0;
+  min-height: 0;
+  overflow-y: auto;
+  width: 100%;
+  max-width: none !important;
+}
+
+/* 移除原有的侧边栏相关样式 */
+.managementLayout,
+.managementSider,
+.menuWrapper,
+.menuItem,
+.menuItemActive,
+.menuIcon,
+.menuLabel {
+  display: none;
+}
+
+@media (max-width: 1200px) {
+  .managementTabs .ant-tabs-tab {
+    padding: 12px 16px !important;
+  }
+
+  .tabLabel {
+    font-size: 13px;
+  }
+
+  .tabIcon {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 768px) {
+  .managementContent {
+    padding: 16px;
+  }
+
+  .managementTabs {
+    .ant-tabs-nav {
+      padding: 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+
+      &::-webkit-scrollbar {
+        display: none;
+      }
+    }
+
+    .ant-tabs-tab {
+      padding: 14px 16px !important;
+      margin: 0 2px 0 2px !important;
+      min-width: 110px;
+      flex-shrink: 0;
+      border-radius: 8px 8px 0 0 !important;
+
+      &:hover {
+        transform: translateY(-0.5px);
+        box-shadow: 0 2px 8px rgba(24, 144, 255, 0.12);
+      }
+
+      &.ant-tabs-tab-active {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 16px rgba(24, 144, 255, 0.15);
+      }
+    }
+  }
+
+  .tabLabel {
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+  }
+
+  .tabIcon {
+    font-size: 16px;
+  }
+}
