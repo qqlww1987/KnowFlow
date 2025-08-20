@@ -13,7 +13,7 @@ import {
   InfoCircleOutlined,
   LoadingOutlined,
 } from '@ant-design/icons';
-import type { GetProp, UploadFile } from 'antd';
+import type { UploadFile, UploadProps } from 'antd';
 import {
   Button,
   Card,
@@ -25,7 +25,6 @@ import {
   Spin,
   Typography,
   Upload,
-  UploadProps,
 } from 'antd';
 import get from 'lodash/get';
 import { CircleStop, Paperclip, SendHorizontal } from 'lucide-react';
@@ -40,7 +39,7 @@ import {
 import FileIcon from '../file-icon';
 import styles from './index.less';
 
-type FileType = Parameters<GetProp<UploadProps, 'beforeUpload'>>[0];
+type FileType = Parameters<NonNullable<UploadProps['beforeUpload']>>[0];
 const { Text } = Typography;
 
 const { TextArea } = Input;
@@ -196,6 +195,14 @@ const MessageInput = ({
     [removeDocument, deleteDocument, isShared],
   );
 
+  const handleCompositionStart = useCallback(() => {
+    // Handle composition start
+  }, []);
+
+  const handleCompositionEnd = useCallback(() => {
+    // Handle composition end
+  }, []);
+
   const handleStopOutputMessage = useCallback(() => {
     stopOutputMessage?.();
   }, [stopOutputMessage]);
@@ -230,7 +237,7 @@ const MessageInput = ({
     >
       <TextArea
         size="large"
-        placeholder={t('sendPlaceholder')}
+        placeholder="请输入您的问题"
         value={value}
         allowClear
         disabled={disabled}
@@ -240,10 +247,13 @@ const MessageInput = ({
           padding: '0px 10px',
           marginTop: 10,
         }}
-        autoSize={{ minRows: 2, maxRows: 10 }}
+        autoSize={{ minRows: 1, maxRows: 10 }}
         onKeyDown={handleKeyDown}
         onChange={onInputChange}
+        onCompositionStart={handleCompositionStart}
+        onCompositionEnd={handleCompositionEnd}
       />
+
       <Divider style={{ margin: '5px 30px 10px 0px' }} />
       <Flex justify="space-between" align="center">
         {fileList.length > 0 && (
