@@ -213,14 +213,6 @@ def get_models(dialog):
     return kbs, embd_mdl, rerank_mdl, chat_mdl, tts_mdl
 
 
-BAD_CITATION_PATTERNS = [
-    re.compile(r"\(\s*ID\s*[: ]*\s*(\d+)\s*\)"),  # (ID: 12)
-    re.compile(r"\[\s*ID\s*[: ]*\s*(\d+)\s*\]"),  # [ID: 12]
-    re.compile(r"【\s*ID\s*[: ]*\s*(\d+)\s*】"),  # 【ID: 12】
-    re.compile(r"ref\s*(\d+)", flags=re.IGNORECASE),  # ref12、REF 12
-]
-
-
 def repair_bad_citation_formats(answer: str, kbinfos: dict, idx: set):
     max_index = len(kbinfos["chunks"])
 
@@ -230,22 +222,28 @@ def repair_bad_citation_formats(answer: str, kbinfos: dict, idx: set):
             return True
         return False
 
-    def find_and_replace(pattern, group_index=1, repl=lambda i: f"ID:{i}", flags=0):
+    def find_and_replace(pattern, group_index=1, repl=lambda i: f"##{i}$$", flags=0):
         nonlocal answer
-
-        def replacement(match):
+        for match in re.finditer(pattern, answer, flags=flags):
             try:
                 i = int(match.group(group_index))
                 if safe_add(i):
-                    return f"[{repl(i)}]"
+                    answer = answer.replace(match.group(0), repl(i))
             except Exception:
-                pass
-            return match.group(0)
+                continue
 
-        answer = re.sub(pattern, replacement, answer, flags=flags)
-
-    for pattern in BAD_CITATION_PATTERNS:
-        find_and_replace(pattern)
+    find_and_replace(r"\(\s*ID:\s*(\d+)\s*\)")  # (ID: 12)
+    find_and_replace(r"\[\s*ID\s*[: ]*\s*(\d+)\s*\]")  # [ID: 12]
+    find_and_replace(r"ID[: ]+(\d+)")  # ID: 12, ID 12
+    find_and_replace(r"\$\$(\d+)\$\$")  # $$12$$
+    find_and_replace(r"\$\[(\d+)\]\$")  # $[12]$
+    find_and_replace(r"\$\$(\d+)\${2,}")  # $$12$$$$
+    find_and_replace(r"\$(\d+)\$")  # $12$
+    find_and_replace(r"(#{2,})(\d+)(\${2,})", group_index=2)  # 2+ # and 2+ $
+    find_and_replace(r"(#{2,})(\d+)(#{1,})", group_index=2)  # 2+ # and 1+ #
+    find_and_replace(r"##(\d+)#{2,}")  # ##12###
+    find_and_replace(r"【(\d+)】")  # 【12】
+    find_and_replace(r"ref\s*(\d+)", flags=re.IGNORECASE)  # ref12, ref 12, REF 12
 
     return answer, idx
 

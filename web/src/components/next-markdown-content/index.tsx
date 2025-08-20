@@ -25,7 +25,7 @@ import {
 } from '@/utils/chat';
 
 import { cn } from '@/lib/utils';
-import { currentReg, replaceTextByOldReg } from '@/pages/chat/utils';
+import { replaceTextByOldReg } from '@/pages/chat/utils';
 import classNames from 'classnames';
 import { pipe } from 'lodash/fp';
 import { CircleAlert } from 'lucide-react';
@@ -37,8 +37,8 @@ import {
 } from '../ui/hover-card';
 import styles from './index.less';
 
-const getChunkIndex = (match: string) => Number(match);
-// TODO: The display of the table is inconsistent with the display previously placed in the MessageItem.
+const reg = /(~{2}\d+={2})/g;
+const getChunkIndex = (match: string) => Number(match.slice(2, -2));
 function MarkdownContent({
   reference,
   clickDocumentButton,
@@ -206,7 +206,7 @@ function MarkdownContent({
 
   const renderReference = useCallback(
     (text: string) => {
-      let replacedText = reactStringReplace(text, currentReg, (match, i) => {
+      let replacedText = reactStringReplace(text, reg, (match, i) => {
         const chunkIndex = getChunkIndex(match);
 
         const { documentUrl, fileExtension, imageId, chunkItem, documentId } =
