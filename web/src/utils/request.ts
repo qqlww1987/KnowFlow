@@ -68,7 +68,7 @@ const errorHandler = (error: {
       });
     }
   }
-  return response ?? { data: { code: 1999 } };
+  return response ?? ({ data: { code: 1999 } } as any);
 };
 
 const request: RequestMethod = extend({
@@ -78,8 +78,14 @@ const request: RequestMethod = extend({
 });
 
 request.interceptors.request.use((url: string, options: any) => {
-  const data = convertTheKeysOfTheObjectToSnake(options.data);
-  const params = convertTheKeysOfTheObjectToSnake(options.params);
+  // Allow skipping snake_case conversion per-request
+  const shouldConvert = !options?.skipSnakeCase;
+  const data = shouldConvert
+    ? convertTheKeysOfTheObjectToSnake(options.data)
+    : options.data;
+  const params = shouldConvert
+    ? convertTheKeysOfTheObjectToSnake(options.params)
+    : options.params;
 
   return {
     url,
@@ -103,27 +109,30 @@ request.interceptors.response.use(async (response: Response, options) => {
     message.error(RetcodeMessage[response?.status as ResultCode]);
   }
 
-  if (options.responseType === 'blob') {
+  if ((options as any).responseType === 'blob') {
     return response;
   }
 
   const data: ResponseType = await response?.clone()?.json();
-  if (data?.code === 100) {
-    message.error(data?.message);
-  } else if (data?.code === 401) {
-    notification.error({
-      message: data?.message,
-      description: data?.message,
-      duration: 3,
-    });
-    authorizationUtil.removeAll();
-    redirectToLogin();
-  } else if (data?.code !== 0) {
-    notification.error({
-      message: `${i18n.t('message.hint')} : ${data?.code}`,
-      description: data?.message,
-      duration: 3,
-    });
+  // 仅当后端返回含有 code 字段的统一响应时，才做通用提示处理
+  if (data && Object.prototype.hasOwnProperty.call(data, 'code')) {
+    if (data?.code === 100) {
+      message.error(data?.message);
+    } else if (data?.code === 401) {
+      notification.error({
+        message: data?.message,
+        description: data?.message,
+        duration: 3,
+      });
+      authorizationUtil.removeAll();
+      redirectToLogin();
+    } else if (data?.code !== 0) {
+      notification.error({
+        message: `${i18n.t('message.hint')} : ${data?.code}`,
+        description: data?.message,
+        duration: 3,
+      });
+    }
   }
   return response;
 });

@@ -1,6 +1,8 @@
 from flask import request, jsonify
 from utils import success_response, error_response
 from services.files.document_service import DocumentService
+from services.rbac.permission_decorator import require_permission
+from models.rbac_models import ResourceType, PermissionType
 from .. import documents_bp
 import json
 
@@ -85,4 +87,4 @@ def update_document_chunking_config(doc_id):
         return success_response(data={'message': '分块配置更新成功'})
         
     except Exception as e:
-        return error_response(f"更新分块配置失败: {str(e)}", code=500) 
+        return error_response(f"更新分块配置失败: {str(e)}", code=500)

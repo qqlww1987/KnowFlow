@@ -31,6 +31,8 @@ DB_CONFIG = {
     "user": "root",
     "password": os.getenv("MYSQL_PASSWORD", "infini_rag_flow"),
     "database": "rag_flow",
+    "autocommit": True,
+    "buffered": True,
 }
 
 # MinIO连接配置

@@ -46,7 +46,7 @@ def get_files():
         return '', 200
         
     try:
-        current_page = int(request.args.get('currentPage', 1))
+        current_page = int(request.args.get('current_page', request.args.get('currentPage', 1)))
         page_size = int(request.args.get('size', 10))
         name_filter = request.args.get('name', '')
         

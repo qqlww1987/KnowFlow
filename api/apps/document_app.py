@@ -21,6 +21,11 @@ import re
 import flask
 from flask import request
 from flask_login import current_user, login_required
+try:
+    manager  # type: ignore
+except NameError:  # pragma: no cover
+    from flask import Blueprint
+    manager = Blueprint('document', __name__)
 
 from api import settings
 from api.constants import IMG_BASE64_PREFIX
@@ -40,15 +45,27 @@ from api.utils.api_utils import (
     server_error_response,
     validate_request,
 )
+from api.utils.rbac_utils import kb_read_required, kb_write_required
 from api.utils.file_utils import filename_type, get_project_base_directory, thumbnail
 from api.utils.web_utils import html2pdf, is_valid_url
 from deepdoc.parser.html_parser import RAGFlowHtmlParser
 from rag.nlp import search
 from rag.utils.storage_factory import STORAGE_IMPL
+from api.db.services.user_service import UserTenantService
+def _fallback_kb_accessible(kb_id: str, user_id: str) -> bool:
+    try:
+        tenants = UserTenantService.query(user_id=user_id)
+        for tenant in tenants:
+            if KnowledgebaseService.query(tenant_id=tenant.tenant_id, id=kb_id):
+                return True
+        return False
+    except Exception:
+        return False
 
 
 @manager.route("/upload", methods=["POST"])  # noqa: F821
 @login_required
+@kb_write_required(resource_id_param='kb_id')
 @validate_request("kb_id")
 def upload():
     kb_id = request.form.get("kb_id")
@@ -78,6 +95,7 @@ def upload():
 
 @manager.route("/web_crawl", methods=["POST"])  # noqa: F821
 @login_required
+@kb_write_required(resource_id_param='kb_id')
 @validate_request("kb_id", "name", "url")
 def web_crawl():
     kb_id = request.form.get("kb_id")
@@ -175,16 +193,12 @@ def create():
 
 @manager.route("/list", methods=["POST"])  # noqa: F821
 @login_required
+@kb_read_required(resource_id_param='kb_id')
 def list_docs():
     kb_id = request.args.get("kb_id")
     if not kb_id:
         return get_json_result(data=False, message='Lack of "KB ID"', code=settings.RetCode.ARGUMENT_ERROR)
-    tenants = UserTenantService.query(user_id=current_user.id)
-    for tenant in tenants:
-        if KnowledgebaseService.query(tenant_id=tenant.tenant_id, id=kb_id):
-            break
-    else:
-        return get_json_result(data=False, message="Only owner of knowledgebase authorized for this operation.", code=settings.RetCode.OPERATING_ERROR)
+    # RBAC权限检查已经在装饰器中完成，无需额外的租户检查
     keywords = request.args.get("keywords", "")
 
     page_number = int(request.args.get("page", 0))

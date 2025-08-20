@@ -1,6 +1,9 @@
 import traceback
-from flask import Blueprint, request
+from flask import Blueprint, request, jsonify
 from services.knowledgebases.service import KnowledgebaseService
+from services.rbac.permission_service import permission_service
+from services.rbac.permission_decorator import require_permission
+from models.rbac_models import ResourceType, PermissionType, RoleType
 from utils import success_response, error_response
 from .. import knowledgebase_bp
 
@@ -9,7 +12,7 @@ def get_knowledgebase_list():
     """获取知识库列表"""
     try:
         params = {
-            'page': int(request.args.get('currentPage', 1)),
+            'page': int(request.args.get('current_page', 1)),
             'size': int(request.args.get('size', 10)),
             'name': request.args.get('name', '')
         }
@@ -76,19 +79,210 @@ def delete_knowledgebase(kb_id):
         return error_response(str(e))
 
 @knowledgebase_bp.route('/batch', methods=['DELETE'])
+# @require_permission('admin')  # 移除权限检查，管理界面由超级管理员操作
 def batch_delete_knowledgebase():
     """批量删除知识库"""
     try:
-        data = request.json
-        if not data or not data.get('ids'):
+        data = request.json or {}
+        # 同时兼容前端不同命名风格：camelCase、snake_case，以及历史字段 ids
+        kb_ids = data.get('kbIds') or data.get('kb_ids') or data.get('ids')
+        if not kb_ids or not isinstance(kb_ids, list) or len(kb_ids) == 0:
             return error_response('请选择要删除的知识库', code=400)
             
         result = KnowledgebaseService.batch_delete_knowledgebase(
-            kb_ids=data['ids']
+            kb_ids=kb_ids
         )
         return success_response(message=f'成功删除 {result} 个知识库')
     except Exception as e:
         return error_response(str(e))
+
+# 权限管理相关接口
+@knowledgebase_bp.route('/<string:kb_id>/permissions', methods=['GET'])
+def get_knowledgebase_permissions(kb_id):
+    """获取知识库权限列表"""
+    try:
+        # 获取知识库的所有用户权限
+        permissions = KnowledgebaseService.get_knowledgebase_permissions(kb_id)
+        return success_response(data=permissions)
+    except Exception as e:
+        return error_response(f"获取权限列表失败: {str(e)}", code=500)
+
+@knowledgebase_bp.route('/<string:kb_id>/permissions/users', methods=['POST'])
+def grant_user_permission(kb_id):
+    """为用户授予知识库权限"""
+    try:
+        data = request.json
+        if not data:
+            return error_response('请求数据不能为空', code=400)
+        
+        user_id = data.get('user_id')
+        permission_level = data.get('permission_level')  # 'admin', 'write', 'read'
+        
+        if not user_id or not permission_level:
+            return error_response('用户ID和权限级别不能为空', code=400)
+        
+        # 验证权限级别
+        if permission_level not in ['admin', 'write', 'read']:
+            return error_response('无效的权限级别', code=400)
+        
+        # 映射权限级别到角色代码
+        role_mapping = {
+            'admin': 'admin',
+            'write': 'editor', 
+            'read': 'viewer'
+        }
+        role_code = role_mapping[permission_level]
+        
+        # 授予角色
+        success = permission_service.grant_role_to_user(
+            user_id=user_id,
+            role_code=role_code,
+            granted_by='current_user',  # TODO: 从token获取当前用户
+            tenant_id='default',
+            resource_type=ResourceType.KNOWLEDGEBASE,
+            resource_id=kb_id
+        )
+        
+        if success:
+            return success_response(
+                data={'message': f'成功为用户授予{permission_level}权限'},
+                message='权限授予成功'
+            )
+        else:
+            return error_response('权限授予失败', code=500)
+            
+    except Exception as e:
+        return error_response(f"授予权限失败: {str(e)}", code=500)
+
+@knowledgebase_bp.route('/<string:kb_id>/permissions/users/<string:user_id>', methods=['DELETE'])
+def revoke_user_permission(kb_id, user_id):
+    """撤销用户的知识库权限"""
+    try:
+        # 直接撤销用户在该知识库的所有相关权限
+        kb_roles = ['admin', 'editor', 'viewer']
+        revoked_count = 0
+        
+        for role_code in kb_roles:
+            success = permission_service.revoke_role_from_user(
+                user_id=user_id,
+                role_code=role_code,
+                tenant_id='default',
+                resource_id=kb_id
+            )
+            if success:
+                revoked_count += 1
+        
+        if revoked_count > 0:
+            return success_response(
+                data={'message': f'成功撤销{revoked_count}个权限'},
+                message='权限撤销成功'
+            )
+        else:
+            return success_response(
+                data={'message': '未找到相关权限'},
+                message='无权限可撤销'
+            )
+            
+    except Exception as e:
+        return error_response(f"撤销权限失败: {str(e)}", code=500)
+
+@knowledgebase_bp.route('/<string:kb_id>/permissions/teams', methods=['POST'])
+def grant_team_permission(kb_id):
+    """为团队授予知识库权限"""
+    try:
+        data = request.json
+        if not data:
+            return error_response('请求数据不能为空', code=400)
+        
+        team_id = data.get('team_id')
+        permission_level = data.get('permission_level')  # 'admin', 'write', 'read'
+        
+        if not team_id or not permission_level:
+            return error_response('团队ID和权限级别不能为空', code=400)
+        
+        # 验证权限级别
+        if permission_level not in ['admin', 'write', 'read']:
+            return error_response('无效的权限级别', code=400)
+        
+        # TODO: 实现团队权限授予逻辑
+        # 这里需要根据团队成员为每个成员授予相应权限
+        success = KnowledgebaseService.grant_team_permission(
+            kb_id=kb_id,
+            team_id=team_id,
+            permission_level=permission_level
+        )
+        
+        if success:
+            return success_response(
+                data={'message': f'成功为团队授予{permission_level}权限'},
+                message='团队权限授予成功'
+            )
+        else:
+            return error_response('团队权限授予失败', code=500)
+            
+    except Exception as e:
+        return error_response(f"授予团队权限失败: {str(e)}", code=500)
+
+@knowledgebase_bp.route('/<string:kb_id>/permissions/teams/<string:team_id>', methods=['DELETE'])
+def revoke_team_permission(kb_id, team_id):
+    """撤销团队的知识库权限"""
+    try:
+        success = KnowledgebaseService.revoke_team_permission(
+            kb_id=kb_id,
+            team_id=team_id
+        )
+        
+        if success:
+            return success_response(
+                data={'message': '成功撤销团队权限'},
+                message='团队权限撤销成功'
+            )
+        else:
+            return error_response('团队权限撤销失败', code=500)
+            
+    except Exception as e:
+        return error_response(f"撤销团队权限失败: {str(e)}", code=500)
+
+@knowledgebase_bp.route('/<string:kb_id>/permissions/check', methods=['POST'])
+def check_knowledgebase_permission(kb_id):
+    """检查用户对知识库的权限"""
+    try:
+        data = request.json
+        if not data:
+            return error_response('请求数据不能为空', code=400)
+        
+        user_id = data.get('user_id')
+        permission_type = data.get('permission_type', 'read')
+        
+        if not user_id:
+            return error_response('用户ID不能为空', code=400)
+        
+        # 解析权限类型
+        try:
+            perm_type = PermissionType(permission_type)
+        except ValueError:
+            return error_response('无效的权限类型', code=400)
+        
+        # 执行权限检查
+        permission_check = permission_service.check_permission(
+            user_id=user_id,
+            resource_type=ResourceType.KNOWLEDGEBASE,
+            resource_id=kb_id,
+            permission_type=perm_type,
+            tenant_id='default'
+        )
+        
+        return success_response(data={
+            'has_permission': permission_check.has_permission,
+            'user_id': permission_check.user_id,
+            'resource_id': permission_check.resource_id,
+            'permission_type': permission_check.permission_type.value,
+            'granted_roles': permission_check.granted_roles,
+            'reason': permission_check.reason
+        })
+        
+    except Exception as e:
+        return error_response(f"权限检查失败: {str(e)}", code=500)
 
 @knowledgebase_bp.route('/<string:kb_id>/documents', methods=['GET'])
 def get_knowledgebase_documents(kb_id):
@@ -96,7 +290,7 @@ def get_knowledgebase_documents(kb_id):
     try:
         params = {
             'kb_id': kb_id,
-            'page': int(request.args.get('currentPage', 1)),
+            'page': int(request.args.get('current_page', 1)),
             'size': int(request.args.get('size', 10)),
             'name': request.args.get('name', '')
         }

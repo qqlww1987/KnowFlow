@@ -1,4 +1,10 @@
 import { useTranslate } from '@/hooks/common-hooks';
+import {
+  checkKbPermission,
+  useGlobalKbAdmin,
+  useKbPermission,
+} from '@/hooks/permission-hooks';
+import { useFetchUserInfo } from '@/hooks/user-setting-hooks';
 import request from '@/utils/request';
 import {
   DatabaseOutlined,
@@ -11,6 +17,7 @@ import {
   SearchOutlined,
   SettingOutlined,
   ThunderboltOutlined,
+  UserOutlined,
 } from '@ant-design/icons';
 import {
   Alert,
@@ -32,6 +39,7 @@ import {
 import React, { useEffect, useState } from 'react';
 import styles from './index.less';
 import { ParsingStatusCard } from './parsing-status-card';
+import PermissionModal from './permission-modal';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -47,6 +55,11 @@ interface KnowledgeBaseData {
   token_num: number;
   create_time: string;
   create_date: string;
+  permission_stats?: {
+    user_count: number;
+    team_count: number;
+    total_count: number;
+  };
 }
 
 interface LogItem {
@@ -86,8 +99,10 @@ const KnowledgeManagementPage = () => {
 
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [viewModalVisible, setViewModalVisible] = useState(false);
+  const [permissionModalVisible, setPermissionModalVisible] = useState(false);
   const [currentKnowledgeBase, setCurrentKnowledgeBase] =
     useState<KnowledgeBaseData | null>(null);
+
   const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
   const [batchParsingLoading, setBatchParsingLoading] = useState(false);
   const [searchValue, setSearchValue] = useState('');
@@ -104,6 +119,9 @@ const KnowledgeManagementPage = () => {
     pageSize: 10,
     total: 0,
   });
+
+  // 文档搜索状态
+  const [docSearchValue, setDocSearchValue] = useState('');
 
   // 1. 添加文档弹窗相关状态
   const [addDocModalVisible, setAddDocModalVisible] = useState(false);
@@ -130,6 +148,36 @@ const KnowledgeManagementPage = () => {
   const [chunkConfigLoading, setChunkConfigLoading] = useState(false);
   const [chunkConfigSaving, setChunkConfigSaving] = useState(false);
 
+  // 登录用户信息
+  const { data: userInfo } = useFetchUserInfo();
+  const userId = userInfo?.id;
+
+  // 权限：全局 kb_admin（创建、批量删除）
+  const { allowed: canCreateKb } = useGlobalKbAdmin();
+  // 权限：针对当前选中知识库
+  const {
+    canRead,
+    canWrite,
+    canAdmin,
+    can: canDo,
+  } = useKbPermission(currentKnowledgeBase?.id);
+
+  // 角色管理相关函数
+  const handleOpenPermissionModal = async (record: KnowledgeBaseData) => {
+    if (!userId) return;
+    const allowed = await checkKbPermission({
+      userId,
+      kbId: record.id,
+      permission: 'admin',
+    });
+    if (!allowed) {
+      message.warning('您没有管理该知识库角色');
+      return;
+    }
+    setCurrentKnowledgeBase(record);
+    setPermissionModalVisible(true);
+  };
+
   // 解析进度弹窗相关状态
   // const [parseProgressModalVisible, setParseProgressModalVisible] = useState(false);
   // const [parseDocId, setParseDocId] = useState<string | null>(null);
@@ -139,12 +187,19 @@ const KnowledgeManagementPage = () => {
     loadUserList();
   }, [pagination.current, pagination.pageSize, searchValue]);
 
+  // 监听文档分页变化
+  useEffect(() => {
+    if (currentKnowledgeBase?.id) {
+      loadDocumentList(currentKnowledgeBase.id);
+    }
+  }, [docPagination.current, docPagination.pageSize, docSearchValue]);
+
   const loadKnowledgeData = async () => {
     setLoading(true);
     try {
       const res = await request.get('/api/v1/knowledgebases', {
         params: {
-          currentPage: pagination.current,
+          current_page: pagination.current, // 修正参数名
           size: pagination.pageSize,
           name: searchValue,
         },
@@ -163,7 +218,7 @@ const KnowledgeManagementPage = () => {
     try {
       const res = await request.get('/api/v1/users', {
         params: {
-          currentPage: 1,
+          current_page: 1, // 修正参数名
           size: 1000,
         },
       });
@@ -181,14 +236,15 @@ const KnowledgeManagementPage = () => {
   const loadDocumentList = async (kbId: string) => {
     setDocumentLoading(true);
     try {
+      const params = {
+        current_page: docPagination.current, // 修正参数名
+        size: docPagination.pageSize,
+        name: docSearchValue, // 添加搜索参数
+      };
+
       const res = await request.get(
         `/api/v1/knowledgebases/${kbId}/documents`,
-        {
-          params: {
-            currentPage: docPagination.current,
-            size: docPagination.pageSize,
-          },
-        },
+        { params },
       );
       const data = res?.data?.data || {};
       setDocumentList(data.list || []);
@@ -218,6 +274,10 @@ const KnowledgeManagementPage = () => {
 
   const handleCreateSubmit = async () => {
     try {
+      if (!canCreateKb) {
+        message.warning('您没有创建知识库的角色');
+        return;
+      }
       const values = await createForm.validateFields();
       setLoading(true);
       await request.post('/api/v1/knowledgebases', {
@@ -233,13 +293,52 @@ const KnowledgeManagementPage = () => {
     }
   };
 
-  const handleView = (record: KnowledgeBaseData) => {
+  const handleView = async (record: KnowledgeBaseData) => {
+    if (!userId) return;
+    const allowed = await checkKbPermission({
+      userId,
+      kbId: record.id,
+      permission: 'read',
+    });
+    if (!allowed) {
+      message.warning('您没有查看该知识库的角色');
+      return;
+    }
     setCurrentKnowledgeBase(record);
     setViewModalVisible(true);
+    // 重置文档搜索和分页
+    setDocSearchValue('');
+    setDocPagination({ current: 1, pageSize: 10, total: 0 });
     loadDocumentList(record.id);
   };
 
+  // 文档搜索处理
+  const handleDocSearch = () => {
+    setDocPagination((prev) => ({ ...prev, current: 1 }));
+    if (currentKnowledgeBase) {
+      loadDocumentList(currentKnowledgeBase.id);
+    }
+  };
+
+  const handleDocReset = () => {
+    setDocSearchValue('');
+    setDocPagination((prev) => ({ ...prev, current: 1 }));
+    if (currentKnowledgeBase) {
+      loadDocumentList(currentKnowledgeBase.id);
+    }
+  };
+
   const handleDelete = async (kbId: string) => {
+    if (!userId) return;
+    const allowed = await checkKbPermission({
+      userId,
+      kbId,
+      permission: 'admin',
+    });
+    if (!allowed) {
+      message.warning('您没有删除该知识库的角色');
+      return;
+    }
     setLoading(true);
     try {
       await request.delete(`/api/v1/knowledgebases/${kbId}`);
@@ -255,6 +354,10 @@ const KnowledgeManagementPage = () => {
   const handleBatchDelete = async () => {
     if (selectedRowKeys.length === 0) {
       message.warning('请选择要删除的知识库');
+      return;
+    }
+    if (!canCreateKb) {
+      message.warning('您没有批量删除知识库的角色');
       return;
     }
 
@@ -292,6 +395,11 @@ const KnowledgeManagementPage = () => {
   const handleParseDocument = async (doc: DocumentData) => {
     if (doc.progress === 1) {
       message.warning('文档已完成解析，无需再重复解析');
+      return;
+    }
+    const allowed = await canDo('write');
+    if (!allowed) {
+      message.warning('您没有解析文档的角色');
       return;
     }
     try {
@@ -369,6 +477,10 @@ const KnowledgeManagementPage = () => {
 
   // 分块规则弹窗
   const openChunkModal = (doc: DocumentData) => {
+    if (!canWrite) {
+      message.warning('您没有编辑分块规则的角色');
+      return;
+    }
     setChunkDocId(doc.id);
     setChunkDocName(doc.name);
     setChunkModalVisible(true);
@@ -395,6 +507,10 @@ const KnowledgeManagementPage = () => {
   };
   const handleChunkConfigSave = async () => {
     if (!chunkDocId) return;
+    if (!canWrite) {
+      message.warning('您没有保存分块配置的角色');
+      return;
+    }
     // 校验
     if (!chunkConfig.strategy) {
       message.error('请选择分块策略');
@@ -500,15 +616,36 @@ const KnowledgeManagementPage = () => {
       ),
     },
     {
-      title: '权限',
-      dataIndex: 'permission',
-      key: 'permission',
-      width: 100,
-      render: (permission: string) => (
-        <Tag color={permission === 'me' ? 'green' : 'orange'}>
-          {permission === 'me' ? '个人' : '团队'}
-        </Tag>
-      ),
+      title: '角色配置',
+      dataIndex: 'permission_stats',
+      key: 'permission_stats',
+      width: 120,
+      render: (
+        stats:
+          | { user_count: number; team_count: number; total_count: number }
+          | undefined,
+      ) => {
+        if (!stats || stats.total_count === 0) {
+          return <Tag color="gray">未配置</Tag>;
+        }
+
+        const parts = [];
+        if (stats.user_count > 0) {
+          parts.push(`${stats.user_count}用户`);
+        }
+        if (stats.team_count > 0) {
+          parts.push(`${stats.team_count}团队`);
+        }
+
+        return (
+          <Tag
+            color="blue"
+            title={`角色分配详情：\n• ${stats.user_count}个直接用户角色\n• ${stats.team_count}个团队角色（影响团队内所有成员）\n• 点击"角色"按钮查看详细配置`}
+          >
+            {parts.join(' ')}
+          </Tag>
+        );
+      },
     },
     {
       title: '创建时间',
@@ -520,7 +657,7 @@ const KnowledgeManagementPage = () => {
       title: '操作',
       key: 'action',
       fixed: 'right' as const,
-      width: 200,
+      width: 220,
       render: (_: any, record: KnowledgeBaseData) => (
         <Space size="small">
           <Button
@@ -531,12 +668,21 @@ const KnowledgeManagementPage = () => {
           >
             查看
           </Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<UserOutlined />}
+            onClick={() => handleOpenPermissionModal(record)}
+          >
+            角色
+          </Button>
           <Popconfirm
-            title={`确定要删除知识库 "${record.name}" 吗？`}
-            description="删除后将无法恢复，且其中的所有文档也将被删除。"
-            onConfirm={() => handleDelete(record.id)}
-            okText="确定"
+            title="确定删除该知识库吗？"
+            description="此操作不可恢复，且其中的所有文档也将被删除"
+            okText="删除"
             cancelText="取消"
+            okButtonProps={{ danger: true }}
+            onConfirm={() => handleDelete(record.id)}
           >
             <Button type="link" size="small" danger icon={<DeleteOutlined />}>
               删除
@@ -630,7 +776,7 @@ const KnowledgeManagementPage = () => {
     setFileLoading(true);
     try {
       const res = await request.get('/api/v1/files', {
-        params: { currentPage: page, size: pageSize },
+        params: { current_page: page, size: pageSize }, // 修正参数名
       });
       const data = res?.data?.data || {};
       setFileList(data.list || []);
@@ -710,6 +856,7 @@ const KnowledgeManagementPage = () => {
               type="primary"
               icon={<PlusOutlined />}
               onClick={handleCreate}
+              disabled={!canCreateKb}
             >
               新建知识库
             </Button>
@@ -717,12 +864,12 @@ const KnowledgeManagementPage = () => {
               title={`确定删除选中的 ${selectedRowKeys.length} 个知识库吗？`}
               description="此操作不可恢复，且其中的所有文档也将被删除"
               onConfirm={handleBatchDelete}
-              disabled={selectedRowKeys.length === 0}
+              disabled={selectedRowKeys.length === 0 || !canCreateKb}
             >
               <Button
                 danger
                 icon={<DeleteOutlined />}
-                disabled={selectedRowKeys.length === 0}
+                disabled={selectedRowKeys.length === 0 || !canCreateKb}
               >
                 批量删除
               </Button>
@@ -821,9 +968,9 @@ const KnowledgeManagementPage = () => {
           </Form.Item>
           <Form.Item
             name="permission"
-            label="权限"
+            label="可见范围"
             initialValue="me"
-            rules={[{ required: true, message: '请选择权限' }]}
+            rules={[{ required: true, message: '请选择可见范围' }]}
           >
             <Select>
               <Option value="me">个人</Option>
@@ -866,7 +1013,7 @@ const KnowledgeManagementPage = () => {
                     : '英文'}
                 </Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="权限">
+              <Descriptions.Item label="可见范围">
                 <Tag
                   color={
                     currentKnowledgeBase.permission === 'me'
@@ -885,6 +1032,7 @@ const KnowledgeManagementPage = () => {
                   type="primary"
                   icon={<PlusOutlined />}
                   onClick={openAddDocModal}
+                  disabled={!canWrite}
                 >
                   添加文档
                 </Button>
@@ -893,9 +1041,37 @@ const KnowledgeManagementPage = () => {
                   icon={<ThunderboltOutlined />}
                   loading={batchParsingLoading}
                   onClick={handleBatchParse}
-                  disabled={documentList.length === 0}
+                  disabled={documentList.length === 0 || !canWrite}
                 >
                   {batchParsingLoading ? '正在批量解析...' : '批量解析'}
+                </Button>
+              </Space>
+
+              {/* 文档搜索区域 */}
+              <Space>
+                <Input
+                  placeholder="搜索文档名称"
+                  value={docSearchValue}
+                  onChange={(e) => setDocSearchValue(e.target.value)}
+                  onPressEnter={handleDocSearch}
+                  style={{ width: 200 }}
+                  allowClear
+                />
+                <Button
+                  type="primary"
+                  icon={<SearchOutlined />}
+                  onClick={handleDocSearch}
+                  loading={documentLoading}
+                  size="small"
+                >
+                  搜索
+                </Button>
+                <Button
+                  icon={<ReloadOutlined />}
+                  onClick={handleDocReset}
+                  size="small"
+                >
+                  重置
                 </Button>
               </Space>
             </div>
@@ -922,6 +1098,29 @@ const KnowledgeManagementPage = () => {
                   emptyText: <Empty description="暂无文档数据" />,
                 }}
               />
+
+              {/* 文档列表分页 */}
+              <div className={styles.documentPaginationWrapper}>
+                <Pagination
+                  current={docPagination.current}
+                  pageSize={docPagination.pageSize}
+                  total={docPagination.total}
+                  onChange={(page, pageSize) => {
+                    setDocPagination((prev) => ({
+                      ...prev,
+                      current: page,
+                      pageSize: pageSize || prev.pageSize,
+                    }));
+                  }}
+                  showSizeChanger
+                  showQuickJumper
+                  showTotal={(total, range) =>
+                    `第 ${range[0]}-${range[1]} 条/共 ${total} 条文档`
+                  }
+                  pageSizeOptions={['10', '20', '50', '100']}
+                  size="small"
+                />
+              </div>
             </div>
           </div>
         )}
@@ -1048,6 +1247,14 @@ const KnowledgeManagementPage = () => {
 
       {/* 解析进度弹窗 */}
       {/* 解析进度弹窗相关代码已移除 */}
+
+      {/* 角色管理模态框 */}
+      <PermissionModal
+        visible={permissionModalVisible}
+        onCancel={() => setPermissionModalVisible(false)}
+        knowledgeBaseId={currentKnowledgeBase?.id || ''}
+        knowledgeBaseName={currentKnowledgeBase?.name || ''}
+      />
     </div>
   );
 };
