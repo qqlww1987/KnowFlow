@@ -4,7 +4,6 @@ import { useNavigate, useParams, useSearchParams } from 'umi';
 
 export enum QueryStringMap {
   KnowledgeId = 'knowledgeId',
-  id = 'id',
 }
 
 export const useNavigatePage = () => {
@@ -35,31 +34,17 @@ export const useNavigatePage = () => {
     navigate(Routes.Chats);
   }, [navigate]);
 
-  const navigateToChat = useCallback(
-    (id: string) => () => {
-      navigate(`${Routes.Chat}/${id}`);
-    },
-    [navigate],
-  );
-
-  const navigateToAgents = useCallback(() => {
-    navigate(Routes.Agents);
+  const navigateToChat = useCallback(() => {
+    navigate(Routes.Chat);
   }, [navigate]);
 
   const navigateToAgentList = useCallback(() => {
-    navigate(Routes.AgentList);
+    navigate(Routes.Agents);
   }, [navigate]);
 
   const navigateToAgent = useCallback(
     (id: string) => () => {
       navigate(`${Routes.Agent}/${id}`);
-    },
-    [navigate],
-  );
-
-  const navigateToAgentLogs = useCallback(
-    (id: string) => () => {
-      navigate(`${Routes.AgentLogPage}/${id}`);
     },
     [navigate],
   );
@@ -79,8 +64,7 @@ export const useNavigatePage = () => {
   const navigateToChunkParsedResult = useCallback(
     (id: string, knowledgeId?: string) => () => {
       navigate(
-        // `${Routes.ParsedResult}/${id}?${QueryStringMap.KnowledgeId}=${knowledgeId}`,
-        `${Routes.ParsedResult}/chunks?id=${knowledgeId}&doc_id=${id}`,
+        `${Routes.ParsedResult}/${id}?${QueryStringMap.KnowledgeId}=${knowledgeId}`,
       );
     },
     [navigate],
@@ -92,7 +76,6 @@ export const useNavigatePage = () => {
         [QueryStringMap.KnowledgeId]: searchParams.get(
           QueryStringMap.KnowledgeId,
         ),
-        [QueryStringMap.id]: searchParams.get(QueryStringMap.id),
       };
       if (queryStringKey) {
         return allQueryString[queryStringKey];
@@ -111,13 +94,6 @@ export const useNavigatePage = () => {
     [getQueryString, id, navigate],
   );
 
-  const navigateToFiles = useCallback(
-    (folderId?: string) => {
-      navigate(`${Routes.Files}?folderId=${folderId}`);
-    },
-    [navigate],
-  );
-
   return {
     navigateToDatasetList,
     navigateToDataset,
@@ -128,13 +104,10 @@ export const useNavigatePage = () => {
     navigateToChunkParsedResult,
     getQueryString,
     navigateToChunk,
-    navigateToAgents,
+    navigateToAgentList,
     navigateToAgent,
-    navigateToAgentLogs,
     navigateToAgentTemplates,
     navigateToSearchList,
     navigateToSearch,
-    navigateToFiles,
-    navigateToAgentList,
   };
 };

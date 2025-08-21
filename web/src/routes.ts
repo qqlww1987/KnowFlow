@@ -35,7 +35,6 @@ export enum Routes {
   Result = '/result',
   ResultView = `${Chunk}${Result}`,
   KnowledgeGraph = '/knowledge-graph',
-  AgentLogPage = '/agent-log-page',
 }
 
 const routes = [

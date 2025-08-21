@@ -25,7 +25,6 @@ import {
   Download,
   History,
   LaptopMinimalCheck,
-  Logs,
   ScreenShare,
   Settings,
   Upload,
@@ -102,7 +101,6 @@ export default function Agent() {
 
   const { showEmbedModal, hideEmbedModal, embedVisible, beta } =
     useShowEmbedModal();
-  const { navigateToAgentLogs } = useNavigatePage();
   const time = useWatchAgentChange(chatDrawerVisible);
 
   return (
@@ -141,13 +139,6 @@ export default function Agent() {
           <Button variant={'secondary'} onClick={showVersionDialog}>
             <History />
             {t('flow.historyversion')}
-          </Button>
-          <Button
-            variant={'secondary'}
-            onClick={navigateToAgentLogs(id as string)}
-          >
-            <Logs />
-            {t('flow.log')}
           </Button>
 
           <DropdownMenu>
