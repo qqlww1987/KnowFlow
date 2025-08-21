@@ -212,7 +212,7 @@ class PermissionService:
                 JOIN rbac_role_permissions rp ON r.id = rp.role_id
                 JOIN rbac_permissions p ON rp.permission_id = p.id
                 WHERE ur.user_id = %s AND ur.is_active = 1
-                AND p.resource_type = 'system' AND p.permission_type = %s
+                AND p.permission_type = %s
                 AND (ur.expires_at IS NULL OR ur.expires_at > NOW())
                 AND ur.resource_id IS NULL
             """

@@ -844,6 +844,9 @@ def agent_bot_completions(agent_id):
     if not objs:
         return get_error_data_result(message='Authentication error: API key is invalid!"')
 
+    if "quote" not in req:
+        req["quote"] = False
+
     if req.get("stream", True):
         resp = Response(agent_completion(objs[0].tenant_id, agent_id, **req), mimetype="text/event-stream")
         resp.headers.add_header("Cache-control", "no-cache")

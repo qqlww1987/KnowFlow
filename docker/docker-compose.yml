@@ -76,7 +76,7 @@ services:
 
   knowflow-backend:
     container_name: knowflow-backend
-    image: zxwei/knowflow-server:v2.0.4
+    image: zxwei/knowflow-server:v2.0.6
     build:
       context: ../knowflow
       dockerfile: Dockerfile
@@ -107,7 +107,10 @@ services:
       - ragflow
     restart: on-failure
     depends_on:
-      - knowflow-gotenberg
+      mysql:
+        condition: service_healthy
+      knowflow-gotenberg:
+        condition: service_started
 
   knowflow-gotenberg:
     container_name: knowflow-gotenberg
