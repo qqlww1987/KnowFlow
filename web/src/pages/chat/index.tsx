@@ -378,7 +378,10 @@ const Chat = () => {
             ))}
           </Spin>
         </div>
-        <ChatContainer controller={controller}></ChatContainer>
+        <ChatContainer
+          controller={controller}
+          setController={setController}
+        ></ChatContainer>
       </Flex>
       {/* <Divider type={'vertical'} className={styles.divider}></Divider> */}
 
