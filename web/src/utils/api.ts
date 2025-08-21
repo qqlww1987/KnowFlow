@@ -130,6 +130,7 @@ export default {
   // system
   getSystemVersion: `${api_host}/system/version`,
   getSystemStatus: `${api_host}/system/status`,
+  getSystemConfig: `${api_host}/system/config`,
   getSystemTokenList: `${api_host}/system/token_list`,
   createSystemToken: `${api_host}/system/new_token`,
   listSystemToken: `${api_host}/system/token_list`,
