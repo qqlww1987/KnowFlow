@@ -427,6 +427,11 @@ docker buildx build --platform linux/amd64 --target frontend -t zxwei/knowflow-w
 ```bash
 # 安装 uv
 sudo snap install astral-uv --classic
+
+# 安装 libicu
+sudo apt-get update
+sudo apt-get install -y python3.12-dev build-essential pkg-config libicu-dev
+
 uv run download_deps.py
 docker build -f Dockerfile.deps -t infiniflow/ragflow_deps .
 docker build --build-arg LIGHTEN=1 -f Dockerfile -t infiniflow/ragflow:nightly-slim .
