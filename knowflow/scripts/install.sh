@@ -247,6 +247,9 @@ RAGFLOW_BASE_URL=http://$LOCAL_IP:9380
 # 检测到的宿主机IP
 HOST_IP=$LOCAL_IP
 
+# Tiktoken缓存目录 (本地环境使用/tmp)
+TIKTOKEN_CACHE_DIR=/tmp/tiktoken_cache
+
 # Elasticsearch 配置
 ES_HOST=$LOCAL_IP
 ES_PORT=1200

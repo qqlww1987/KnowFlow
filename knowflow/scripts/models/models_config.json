@@ -1,0 +1,35 @@
+{
+  "models": {
+    "qwen3-30b-a3b": {
+      "repo_id": "Qwen/Qwen3-30B-A3B-Instruct-2507",
+      "description": "Qwen3 30B A3B 指令微调模型",
+      "size": "约 24GB",
+      "type": "llm",
+      "enabled": true
+    },
+    "bge-reranker-v2-m3": {
+      "repo_id": "BAAI/bge-reranker-v2-m3",
+      "description": "BGE Reranker v2 M3 模型",
+      "size": "约 2GB",
+      "type": "reranker",
+      "enabled": true
+    },
+    "bge-m3": {
+      "repo_id": "BAAI/bge-m3",
+      "description": "BGE M3 嵌入模型",
+      "size": "约 2GB",
+      "type": "embedding",
+      "enabled": true
+    }
+  },
+  "download_settings": {
+    "base_dir": "./models",
+    "resume_download": true,
+    "use_symlinks": false,
+    "max_workers": 4
+  },
+  "gpustack_settings": {
+    "port": 9000,
+    "auto_register": false
+  }
+}

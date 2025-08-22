@@ -42,51 +42,85 @@ def _save_images_from_result(result, images_dir):
                 
             except Exception as e:
                 print(f"[ERROR] 保存图片 {image_name} 失败: {e}")
+    else:
+        print(f"[INFO] API响应中没有图片数据 - 图片可能已保存到服务器端")
     
     print(f"[INFO] 总共保存了 {saved_count} 张图片到 {images_dir}")
     return saved_count
 
 
 def _process_pdf_with_fastapi(pdf_path, update_progress):
-    """使用 FastAPI 处理 PDF 文件"""
-    if update_progress:
-        update_progress(0.05, "使用 FastAPI 模式处理文档")
+    """
+    使用 FastAPI 处理 PDF 文件
     
-    # 使用全局适配器处理，让适配器自己决定使用哪个backend
-    # 不再从环境变量直接获取，避免绕过配置系统
+    Args:
+        pdf_path (str): PDF 文件路径
+        update_progress (function): 进度回调函数
+    Returns:
+        str: 生成的 Markdown 文件路径
+    """
+    if update_progress:
+        update_progress(0.25, "PDF文件检查完成")
+    
+    # 获取适配器并处理文件
     adapter = get_global_adapter()
     result = adapter.process_file(
         file_path=pdf_path,
         update_progress=update_progress,
-        return_info=True,    # 确保返回 middle_json 信息
-        return_images=True   # 获取原始图片数据
+        return_middle_json=True,   # 确保返回 middle_json 信息
+        return_images=True         # 获取原始图片数据
     )
     
-    # 保存结果到临时文件，保持接口兼容性
-    if 'md_content' in result:
+    # 调试信息
+    print(f"[DEBUG] FastAPI 响应结构: {type(result)}")
+    print(f"[DEBUG] FastAPI 响应字段: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
+    
+    # 处理 FastAPI 的响应结构
+    # 根据curl请求，可能直接返回结果，也可能嵌套在 results 数组中
+    if 'results' in result and len(result['results']) > 0:
+        # 从 results 数组中获取第一个结果（兼容旧格式）
+        first_result = result['results'][0]
+        print(f"[DEBUG] 使用 results 数组格式")
+    elif 'md_content' in result or 'middle_json' in result:
+        # 直接使用结果（新格式）
+        first_result = result
+        print(f"[DEBUG] 使用直接结果格式")
+    else:
+        raise ValueError("FastAPI 返回的数据格式不符合预期，既没有 results 数组也没有直接的 md_content")
+    
+    # 调试信息
+    print(f"[DEBUG] 处理结果字段: {list(first_result.keys())}")
+    print(f"[DEBUG] md_content 存在: {'md_content' in first_result}")
+    print(f"[DEBUG] middle_json 存在: {'middle_json' in first_result}")
+    if 'middle_json' in first_result:
+        print(f"[DEBUG] middle_json 类型: {type(first_result['middle_json'])}")
+        print(f"[DEBUG] middle_json 是否为空: {not first_result['middle_json']}")
+    
+    # 检查是否有 md_content
+    if 'md_content' in first_result and first_result['md_content']:
         temp_dir = tempfile.mkdtemp()
         
         # 保存 Markdown 文件
         md_file_path = os.path.join(temp_dir, "result.md")
         with open(md_file_path, 'w', encoding='utf-8') as f:
-            f.write(result['md_content'])
+            f.write(first_result['md_content'])
         
         # 保存 middle_json 数据到对应位置，供 get_bbox_for_chunk 使用
-        if 'info' in result and result['info']:
+        if 'middle_json' in first_result and first_result['middle_json']:
             middle_json_path = os.path.join(temp_dir, "result_middle.json")
             with open(middle_json_path, 'w', encoding='utf-8') as f:
-                json.dump(result['info'], f, ensure_ascii=False, indent=2)
+                json.dump(first_result['middle_json'], f, ensure_ascii=False, indent=2)
             print(f"[INFO] 已保存位置信息文件: {middle_json_path}")
         else:
-            print(f"[WARNING] FastAPI 未返回位置信息数据 (info 字段)")
+            print(f"[WARNING] FastAPI 未返回位置信息数据 (middle_json 字段为空或不存在)")
         
         # 创建并保存图片到临时目录
         images_dir = os.path.join(temp_dir, 'images')
-        _save_images_from_result(result, images_dir)
+        _save_images_from_result(first_result, images_dir)
             
         return md_file_path
     else:
-        raise ValueError("FastAPI 未返回 md_content")
+        raise ValueError("FastAPI 返回的结果中未包含 md_content 或 md_content 为空")
 
 
 def _safe_create_ragflow(doc_id, kb_id, md_file_path, image_dir, update_progress):

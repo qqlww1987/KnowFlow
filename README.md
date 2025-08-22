@@ -14,7 +14,7 @@
 
 ## 🚀 什么是 KnowFlow
 
-**KnowFlow** 是一个基于 RAGFlow 的企业级开源知识库解决方案，专注于为企业提供真正落地的最后一公里服务。我们持续兼容 RAGFlow 官方版本，同时将社区最佳实践整合进来，为企业知识管理提供更加完善的解决方案。
+**KnowFlow** 是一个基于 RAGFlow 的企业级开源知识库解决方案，专注于为企业提供真正落地的最后一公里服务。我们持续兼容 RAGFlow 官方版本（当前适配 RAGFlow v0.20.1），同时将社区最佳实践整合进来，为企业知识管理提供更加完善的解决方案。
 
 ### 🎯 产品定位
 
@@ -96,7 +96,7 @@ graph TB
 
 | 📚 **智能文档解析** | 🧠 **增强检索问答** | 👥 **企业级管理** | 🔌 **开放集成** |
 |-------------------|-------------------|------------------|----------------|
-| • MinerU2.x OCR引擎<br>• 图文混排输出<br>• 多种分块策略<br>• 20+文档格式支持 | • 精准语义检索<br>• 上下文感知问答<br>• 多模态内容理解<br>• 实时知识更新 | • 用户权限管理<br>• 团队协作空间<br>• 企业微信集成<br>• LDAP/SSO支持 | • 插件化架构<br>• API开放接口<br>• 自定义扩展<br>• 第三方系统集成 |
+| • MinerU2.x OCR引擎<br>• 图文混排输出<br>• 多种分块策略<br>• 20+文档格式支持 | • 精准语义检索<br>• 上下文感知问答<br>• 多模态内容理解<br>• 实时知识更新 | • RBAC权限管理<br>• 团队协作空间<br>• 纯离线部署<br>• 企业微信集成<br>• LDAP/SSO支持 | • 插件化架构<br>• API开放接口<br>• 自定义扩展<br>• 第三方系统集成 |
 
 </div>
 
@@ -110,12 +110,42 @@ graph TB
 | 🔌 | **插件化架构**：无缝兼容 RAGFlow 任意版本，所有增强均可热插拔，升级无忧 |
 | 🏗️ | **微服务设计**：通过独立服务方式增强 RAGFlow，不修改核心代码 |
 | 🧩 | **分块策略丰富**：支持多种分块算法，检索更精准，适配多场景文档 |
-| 🏢 | **企业级特性**：MinerU2.x OCR 引擎、团队/用户/权限管理、企业微信、LDAP/SSO |
+| 🏢 | **企业级特性**：MinerU2.x OCR 引擎、RBAC权限管理、纯离线部署、企业微信、LDAP/SSO |
 | 📈 | **最佳实践集成**：持续吸收社区优质方案，助力企业高效落地 |
 | 🔧 | **简化部署**：一键安装脚本，Docker Compose 开箱即用 |
 
 </div>
 
+
+---
+
+## 📦 版本差异
+
+### 社区版 vs 商业版
+
+| 功能特性 | 社区版 (开源) | 商业版 |
+|---------|-------------|--------|
+| **基础功能** | ✅ RAGFlow 基础功能 | ✅ RAGFlow 核心功能 |
+| **MinerU 解析** | ✅ 图文混排输出 | ✅ 图文混排输出 |
+| **权限管理** | ❌ | ✅ RBAC 权限管理 |
+| **分块策略** | ❌ | ✅ 父子分段 |
+| **版本兼容** | ❌ | ✅ 适配 RAGFlow v0.20.1 |
+| **企业集成** | ✅ 企业微信集成 | ✅ 全面企业集成（LDAP/SSO/AD） |
+| **高级分析** | ❌ | ✅ 使用统计分析 |
+| **技术支持** | 🔧 社区支持 | 🔧 专业技术支持 |
+| **商业授权** | ❌ | ✅ 商业使用许可 |
+
+### 商业版增强特性
+
+- **RBAC 权限管理**：基于角色的访问控制，精细化权限分配
+- **父子分段**：智能分块策略，提升检索精度和问答质量
+- **版本兼容**：适配最新 RAGFlow v0.20.1，持续更新支持
+- **企业级安全**：数据加密、审计日志、合规性管理
+- **性能优化**：专业性能调优，支持大规模并发
+- **定制开发**：根据企业需求定制功能模块
+- **专业支持**：7x24小时技术支持，快速响应
+
+> 💡 **获取商业版**：微信联系 `skycode007`（备注"商业版咨询"）
 
 ---
 
@@ -131,30 +161,52 @@ graph TB
 
 #### 1. 启动 MinerU 服务
 
-选择以下两种镜像之一：
+基于 SGLang 的 MinerU 完全离线部署方案，镜像包含所有必要的模型文件，无需运行时下载：
 
-**完整版（推荐）- 包含所有功能**
+**SGLang 模式（推荐）- 支持所有后端模式**
 ```bash
-docker run --rm -d --gpus=all \
-  --shm-size=32g \
-  -p 8888:8888 -p 30000:30000 \
-  --name mineru-api \
-  zxwei/mineru-api-full:2.1.0
+docker run -d \
+    --gpus all \
+    -p 8888:8888 \
+    -p 30000:30000 \
+    -e MINERU_MODEL_SOURCE=local \
+    -e SGLANG_MEM_FRACTION_STATIC=0.8 \
+    --name mineru-sglang \
+    zxwei/mineru-api-full:v2.1.11
 ```
 
-**基础版 - 仅包含基础功能**
+**Pipeline 模式 - 仅支持标准 Pipeline 后端**
 ```bash
-docker run --rm -d --gpus=all \
-  --shm-size=32g \
-  -p 8888:8888 \
-  --name mineru-api \
-  zxwei/mineru-api:2.1.0
+docker run -d \
+    --gpus all \
+    -p 8888:8888 \
+    --name mineru-pipeline \
+    -e MINERU_MODEL_SOURCE=local \
+    -e INSTALL_TYPE=core \
+    zxwei/mineru-api-full:v2.1.11
 ```
 
-> 💡 **镜像说明：**
-> - `zxwei/mineru-api-full`：包含完整的 VLM 功能，支持所有后端类型
-> - `zxwei/mineru-api`：基础版本，主要支持 pipeline 后端
-> - 如需 GPU 加速，请确保已安装 nvidia-container-toolkit
+**带数据卷挂载的部署**
+```bash
+docker run -d \
+    --gpus all \
+    -p 8888:8888 \
+    -p 30000:30000 \
+    -v $(pwd)/data:/app/data \
+    -v $(pwd)/output:/app/output \
+    -e MINERU_MODEL_SOURCE=local \
+    -e SGLANG_MEM_FRACTION_STATIC=0.8 \
+    --name mineru-sglang \
+    zxwei/mineru-api-full:v2.1.11
+```
+
+> 💡 **镜像特性：**
+> - **完全离线部署**: 所有模型文件已预下载并打包在镜像中
+> - **最新版本**: 使用 MinerU v2.1.11 最新版本
+> - **SGLang 集成**: 基于 SGLang v0.4.7-cu124 官方镜像
+> - **全功能支持**: 支持 Pipeline 和 VLM 两种模式
+> - **高性能**: GPU 加速推理，支持 CUDA 12.4
+> - **智能启动**: 支持环境变量配置，灵活的参数调优
 
 #### 2. MinerU 服务地址配置
 
@@ -191,11 +243,28 @@ git clone https://github.com/weizxfree/KnowFlow.git
 
 2. 进入到 `docker` 目录执行（此步骤和 RAGFlow 官方一致）：
 
+如有 GPU 则选择：
 ```bash
-docker compose up -d
+docker compose -f docker-compose-gpu.yml up -d
+```
+
+无 GPU 则选择：
+```bash
+docker compose -f docker-compose.yml up -d
 ```
 
 访问地址：`http://服务器IP:80`，进入 KnowFlow 首页
+
+#### 4. 默认管理员账户
+
+系统启动后，请使用以下默认超级管理员账户登录：
+
+```
+邮箱：admin@gmail.com
+密码：admin
+```
+
+> 💡 **安全提示：** 首次登录后，请及时修改默认密码以确保系统安全。
 
 ### 方式二：源码部署
 
@@ -298,7 +367,7 @@ pnpm dev
 
 ### 🎨 全新 UI 界面
 
-基于 RAGFlow v0.19.0 二次开发，提供更加现代化的用户界面：
+基于 RAGFlow v0.20.1 二次开发，提供更加现代化的用户界面：
 
 <div align="center">
   <img src="knowflow/assets/ui_1.png" alt="KnowFlow 主界面">
@@ -322,6 +391,8 @@ pnpm dev
 
 
 **核心特性：**
+- **RBAC权限管理**：基于角色的访问控制，精细化权限分配
+- **纯离线部署**：支持完全离线环境部署，满足高安全性要求
 - 移除前端用户注册通道，管理员统一管理用户
 - 用户管理、团队管理、模型配置管理
 - 新用户自动加入创建时间最早用户的团队
@@ -354,7 +425,116 @@ pnpm dev
 
 ## ⚙️ 高级配置
 
-### 🔧 MinerU 本地调试（开发环境）
+### 🔧 MinerU 高级配置
+
+#### 环境变量配置
+
+通过环境变量自定义 MinerU 启动行为：
+
+```bash
+# 自定义 SGLang 服务器参数
+docker run -d \
+    --gpus all \
+    -p 8888:8888 \
+    -p 30000:30000 \
+    -e MINERU_MODEL_SOURCE=local \
+    -e SGLANG_TP_SIZE=2 \
+    -e SGLANG_MEM_FRACTION_STATIC=0.9 \
+    -e SGLANG_ENABLE_TORCH_COMPILE=true \
+    --name mineru-sglang-custom \
+    zxwei/mineru-api-full:v2.1.11
+```
+
+#### 配置文件挂载
+
+**方法一：环境变量文件**
+```bash
+# 创建本地 .env 文件
+cp .env.example .env
+vim .env
+
+# 挂载配置文件
+docker run -d \
+    --gpus all \
+    -p 8888:8888 \
+    -p 30000:30000 \
+    -v $(pwd)/.env:/app/.env \
+    -v $(pwd)/mineru.json:/root/mineru.json \
+    -e MINERU_MODEL_SOURCE=local \
+    --name mineru-sglang \
+    zxwei/mineru-api-full:v2.1.11
+```
+
+**方法二：完整配置挂载（生产环境推荐）**
+```bash
+# 创建配置目录
+mkdir -p config
+cp .env config/
+cp mineru.json config/
+
+# 挂载整个配置目录
+docker run -d \
+    --gpus all \
+    -p 8888:8888 \
+    -p 30000:30000 \
+    -v $(pwd)/config/.env:/app/.env \
+    -v $(pwd)/config/mineru.json:/root/mineru.json \
+    -v $(pwd)/data:/app/data \
+    -v $(pwd)/output:/app/output \
+    -e MINERU_MODEL_SOURCE=local \
+    --name mineru-sglang \
+    zxwei/mineru-api-full:v2.1.11
+```
+
+#### 环境变量配置示例
+
+**.env 文件配置**：
+```bash
+# 基础配置
+INSTALL_TYPE=all
+MINERU_MODEL_SOURCE=local
+API_PORT=8888
+SGLANG_PORT=30000
+
+# SGLang 性能参数
+SGLANG_TP_SIZE=2                    # 张量并行大小
+SGLANG_DP_SIZE=1                    # 数据并行大小
+SGLANG_MEM_FRACTION_STATIC=0.8      # 内存分配比例
+SGLANG_ENABLE_TORCH_COMPILE=true    # 启用编译优化
+SGLANG_MAX_SEQ_LEN=8192             # 最大序列长度
+SGLANG_BATCH_SIZE=64                # 批处理大小
+
+# 高级配置
+STARTUP_WAIT_TIME=20                # 启动等待时间
+LOG_LEVEL=INFO                      # 日志级别
+VERBOSE=true                        # 详细日志
+```
+
+#### 常见配置场景
+
+**高性能配置（多 GPU）**
+```bash
+SGLANG_TP_SIZE=4
+SGLANG_MEM_FRACTION_STATIC=0.85
+SGLANG_ENABLE_TORCH_COMPILE=true
+SGLANG_MAX_SEQ_LEN=16384
+SGLANG_BATCH_SIZE=128
+```
+
+**内存受限环境**
+```bash
+SGLANG_TP_SIZE=1
+SGLANG_MEM_FRACTION_STATIC=0.7
+SGLANG_MAX_SEQ_LEN=4096
+SGLANG_BATCH_SIZE=32
+```
+
+**仅 API 服务（不启动 SGLang）**
+```bash
+INSTALL_TYPE=core
+```
+
+#### MinerU 本地调试（开发环境）
 
 如果需要在本地环境进行开发调试：
 
@@ -367,14 +547,13 @@ export MINERU_DEVICE_MODE=cpu
 export MINERU_MODEL_SOURCE=modelscope
 
 # 3. 进入项目目录
-cd web_api
+cd knowflow/web_api
 
 # 4. 启动本地服务
 python app.py
 ```
 
 **配置 settings.yaml：**
-
 ```yaml
 mineru:
   fastapi:
@@ -385,6 +564,21 @@ mineru:
     sglang:
       # 本地SGLang服务地址（如果使用vlm-sglang-client后端）
       server_url: "http://localhost:30000"
+```
+
+#### API 使用示例
+
+**健康检查**
+```bash
+curl http://localhost:8888/health
+```
+
+**文档解析 API**
+```bash
+# 上传文档进行解析
+curl -X POST "http://localhost:8888/parse" \
+     -F "file=@document.pdf" \
+     -F "mode=pipeline"
 ```
 
 
@@ -408,6 +602,11 @@ docker buildx build --platform linux/amd64 --target frontend -t zxwei/knowflow-w
 ```bash
 # 安装 uv
 sudo snap install astral-uv --classic
+
+# 安装 libicu
+sudo apt-get update
+sudo apt-get install -y python3.12-dev build-essential pkg-config libicu-dev
+
 uv run download_deps.py
 docker build -f Dockerfile.deps -t infiniflow/ragflow_deps .
 docker build --build-arg LIGHTEN=1 -f Dockerfile -t infiniflow/ragflow:nightly-slim .
@@ -443,27 +642,22 @@ RAGFLOW_IMAGE=infiniflow/ragflow:nightly-slim
 - [x] MinerU 2.0 接入
 - [x] RAGFlow 前端 UI 源码开源
 - [x] API Token 自动生成机制
-- [ ] TextIn 接入
-- [ ] MinerU 支持自动问题，自动关键词，Raptor，知识图谱 
-- [ ] 多租户数据隔离
-- [ ] 知识库版本管理
+- [x] MinerU 支持自动问题，自动关键词，Raptor，知识图谱 
 - [ ] 文档审批工作流
 
 ---
 
 ## ❓ 常见问题
 
-### 1. 如何选择 MinerU 镜像版本？
+### 1. MinerU 镜像选择与特性
 
-**zxwei/mineru-api-full（推荐）：**
-- 包含完整的 VLM 功能
-- 支持所有后端类型：pipeline, vlm-transformers, vlm-sglang-engine, vlm-sglang-client
-- 镜像较大，但功能最全
-
-**zxwei/mineru-api：**
-- 基础版本，镜像较小
-- 主要支持 pipeline 后端
-- 适合基础文档解析需求
+**zxwei/mineru-api-full:v2.1.11（推荐）：**
+- ✅ **完全离线部署**: 所有模型文件已预下载并打包在镜像中
+- ✅ **最新版本**: 使用 MinerU v2.1.11 最新版本
+- ✅ **SGLang 集成**: 基于 SGLang v0.4.7-cu124 官方镜像
+- ✅ **全功能支持**: 支持 Pipeline 和 VLM 两种模式
+- ✅ **高性能**: GPU 加速推理，支持 CUDA 12.4
+- ✅ **智能启动**: 默认支持环境变量配置，灵活的参数调优
 
 ### 2. 如何启用 GPU 加速？
 
@@ -492,16 +686,77 @@ mineru:
   default_backend: "vlm-sglang-client"  # 使用 VLM 后端
 ```
 
-### 3. 常见错误处理
+### 3. MinerU 故障排除
 
-**端口冲突：**
-- MinerU 服务：8888, 30000
-- KnowFlow 前端：8081
-- 后端服务：5000
-- 确保端口未被占用
+#### 常见问题
 
-**内存不足：**
-增加 Docker 内存限制或调整 `--shm-size` 参数
+**1. 构建时间过长**
+- 模型下载需要时间，请耐心等待
+- 建议使用 ModelScope 源（国内网络更快）
+
+**2. 内存不足**
+- 确保 Docker 有足够内存（建议 8GB+）
+- 调整 `SGLANG_MEM_FRACTION_STATIC` 参数
+- 可以分阶段构建或使用更大的机器
+
+**3. GPU 不可用**
+- 确保安装了 nvidia-docker2
+- 检查 CUDA 驱动版本兼容性
+
+**4. SGLang 服务启动失败**
+- 检查 GPU 内存是否足够
+- 调整 `SGLANG_TP_SIZE` 和 `SGLANG_MEM_FRACTION_STATIC`
+- 增加 `STARTUP_WAIT_TIME` 等待时间
+
+**5. 环境变量不生效**
+- 确保 `.env` 文件格式正确（无空格、正确的键值对）
+- 检查文件挂载路径是否正确
+- 使用 `docker exec` 进入容器检查环境变量
+
+**6. 端口冲突**
+- 修改 `API_PORT` 和 `SGLANG_PORT` 环境变量
+- 确保宿主机端口未被占用：
+  - MinerU API 服务：8888
+  - SGLang 服务：30000
+  - KnowFlow 前端：8081
+  - KnowFlow 后端：5000
+
+**7. 配置文件挂载问题**
+- 确保配置文件路径正确且文件存在
+- 检查文件权限（建议 644 权限）
+- 验证 JSON 格式是否正确（使用 `jq` 工具验证）
+- 确保挂载路径与容器内路径匹配
+
+**8. 模型路径配置错误**
+- 检查 `mineru.json` 中的 `models-dir` 配置
+- 确保模型文件在指定路径存在
+- 验证模型文件完整性
+
+#### 日志查看与调试
+
+```bash
+# 查看容器日志
+docker logs mineru-sglang
+
+# 实时查看日志
+docker logs -f mineru-sglang
+
+# 进入容器检查配置
+docker exec -it mineru-sglang bash
+
+# 检查环境变量
+docker exec mineru-sglang env | grep -E "(SGLANG|API|MINERU)"
+
+# 验证配置文件
+docker exec mineru-sglang cat /app/.env
+docker exec mineru-sglang cat /root/mineru.json
+
+# 检查模型文件
+docker exec mineru-sglang ls -la /app/models/
+
+# 验证 JSON 配置格式
+docker exec mineru-sglang jq . /root/mineru.json
+```
 
 **网络连接问题：**
 检查防火墙设置和容器网络配置
@@ -513,6 +768,13 @@ mineru:
 > 如果知识库内容包含图片，请在回答中包含图片URL。<br>
 > 注意这个 html 格式的 URL 是来自知识库本身，URL 不能做任何改动。<br>
 > 请确保回答简洁、专业，将图片自然地融入回答内容中。
+
+### 4. 性能优化建议
+
+1. **使用 GPU**: 启用 GPU 加速可显著提升处理速度
+2. **内存配置**: 为容器分配足够内存（推荐 8GB+）
+3. **存储优化**: 使用 SSD 存储可提升 I/O 性能
+4. **网络配置**: 如需外网访问，配置适当的防火墙规则
 
 ---
 

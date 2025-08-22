@@ -34,9 +34,18 @@ COPY server/requirements.txt /app/
 # 安装依赖
 RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple \
     && rm -rf ~/.cache/pip
+
+# 下载tiktoken缓存文件用于离线环境
+COPY scripts/download_tiktoken.py /app/scripts/
+RUN pip install tiktoken && \
+    mkdir -p /opt/tiktoken_cache && \
+    python3 /app/scripts/download_tiktoken.py
+
 # 复制后端代码
 COPY server /app
 
+# 设置tiktoken缓存目录环境变量
+ENV TIKTOKEN_CACHE_DIR=/opt/tiktoken_cache
 
 # 暴露后端端口
 EXPOSE 5000
