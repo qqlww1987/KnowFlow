@@ -43,7 +43,7 @@ services:
 
   knowflow-backend:
     container_name: knowflow-backend
-    image: zxwei/knowflow-server:v2.0.6
+    image: zxwei/knowflow-server:v2.0.7
     build:
       context: ../knowflow
       dockerfile: Dockerfile
@@ -85,7 +85,7 @@ services:
         condition: service_healthy
       knowflow-gotenberg:
         condition: service_started
-  
+
 
   knowflow-gotenberg:
     container_name: knowflow-gotenberg

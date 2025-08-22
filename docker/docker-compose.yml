@@ -76,7 +76,7 @@ services:
 
   knowflow-backend:
     container_name: knowflow-backend
-    image: zxwei/knowflow-server:v2.0.6
+    image: zxwei/knowflow-server:v2.0.7
     build:
       context: ../knowflow
       dockerfile: Dockerfile
