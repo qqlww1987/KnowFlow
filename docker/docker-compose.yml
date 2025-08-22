@@ -71,11 +71,7 @@ services:
 
   knowflow-backend:
     container_name: knowflow-backend
-<<<<<<< HEAD
-    image: zxwei/knowflow-server:v2.0.2
-=======
     image: zxwei/knowflow-server:v2.0.3
->>>>>>> wzx_feature_offline
     build:
       context: ../knowflow
       dockerfile: Dockerfile
