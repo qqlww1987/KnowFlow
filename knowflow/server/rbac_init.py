@@ -27,9 +27,13 @@ class RBACInitializer:
     def _get_db_connection(self):
         """获取数据库连接"""
         if not self.db:
-            self.db = get_db_connection()
-            self.db.autocommit = True
-            self.cursor = self.db.cursor()
+            try:
+                self.db = get_db_connection()
+                self.db.autocommit = True
+                self.cursor = self.db.cursor()
+            except Exception as e:
+                logger.error(f"数据库连接失败: {e}")
+                raise
         return self.db
     
     def initialize(self):
@@ -85,6 +89,10 @@ class RBACInitializer:
     def _is_rbac_initialized(self):
         """检查RBAC是否已经初始化"""
         try:
+            # 确保有数据库连接
+            if not self.db or not self.cursor:
+                self._get_db_connection()
+            
             # 检查核心表是否存在且有数据
             self.cursor.execute("""
                 SELECT COUNT(*) FROM information_schema.tables 
@@ -101,7 +109,8 @@ class RBACInitializer:
             
             return roles_count > 0
             
-        except Exception:
+        except Exception as e:
+            logger.debug(f"RBAC初始化检查失败: {e}")
             return False
     
     def _create_tables(self):

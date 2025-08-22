@@ -2,12 +2,14 @@ import database
 import jwt
 import os
 import logging
+import time
+import threading
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from datetime import datetime, timedelta
 from routes import register_routes
 from dotenv import load_dotenv
-from rbac_init import initialize_rbac_system
+from rbac_init import initialize_rbac_system, RBACInitializer
 
 # 配置日志
 logging.basicConfig(
@@ -23,26 +25,145 @@ app = Flask(__name__)
 # 启用CORS，允许前端访问
 CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
 
+# 请求前钩子：确保RBAC已初始化
+@app.before_request
+def ensure_rbac_ready():
+    """
+    在处理需要RBAC的请求前确保RBAC已初始化
+    排除不需要RBAC的路径
+    """
+    # 不需要RBAC检查的路径
+    excluded_paths = [
+        '/api/v1/auth/login',
+        '/api/v1/admin/rbac/status',
+        '/api/v1/admin/rbac/init',
+        '/health',
+        '/'
+    ]
+    
+    # 如果是排除的路径，直接跳过
+    if request.path in excluded_paths:
+        return
+    
+    # 如果是静态文件或非API路径，跳过
+    if not request.path.startswith('/api/'):
+        return
+    
+    # 对于API路径，确保RBAC已初始化
+    if not ensure_rbac_initialized():
+        logger.warning(f"RBAC未初始化，拒绝请求: {request.path}")
+        return jsonify({
+            "code": 503,
+            "message": "服务正在初始化中，请稍后再试",
+            "data": {
+                "suggestion": "请等待服务完成初始化或使用 /api/v1/admin/rbac/init 手动初始化"
+            }
+        }), 503
+
 # 注册所有路由
 register_routes(app)
 
-# 初始化RBAC权限系统
-def initialize_rbac():
-    """应用启动时初始化RBAC权限系统"""
-    try:
-        logger.info("开始初始化RBAC权限系统...")
-        success = initialize_rbac_system()
-        if success:
-            logger.info("✓ RBAC权限系统初始化成功")
-            logger.info("默认管理员账户: admin@gmail.com / admin")
-        else:
-            logger.error("✗ RBAC权限系统初始化失败")
-    except Exception as e:
-        logger.error(f"RBAC系统初始化异常: {e}")
+# 延迟初始化标记
+rbac_initialized = False
+rbac_init_lock = threading.Lock()
 
-# 在应用上下文中初始化RBAC
-with app.app_context():
-    initialize_rbac()
+def check_database_ready():
+    """检查数据库是否准备就绪 - 检查所有RBAC初始化所需的表"""
+    try:
+        initializer = RBACInitializer()
+        db = initializer._get_db_connection()
+        cursor = db.cursor()
+        
+        # 定义RBAC初始化所需的所有表
+        required_tables = ['user', 'tenant', 'user_tenant']
+        missing_tables = []
+        
+        for table in required_tables:
+            cursor.execute("""
+                SELECT COUNT(*) FROM information_schema.tables 
+                WHERE table_schema = DATABASE() AND table_name = %s
+            """, (table,))
+            table_exists = cursor.fetchone()[0] > 0
+            
+            if not table_exists:
+                missing_tables.append(table)
+                logger.debug(f"缺少表: {table}")
+            else:
+                logger.debug(f"表存在: {table}")
+        
+        cursor.close()
+        db.close()
+        
+        if missing_tables:
+            logger.info(f"等待以下表创建: {', '.join(missing_tables)}")
+            return False
+        
+        logger.debug("所有必需表已存在")
+        return True
+        
+    except Exception as e:
+        logger.debug(f"数据库检查失败: {e}")
+        return False
+
+def delayed_rbac_init():
+    """延迟RBAC初始化，带重试机制"""
+    global rbac_initialized
+    
+    with rbac_init_lock:
+        if rbac_initialized:
+            return True
+            
+        max_retries = 30  # 最多重试30次
+        retry_interval = 2  # 每次重试间隔2秒
+        
+        for attempt in range(max_retries):
+            try:
+                # 检查数据库是否准备就绪
+                if not check_database_ready():
+                    logger.info(f"等待数据库就绪... (尝试 {attempt + 1}/{max_retries})")
+                    time.sleep(retry_interval)
+                    continue
+                
+                # 执行RBAC初始化
+                logger.info(f"开始RBAC初始化... (尝试 {attempt + 1}/{max_retries})")
+                success = initialize_rbac_system()
+                
+                if success:
+                    rbac_initialized = True
+                    logger.info("✓ RBAC权限系统延迟初始化成功")
+                    logger.info("默认管理员账户: admin@gmail.com / admin")
+                    return True
+                else:
+                    logger.warning(f"RBAC初始化失败，将重试... (尝试 {attempt + 1}/{max_retries})")
+                    
+            except Exception as e:
+                logger.warning(f"RBAC初始化异常，将重试: {e} (尝试 {attempt + 1}/{max_retries})")
+            
+            if attempt < max_retries - 1:
+                time.sleep(retry_interval)
+        
+        logger.error("RBAC初始化最终失败，已达到最大重试次数")
+        return False
+
+def ensure_rbac_initialized():
+    """确保RBAC已初始化的装饰器函数"""
+    global rbac_initialized
+    
+    if rbac_initialized:
+        return True
+    
+    return delayed_rbac_init()
+
+# 后台初始化线程
+def background_init():
+    """后台初始化线程"""
+    logger.info("启动后台RBAC初始化...")
+    time.sleep(5)  # 等待5秒让其他服务启动
+    delayed_rbac_init()
+
+# 启动后台初始化线程
+background_thread = threading.Thread(target=background_init, daemon=True)
+background_thread.start()
 
 # 从环境变量获取配置
 ADMIN_USERNAME = os.getenv('MANAGEMENT_ADMIN_USERNAME', 'admin')
@@ -91,6 +212,8 @@ def login():
 @app.route('/api/v1/admin/rbac/init', methods=['POST'])
 def admin_rbac_init():
     """手动初始化RBAC系统的管理接口"""
+    global rbac_initialized
+    
     try:
         # 简单的认证（可以根据需要增强）
         auth_header = request.headers.get('Authorization')
@@ -99,7 +222,7 @@ def admin_rbac_init():
         
         # 执行RBAC初始化
         logger.info("手动触发RBAC系统初始化...")
-        success = initialize_rbac_system()
+        success = delayed_rbac_init()
         
         if success:
             logger.info("✓ RBAC权限系统手动初始化成功")
@@ -122,19 +245,36 @@ def admin_rbac_init():
 @app.route('/api/v1/admin/rbac/status', methods=['GET'])
 def admin_rbac_status():
     """检查RBAC系统状态"""
+    global rbac_initialized
+    
     try:
         from rbac_init import RBACInitializer
         initializer = RBACInitializer()
         
+        # 检查数据库是否就绪
+        db_ready = check_database_ready()
+        
         # 检查RBAC是否已初始化
-        is_initialized = initializer._is_rbac_initialized()
+        is_initialized = rbac_initialized and initializer._is_rbac_initialized()
+        
+        table_status = get_detailed_database_status()
         
         status_info = {
+            "database_ready": db_ready,
+            "required_tables": table_status,
             "rbac_initialized": is_initialized,
+            "background_init_status": rbac_initialized,
             "timestamp": datetime.now().isoformat()
         }
         
-        if is_initialized:
+        # 添加缺少表的信息
+        if table_status:
+            missing_tables = [table for table, exists in table_status.items() if not exists]
+            if missing_tables:
+                status_info["missing_tables"] = missing_tables
+                status_info["waiting_for"] = f"Waiting for tables: {', '.join(missing_tables)}"
+        
+        if is_initialized and db_ready:
             # 获取基本统计信息
             try:
                 db = initializer._get_db_connection()
@@ -172,7 +312,69 @@ def admin_rbac_status():
         logger.error(f"检查RBAC状态异常: {e}")
         return {"code": 1, "message": f"状态检查异常: {str(e)}"}, 500
 
+def get_detailed_database_status():
+    """获取详细的数据库状态信息"""
+    try:
+        initializer = RBACInitializer()
+        db = initializer._get_db_connection()
+        cursor = db.cursor()
+        
+        required_tables = ['user', 'tenant', 'user_tenant']
+        table_status = {}
+        
+        for table in required_tables:
+            cursor.execute("""
+                SELECT COUNT(*) FROM information_schema.tables 
+                WHERE table_schema = DATABASE() AND table_name = %s
+            """, (table,))
+            table_exists = cursor.fetchone()[0] > 0
+            table_status[table] = table_exists
+        
+        cursor.close()
+        db.close()
+        
+        return table_status
+        
+    except Exception as e:
+        logger.debug(f"获取数据库状态失败: {e}")
+        return {}
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    """
+    健康检查接口 - 提供详细的服务状态信息
+    """
+    global rbac_initialized
+
+    db_ready = check_database_ready()
+    table_status = get_detailed_database_status()
+    
+    health_status = {
+        "status": "healthy" if db_ready and rbac_initialized else "initializing",
+        "database_ready": db_ready,
+        "required_tables": table_status,
+        "rbac_initialized": rbac_initialized,
+        "timestamp": datetime.now().isoformat()
+    }
+    
+    # 添加缺少表的信息
+    if table_status:
+        missing_tables = [table for table, exists in table_status.items() if not exists]
+        if missing_tables:
+            health_status["missing_tables"] = missing_tables
+            health_status["waiting_for"] = f"Waiting for tables: {', '.join(missing_tables)}"
+    
+    status_code = 200 if (db_ready and rbac_initialized) else 503
+    
+    return jsonify({
+        "code": 0 if status_code == 200 else 1,
+        "data": health_status,
+        "message": "服务运行正常" if status_code == 200 else "服务正在初始化"
+    }), status_code
+
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
+    logger.info(f"KnowFlow Server 启动中... 端口: {port}")
+    logger.info("RBAC将在后台自动初始化，或可通过 /api/v1/admin/rbac/init 手动初始化")
     app.run(host='0.0.0.0', port=port, debug=True)
