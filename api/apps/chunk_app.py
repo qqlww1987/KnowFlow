@@ -391,3 +391,282 @@ def knowledge_graph():
         obj[ty] = content_json
 
     return get_json_result(data=obj)
+
+
+@manager.route('/parent_child_split', methods=['POST'])  # noqa: F821
+def parent_child_split():
+    """
+    父子分块API端点 - 供外部服务调用
+    不需要登录认证，供knowflow服务使用
+    """
+    try:
+        import traceback
+        
+        # 解析请求参数
+        req = request.get_json()
+        if not req:
+            return get_json_result(data=None, message="Request body is required", code=400)
+        
+        # 必需参数
+        text = req.get('text', '').strip()
+        doc_id = req.get('doc_id', 'unknown')
+        kb_id = req.get('kb_id', 'unknown')
+        
+        if not text:
+            return get_json_result(data=None, message="Text is required", code=400)
+        
+        # 可选参数
+        chunk_token_num = req.get('chunk_token_num', 256)
+        min_chunk_tokens = req.get('min_chunk_tokens', 10)
+        parent_config = req.get('parent_config', {})
+        metadata = req.get('metadata', {})
+        
+        # 使用tiktoken进行准确的token计算
+        import tiktoken
+        encoder = tiktoken.get_encoding("cl100k_base")
+        
+        def accurate_token_count(text):
+            return len(encoder.encode(text))
+        
+        # 通过HTTP调用KnowFlow服务获取智能分块
+        def get_smart_chunks_from_knowflow(text, chunk_token_num=128, min_chunk_tokens=10):
+            """通过HTTP API调用KnowFlow的智能分块服务"""
+            try:
+                import requests
+                import os
+                
+                knowflow_api_url = os.getenv('KNOWFLOW_API_URL', 'http://localhost:5000')
+                api_endpoint = f"{knowflow_api_url}/api/smart_chunk"
+                
+                request_data = {
+                    'text': text,
+                    'chunk_token_num': chunk_token_num,
+                    'min_chunk_tokens': min_chunk_tokens,
+                    'method': 'smart'
+                }
+                
+                response = requests.post(
+                    api_endpoint,
+                    json=request_data,
+                    headers={'Content-Type': 'application/json'},
+                    timeout=60
+                )
+                
+                if response.status_code == 200:
+                    result_data = response.json()
+                    if result_data.get('code') == 0:
+                        return result_data.get('data', {}).get('chunks', [])
+                    else:
+                        raise Exception(f"KnowFlow API Error: {result_data.get('message', 'Unknown error')}")
+                else:
+                    raise Exception(f"HTTP Error: {response.status_code}")
+                    
+            except Exception:
+                try:
+                    from rag.nlp import naive
+                    return naive.split_by_sentences(text, chunk_token_num)
+                except:
+                    return [text]
+        
+        # 获取智能分块结果
+        child_chunks_content = get_smart_chunks_from_knowflow(
+            text, 
+            chunk_token_num=chunk_token_num, 
+            min_chunk_tokens=min_chunk_tokens
+        )
+        
+        # 构建子分块对象
+        import hashlib
+        
+        class SimpleChunkInfo:
+            def __init__(self, id, content, token_count, char_count, order, metadata=None):
+                self.id = id
+                self.content = content
+                self.token_count = token_count
+                self.char_count = char_count
+                self.order = order
+                self.metadata = metadata or {}
+        
+        child_chunks = []
+        for i, content in enumerate(child_chunks_content):
+            chunk_id = f"{doc_id}_child_{i:04d}_{hashlib.md5(content.encode('utf-8')).hexdigest()[:8]}"
+            child_chunks.append(SimpleChunkInfo(
+                id=chunk_id,
+                content=content,
+                token_count=accurate_token_count(content),
+                char_count=len(content),
+                order=i,
+                metadata={'chunk_type': 'child', 'chunk_method': 'child_smart'}
+            ))
+        
+        # 构建父分块
+        parent_chunks = []
+        relationships = []
+        current_parent_content = []
+        current_parent_tokens = 0
+        current_child_ids = []
+        parent_order = 0
+        parent_chunk_size = parent_config.get('parent_chunk_size', 1024)
+        
+        for child_chunk in child_chunks:
+            # 检查是否需要创建新的父分块
+            if (current_parent_tokens + child_chunk.token_count > parent_chunk_size 
+                and current_parent_content):
+                
+                # 创建父分块
+                parent_content = "\n\n".join(current_parent_content).strip()
+                parent_id = f"{doc_id}_parent_{parent_order:04d}_{hashlib.md5(parent_content.encode('utf-8')).hexdigest()[:8]}"
+                
+                parent_chunk = SimpleChunkInfo(
+                    id=parent_id,
+                    content=parent_content,
+                    token_count=accurate_token_count(parent_content),
+                    char_count=len(parent_content),
+                    order=parent_order,
+                    metadata={'chunk_type': 'parent', 'chunk_method': 'parent_smart', 'contains_children': len(current_child_ids)}
+                )
+                parent_chunks.append(parent_chunk)
+                
+                # 建立关系映射
+                for child_id in current_child_ids:
+                    relationships.append({
+                        'child_chunk_id': child_id,
+                        'parent_chunk_id': parent_chunk.id,
+                        'doc_id': doc_id,
+                        'kb_id': kb_id,
+                        'relevance_score': 100
+                    })
+                
+                # 重置状态开始新的父分块
+                current_parent_content = []
+                current_parent_tokens = 0
+                current_child_ids = []
+                parent_order += 1
+            
+            # 添加到当前父分块
+            current_parent_content.append(child_chunk.content)
+            current_parent_tokens += child_chunk.token_count
+            current_child_ids.append(child_chunk.id)
+        
+        # 处理最后一个父分块
+        if current_parent_content:
+            parent_content = "\n\n".join(current_parent_content).strip()
+            parent_id = f"{doc_id}_parent_{parent_order:04d}_{hashlib.md5(parent_content.encode('utf-8')).hexdigest()[:8]}"
+            
+            parent_chunk = SimpleChunkInfo(
+                id=parent_id,
+                content=parent_content,
+                token_count=accurate_token_count(parent_content),
+                char_count=len(parent_content),
+                order=parent_order,
+                metadata={'chunk_type': 'parent', 'chunk_method': 'parent_smart', 'contains_children': len(current_child_ids)}
+            )
+            parent_chunks.append(parent_chunk)
+            
+            # 建立关系映射
+            for child_id in current_child_ids:
+                relationships.append({
+                    'child_chunk_id': child_id,
+                    'parent_chunk_id': parent_chunk.id,
+                    'doc_id': doc_id,
+                    'kb_id': kb_id,
+                    'relevance_score': 100
+                })
+        
+        # 构建结果对象
+        class SimpleParentChildResult:
+            def __init__(self, parent_chunks, child_chunks, relationships, total_parents, total_children):
+                self.parent_chunks = parent_chunks
+                self.child_chunks = child_chunks
+                self.relationships = relationships
+                self.total_parents = total_parents
+                self.total_children = total_children
+        
+        result = SimpleParentChildResult(
+            parent_chunks=parent_chunks,
+            child_chunks=child_chunks,
+            relationships=relationships,
+            total_parents=len(parent_chunks),
+            total_children=len(child_chunks)
+        )
+        
+        
+        # 根据检索模式决定返回内容
+        retrieval_mode = parent_config.get('retrieval_mode', 'parent')
+        
+        if retrieval_mode == 'child':
+            chunks_content = [chunk.content for chunk in result.child_chunks]
+        elif retrieval_mode == 'hybrid':
+            chunks_content = [chunk.content for chunk in result.parent_chunks]
+        else:
+            chunks_content = [chunk.content for chunk in result.parent_chunks]
+        
+        vector_storage_chunks = [chunk.content for chunk in result.child_chunks]
+        
+        # 构建详细结果信息
+        detailed_result = {
+            'parent_chunks': [
+                {
+                    'id': chunk.id,
+                    'content': chunk.content,
+                    'order': chunk.order,
+                    'token_count': accurate_token_count(chunk.content),
+                    'char_count': len(chunk.content),
+                    'metadata': chunk.metadata
+                }
+                for chunk in result.parent_chunks
+            ],
+            'child_chunks': [
+                {
+                    'id': chunk.id,
+                    'content': chunk.content,
+                    'order': chunk.order,
+                    'token_count': accurate_token_count(chunk.content),
+                    'char_count': len(chunk.content),
+                    'metadata': chunk.metadata
+                }
+                for chunk in result.child_chunks
+            ],
+            'relationships': result.relationships,
+            'total_parents': result.total_parents,
+            'total_children': result.total_children,
+            'config_used': {
+                'parent_chunk_size': parent_config.get('parent_chunk_size', 1024),
+                'child_chunk_size': chunk_token_num,
+                'retrieval_mode': parent_config.get('retrieval_mode', 'parent')
+            }
+        }
+        
+        return get_json_result(data={
+            'chunks': chunks_content,
+            'vector_chunks': vector_storage_chunks,
+            'detailed_result': detailed_result,
+            'mode_info': {
+                'retrieval_mode': retrieval_mode,
+                'returned_content_type': 'child' if retrieval_mode == 'child' else 'parent',
+                'vector_storage_type': 'child'
+            }
+        }, message="Parent-child chunking completed successfully")
+        
+    except Exception as e:
+        return get_json_result(
+            data=None,
+            message=f"Parent-child chunking failed: {str(e)}", 
+            code=500
+        )
+
+
+@manager.route('/parent_child_health', methods=['GET'])  # noqa: F821
+def parent_child_health():
+    """健康检查端点"""
+    try:
+        return get_json_result(
+            data={'status': 'healthy', 'version': '2.1.0'},
+            message="Parent-child service is healthy"
+        )
+    except Exception as e:
+        return get_json_result(
+            data={'status': 'unhealthy', 'error': str(e)},
+            message="Parent-child service is unhealthy",
+            code=500
+        )

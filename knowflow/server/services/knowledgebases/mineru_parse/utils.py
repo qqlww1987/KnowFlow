@@ -61,12 +61,13 @@ def split_markdown_to_chunks_configured(txt, chunk_token_num=256, min_chunk_toke
     根据配置选择合适的分块方法的统一接口
     
     支持的分块方法：
+    - 'parent_child': 父子分块模式，基于Smart分块的双层结构
     - 'strict_regex': 严格按正则表达式分块（当配置启用时）
     - 'advanced': split_markdown_to_chunks_advanced (高级分块，混合策略)
     - 'smart': split_markdown_to_chunks_smart (智能分块，基于AST，默认)
     - 'basic': split_markdown_to_chunks (基础分块)
     
-    可通过环境变量 CHUNK_METHOD 配置，支持的值：advanced, smart, basic
+    可通过环境变量 CHUNK_METHOD 配置，支持的值：parent_child, advanced, smart, basic
     也可通过kwargs传入自定义配置：
     - chunking_config: 分块配置字典，包含strategy等字段
     """
@@ -102,7 +103,17 @@ def split_markdown_to_chunks_configured(txt, chunk_token_num=256, min_chunk_toke
         print(f"  🔢 最小分块: {min_chunk_tokens}")
         
         # 其他策略的处理
-        if strategy == 'advanced':
+        if strategy == 'parent_child':
+            print(f"  🎯 使用父子分块策略")
+            return split_markdown_to_chunks_parent_child(
+                txt,
+                chunk_token_num=chunk_token_num,
+                min_chunk_tokens=min_chunk_tokens,
+                parent_config=custom_chunking_config.get('parent_config', {}),
+                doc_id=kwargs.get('doc_id', 'unknown'),
+                kb_id=kwargs.get('kb_id', 'unknown')
+            )
+        elif strategy == 'advanced':
             include_metadata = kwargs.pop('include_metadata', False)
             overlap_ratio = kwargs.pop('overlap_ratio', 0.0)
             print(f"  🎯 使用高级分块策略")
@@ -1435,3 +1446,119 @@ def split_markdown_to_chunks_strict_regex(txt, chunk_token_num=256, min_chunk_to
     except Exception as e:
         print(f"❌ [ERROR] 自定义正则分块发生异常: {e}，回退到智能分块")
         return split_markdown_to_chunks_smart(txt, chunk_token_num, min_chunk_tokens)
+
+
+def split_markdown_to_chunks_parent_child(txt, chunk_token_num=256, min_chunk_tokens=10, 
+                                         parent_config=None, doc_id='unknown', kb_id='unknown'):
+    """
+    基于Smart分块的父子分块方法 - 通过HTTP API调用
+    调用RAGFlow API层的父子分块服务
+    
+    Args:
+        txt: 要分块的文本
+        chunk_token_num: 子分块大小（tokens）
+        min_chunk_tokens: 最小子分块大小
+        parent_config: 父分块配置
+        doc_id: 文档ID
+        kb_id: 知识库ID
+        
+    Returns:
+        list: 父分块列表（用于常规分块接口兼容）
+        
+    Note:
+        该函数通过HTTP调用RAGFlow API，实现跨容器通信
+    """
+    if not txt or not txt.strip():
+        return []
+    
+    parent_config = parent_config or {}
+    
+    try:
+        import requests
+        import json
+        
+        print(f"🚀 [DEBUG] 通过HTTP API调用父子分块")
+        print(f"  📝 文本长度: {len(txt)} 字符")
+        print(f"  📋 doc_id: {doc_id}, kb_id: {kb_id}")
+        print(f"  🔢 子分块大小: {chunk_token_num}")
+        print(f"  📊 父分块配置: {parent_config}")
+        
+        # 获取RAGFlow API服务地址
+        ragflow_api_url = os.getenv('RAGFLOW_API_URL', 'http://localhost:9380')
+        api_endpoint = f"{ragflow_api_url}/v1/chunk/parent_child_split"
+        
+        # 准备请求数据
+        request_data = {
+            'text': txt,
+            'doc_id': doc_id,
+            'kb_id': kb_id,
+            'chunk_token_num': chunk_token_num,
+            'min_chunk_tokens': min_chunk_tokens,
+            'parent_config': parent_config,
+            'metadata': {'source': 'mineru_parse'}
+        }
+        
+        print(f"🌐 [DEBUG] 调用API: {api_endpoint}")
+        
+        # 发送HTTP请求
+        response = requests.post(
+            api_endpoint,
+            json=request_data,
+            headers={'Content-Type': 'application/json'},
+            timeout=120  # 2分钟超时
+        )
+        
+        if response.status_code == 200:
+            result_data = response.json()
+            
+            if result_data.get('code') == 0:
+                # 成功获取结果
+                chunks = result_data.get('data', {}).get('chunks', [])  # 这是父分块（用于检索上下文）
+                vector_chunks = result_data.get('data', {}).get('vector_chunks', [])  # 这是子分块（用于向量存储）
+                detailed_result = result_data.get('data', {}).get('detailed_result', {})
+                
+                print(f"📊 [DEBUG] API调用成功:")
+                print(f"  👨 父分块: {len(chunks)} 个（用于检索上下文）")
+                print(f"  👶 子分块: {len(vector_chunks)} 个（用于向量存储）")
+                print(f"  📈 详细结果: {detailed_result.get('total_parents', 0)} 父分块, {detailed_result.get('total_children', 0)} 子分块")
+                
+                # 保存详细结果到全局变量（供其他模块使用）
+                global _last_parent_child_result
+                _last_parent_child_result = detailed_result
+                
+                # ⭐ 关键修改：返回子分块列表，这样前端显示的就是子分块数量
+                # 子分块用于向量存储，数量与智能分块一致
+                return vector_chunks if vector_chunks else chunks
+            else:
+                error_msg = result_data.get('message', 'Unknown API error')
+                print(f"❌ [ERROR] API返回错误: {error_msg}")
+                raise Exception(f"API Error: {error_msg}")
+        else:
+            print(f"❌ [ERROR] HTTP请求失败: {response.status_code}")
+            print(f"  响应内容: {response.text}")
+            raise Exception(f"HTTP Error: {response.status_code}")
+        
+    except requests.exceptions.Timeout:
+        print(f"⏰ [ERROR] API调用超时，回退到智能分块")
+        return split_markdown_to_chunks_smart(txt, chunk_token_num, min_chunk_tokens)
+    except requests.exceptions.ConnectionError:
+        print(f"🔌 [ERROR] 无法连接到RAGFlow API服务，回退到智能分块")
+        return split_markdown_to_chunks_smart(txt, chunk_token_num, min_chunk_tokens)
+    except Exception as e:
+        print(f"❌ [ERROR] 父子分块HTTP调用失败: {e}，回退到智能分块")
+        import traceback
+        traceback.print_exc()
+        return split_markdown_to_chunks_smart(txt, chunk_token_num, min_chunk_tokens)
+
+
+# _save_parent_child_chunks_to_db 函数已移至 RAGFlow API 层处理
+
+
+# 全局变量存储最后一次父子分块结果
+_last_parent_child_result = None
+
+
+def get_last_parent_child_result():
+    """获取最后一次父子分块的完整结果"""
+    global _last_parent_child_result
+    return _last_parent_child_result
