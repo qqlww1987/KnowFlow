@@ -33,6 +33,13 @@ from api.db.services.common_service import CommonService
 from api.db.services.knowledgebase_service import KnowledgebaseService
 from api.db.services.langfuse_service import TenantLangfuseService
 from api.db.services.llm_service import LLMBundle, TenantLLMService
+
+# 添加父子分块支持
+try:
+    from api.db.parent_child_models import ParentChildMapping
+    PARENT_CHILD_AVAILABLE = True
+except ImportError:
+    PARENT_CHILD_AVAILABLE = False
 from api.utils import current_timestamp, datetime_format
 from rag.app.resume import forbidden_select_fields4resume
 from rag.app.tag import label_question
@@ -40,6 +47,151 @@ from rag.nlp.search import index_name
 from rag.prompts import chunks_format, citation_prompt, cross_languages, full_question, kb_prompt, keyword_extraction, message_fit_in
 from rag.utils import num_tokens_from_string, rmSpace
 from rag.utils.tavily_conn import Tavily
+
+
+def check_kb_parent_child_enabled(kb_ids):
+    """检查知识库中是否有使用父子分块策略的文档"""
+    if not PARENT_CHILD_AVAILABLE:
+        return False, []
+    
+    enabled_kbs = []
+    try:
+        from api.db.services.document_service import DocumentService
+        
+        for kb_id in kb_ids:
+            # 查询该知识库下是否有使用parent_child策略的文档
+            documents = DocumentService.get_by_kb_id(kb_id)
+            
+            for doc in documents:
+                if doc.parser_config:
+                    try:
+                        import json
+                        if isinstance(doc.parser_config, str):
+                            parser_config = json.loads(doc.parser_config)
+                        else:
+                            parser_config = doc.parser_config
+                        
+                        chunking_config = parser_config.get('chunking_config', {})
+                        strategy = chunking_config.get('strategy', 'smart')
+                        
+                        if strategy == 'parent_child':
+                            enabled_kbs.append(kb_id)
+                            break  # 该知识库有父子分块文档，跳出内层循环
+                    except:
+                        continue
+    except:
+        pass
+    
+    return len(enabled_kbs) > 0, enabled_kbs
+
+
+def parent_child_retrieval(query, embd_mdl, tenant_ids, kb_ids, page, top_n, similarity_threshold, vector_similarity_weight, doc_ids=None, top=1024, aggs=False, rerank_mdl=None, rank_feature=None):
+    """父子分块检索逻辑"""
+    try:
+        # 先进行标准检索获取子分块
+        child_results = settings.retrievaler.retrieval(
+            query, embd_mdl, tenant_ids, kb_ids, page, top_n,
+            similarity_threshold, vector_similarity_weight,
+            doc_ids=doc_ids, top=top, aggs=aggs, rerank_mdl=rerank_mdl,
+            rank_feature=rank_feature
+        )
+        
+        # 获取父分块内容
+        parent_chunks = []
+        processed_parents = set()  # 避免重复的父分块
+        
+        for chunk in child_results.get("chunks", []):
+            child_chunk_id = chunk.get("id")
+            doc_id = chunk.get("doc_id")
+            if not child_chunk_id or not doc_id:
+                continue
+            
+            # 检查该文档是否启用了父子分块
+            try:
+                from api.db.services.document_service import DocumentService
+                document = DocumentService.get_by_id(doc_id)
+                if not document or not document.parser_config:
+                    continue
+                    
+                import json
+                if isinstance(document.parser_config, str):
+                    parser_config = json.loads(document.parser_config)
+                else:
+                    parser_config = document.parser_config
+                
+                chunking_config = parser_config.get('chunking_config', {})
+                strategy = chunking_config.get('strategy', 'smart')
+                
+                # 只对父子分块策略的文档进行父子检索
+                if strategy != 'parent_child':
+                    continue
+                    
+            except Exception as e:
+                logging.warning(f"Failed to check document strategy for {doc_id}: {e}")
+                continue
+            
+            # 查询父子关系映射
+            try:
+                mappings = ParentChildMapping.select().where(
+                    ParentChildMapping.child_chunk_id == child_chunk_id
+                ).limit(1)
+                
+                for mapping in mappings:
+                    parent_id = mapping.parent_chunk_id
+                    if parent_id in processed_parents:
+                        continue
+                    processed_parents.add(parent_id)
+                    
+                    # 从ES中获取父分块内容
+                    parent_chunk_data = settings.docStoreConn.get(
+                        parent_id, 
+                        index_name(mapping.doc_id), 
+                        [mapping.kb_id]
+                    )
+                    
+                    if parent_chunk_data:
+                        # 构建父分块数据结构，保持与标准检索结果兼容
+                        parent_chunk = {
+                            "id": parent_id,
+                            "content_with_weight": parent_chunk_data.get("content_with_weight", ""),
+                            "doc_id": mapping.doc_id,
+                            "docnm_kwd": parent_chunk_data.get("docnm_kwd", ""),
+                            "kb_id": mapping.kb_id,
+                            "similarity": chunk.get("similarity", 0.5),  # 继承子分块的相似度
+                            "term_similarity": chunk.get("term_similarity", 0.5),
+                            "vector": chunk.get("vector", []),
+                            "positions": parent_chunk_data.get("positions", []),
+                            "img_id": parent_chunk_data.get("img_id", ""),
+                            "important_kwd": parent_chunk_data.get("important_kwd", []),
+                            "question_kwd": parent_chunk_data.get("question_kwd", []),
+                            "chunk_type": "parent"  # 标记为父分块
+                        }
+                        parent_chunks.append(parent_chunk)
+            
+            except Exception as e:
+                logging.warning(f"Failed to get parent chunk for child {child_chunk_id}: {e}")
+                continue
+        
+        # 如果找到父分块，返回父分块结果；否则返回原始子分块结果
+        if parent_chunks:
+            logging.info(f"Parent-child retrieval: {len(parent_chunks)} parent chunks retrieved")
+            # 保持原有的结果结构
+            result = deepcopy(child_results)
+            result["chunks"] = parent_chunks[:top_n]  # 限制返回数量
+            return result
+        else:
+            logging.info("Parent-child retrieval: no parent chunks found, using child chunks")
+            return child_results
+            
+    except Exception as e:
+        logging.error(f"Parent-child retrieval failed: {e}")
+        # 回退到标准检索
+        return settings.retrievaler.retrieval(
+            query, embd_mdl, tenant_ids, kb_ids, page, top_n,
+            similarity_threshold, vector_similarity_weight,
+            doc_ids=doc_ids, top=top, aggs=aggs, rerank_mdl=rerank_mdl,
+            rank_feature=rank_feature
+        )
 
 
 class DialogService(CommonService):
@@ -342,21 +494,42 @@ def chat(dialog, messages, stream=True, **kwargs):
                     yield think
         else:
             if embd_mdl:
-                kbinfos = retriever.retrieval(
-                    " ".join(questions),
-                    embd_mdl,
-                    tenant_ids,
-                    dialog.kb_ids,
-                    1,
-                    dialog.top_n,
-                    dialog.similarity_threshold,
-                    dialog.vector_similarity_weight,
-                    doc_ids=attachments,
-                    top=dialog.top_k,
-                    aggs=False,
-                    rerank_mdl=rerank_mdl,
-                    rank_feature=label_question(" ".join(questions), kbs),
-                )
+                # 检查是否启用父子分块检索
+                parent_child_enabled, enabled_kb_ids = check_kb_parent_child_enabled(dialog.kb_ids)
+                
+                if parent_child_enabled:
+                    logging.info(f"Using parent-child retrieval for KBs: {enabled_kb_ids}")
+                    kbinfos = parent_child_retrieval(
+                        " ".join(questions),
+                        embd_mdl,
+                        tenant_ids,
+                        dialog.kb_ids,
+                        1,
+                        dialog.top_n,
+                        dialog.similarity_threshold,
+                        dialog.vector_similarity_weight,
+                        doc_ids=attachments,
+                        top=dialog.top_k,
+                        aggs=False,
+                        rerank_mdl=rerank_mdl,
+                        rank_feature=label_question(" ".join(questions), kbs),
+                    )
+                else:
+                    kbinfos = retriever.retrieval(
+                        " ".join(questions),
+                        embd_mdl,
+                        tenant_ids,
+                        dialog.kb_ids,
+                        1,
+                        dialog.top_n,
+                        dialog.similarity_threshold,
+                        dialog.vector_similarity_weight,
+                        doc_ids=attachments,
+                        top=dialog.top_k,
+                        aggs=False,
+                        rerank_mdl=rerank_mdl,
+                        rank_feature=label_question(" ".join(questions), kbs),
+                    )
             if prompt_config.get("tavily_api_key"):
                 tav = Tavily(prompt_config["tavily_api_key"])
                 tav_res = tav.retrieve_chunks(" ".join(questions))

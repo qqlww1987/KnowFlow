@@ -316,6 +316,219 @@ def add_chunks_with_positions(doc, chunks, md_file_path, chunk_content_to_index,
         
         return 0
 
+def _save_parent_child_to_ragflow(doc_id, kb_id, parent_child_result, update_progress):
+    """保存父子分块数据：映射关系到MySQL，内容到Elasticsearch"""
+    try:
+        from database import get_db_connection
+        import uuid
+        from datetime import datetime
+        
+        # 获取父子分块数据
+        parent_chunks = parent_child_result.get('parent_chunks', [])
+        child_chunks = parent_child_result.get('child_chunks', [])
+        relationships = parent_child_result.get('relationships', [])
+        
+        # 生成父分块和子分块的数据库ID
+        parent_ids = [str(uuid.uuid4()) for _ in parent_chunks]
+        child_ids = [str(uuid.uuid4()) for _ in child_chunks]
+        
+        update_progress(0.85, "将父子分块索引到Elasticsearch...")
+        
+        # 将父分块和子分块都存储到 Elasticsearch
+        _index_parent_child_to_elasticsearch(doc_id, kb_id, parent_chunks, child_chunks, parent_ids, child_ids)
+        print(f"✅ [INFO] 父子分块已索引到Elasticsearch")
+        
+        update_progress(0.95, "保存父子映射关系到MySQL...")
+        
+        # 只保存映射关系到MySQL（检索时需要）
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        current_time = int(datetime.now().timestamp() * 1000)
+        current_datetime = datetime.now()
+        
+        # 创建原始ID到数据库ID的映射
+        orig_parent_to_db = {}
+        orig_child_to_db = {}
+        
+        for i, chunk in enumerate(parent_chunks):
+            orig_parent_to_db[chunk['id']] = parent_ids[i]
+        
+        for i, chunk in enumerate(child_chunks):
+            orig_child_to_db[chunk['id']] = child_ids[i]
+        
+        # 保存父子映射关系
+        for relationship in relationships:
+            child_orig_id = relationship['child_chunk_id']
+            parent_orig_id = relationship['parent_chunk_id']
+            
+            child_db_id = orig_child_to_db.get(child_orig_id)
+            parent_db_id = orig_parent_to_db.get(parent_orig_id)
+            
+            if child_db_id and parent_db_id:
+                cursor.execute("""
+                    INSERT INTO parent_child_mapping (
+                        child_chunk_id, parent_chunk_id, doc_id, kb_id, relevance_score,
+                        create_time, create_date, update_time, update_date
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    child_db_id, parent_db_id, doc_id, kb_id,
+                    relationship.get('relevance_score', 100),
+                    current_time, current_datetime, current_time, current_datetime
+                ))
+            else:
+                print(f"⚠️ [WARNING] 映射关系缺失: child={child_orig_id}, parent={parent_orig_id}")
+        
+        # 提交事务
+        conn.commit()
+        
+        print(f"✅ [INFO] 成功保存映射关系：{len(parent_chunks)} 个父分块，{len(child_chunks)} 个子分块")
+        
+    except Exception as e:
+        print(f"❌ [ERROR] 保存父子分块数据失败: {e}")
+        if 'conn' in locals() and conn:
+            conn.rollback()
+        raise
+    finally:
+        if 'cursor' in locals() and cursor:
+            cursor.close()
+        if 'conn' in locals() and conn:
+            conn.close()
+
+
+def _index_parent_child_to_elasticsearch(doc_id, kb_id, parent_chunks, child_chunks, parent_ids, child_ids):
+    """将父子分块索引到Elasticsearch：父分块用于检索返回，子分块用于向量搜索"""
+    try:
+        from database import get_db_connection, get_es_client
+        from datetime import datetime
+        import re
+        
+        # 获取tenant_id用于索引
+        tenant_id = _get_kb_tenant_id(kb_id)
+        if not tenant_id:
+            raise Exception(f"无法获取知识库 {kb_id} 的tenant_id")
+        
+        # 获取文档信息
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM document WHERE id = %s", (doc_id,))
+        doc_result = cursor.fetchone()
+        doc_name = doc_result[0] if doc_result else "unknown"
+        cursor.close()
+        conn.close()
+        
+        # 获取ES客户端
+        es_client = get_es_client()
+        
+        # 构建索引名（遵循RAGFlow命名规范）
+        index_name = f"ragflow_{tenant_id}"
+        
+        # 简单分词函数（避免导入RAGFlow分词器）
+        def simple_tokenize(text):
+            if not text:
+                return ""
+            # 基本分词：分割中英文，保留关键词
+            tokens = re.findall(r'[\w\u4e00-\u9fff]+', text.lower())
+            return " ".join(tokens)
+        
+        # 准备批量索引数据
+        batch_operations = []
+        current_time = datetime.now()
+        
+        # 构建父分块文档
+        for i, (parent_chunk, parent_id) in enumerate(zip(parent_chunks, parent_ids)):
+            # ES操作头
+            batch_operations.append({
+                "index": {
+                    "_index": index_name,
+                    "_id": parent_id
+                }
+            })
+            
+            # 父分块文档内容
+            parent_doc = {
+                "id": parent_id,
+                "doc_id": doc_id,
+                "kb_id": [kb_id],
+                "docnm_kwd": doc_name,
+                "title_tks": simple_tokenize(doc_name),
+                "content_with_weight": parent_chunk['content'],
+                "content_ltks": simple_tokenize(parent_chunk['content']),
+                "content_sm_ltks": simple_tokenize(parent_chunk['content']),  # 简化处理
+                "important_kwd": [],
+                "important_tks": "",
+                "question_kwd": [],
+                "question_tks": "",
+                "available_int": 1,
+                "create_time": current_time.strftime("%Y-%m-%d %H:%M:%S"),
+                "create_timestamp_flt": current_time.timestamp(),
+                "chunk_type": "parent",  # 标记为父分块
+                "chunk_order": parent_chunk.get('order', i),
+            }
+            batch_operations.append(parent_doc)
+        
+        # 构建子分块文档
+        for i, (child_chunk, child_id) in enumerate(zip(child_chunks, child_ids)):
+            # ES操作头
+            batch_operations.append({
+                "index": {
+                    "_index": index_name,
+                    "_id": child_id
+                }
+            })
+            
+            # 子分块文档内容
+            child_doc = {
+                "id": child_id,
+                "doc_id": doc_id,
+                "kb_id": [kb_id],
+                "docnm_kwd": doc_name,
+                "title_tks": simple_tokenize(doc_name),
+                "content_with_weight": child_chunk['content'],
+                "content_ltks": simple_tokenize(child_chunk['content']),
+                "content_sm_ltks": simple_tokenize(child_chunk['content']),  # 简化处理
+                "important_kwd": [],
+                "important_tks": "",
+                "question_kwd": [],
+                "question_tks": "",
+                "available_int": 1,
+                "create_time": current_time.strftime("%Y-%m-%d %H:%M:%S"),
+                "create_timestamp_flt": current_time.timestamp(),
+                "chunk_type": "child",  # 标记为子分块
+                "chunk_order": child_chunk.get('order', i),
+            }
+            batch_operations.append(child_doc)
+        
+        # 批量插入到Elasticsearch
+        if batch_operations:
+            # 使用KnowFlow的ES客户端进行批量插入
+            response = es_client.bulk(
+                body=batch_operations,
+                refresh=True,
+                timeout='60s'
+            )
+            
+            # 检查是否有错误
+            if response.get('errors'):
+                error_items = []
+                for item in response.get('items', []):
+                    if 'index' in item and item['index'].get('error'):
+                        error_items.append(item['index']['error'])
+                
+                if error_items:
+                    print(f"⚠️ [WARNING] ES索引部分失败: {error_items[:3]}")  # 只显示前3个错误
+                else:
+                    print(f"✅ [INFO] 成功索引 {len(parent_chunks)} 个父分块和 {len(child_chunks)} 个子分块到Elasticsearch")
+            else:
+                print(f"✅ [INFO] 成功索引 {len(parent_chunks)} 个父分块和 {len(child_chunks)} 个子分块到Elasticsearch")
+        
+    except Exception as e:
+        print(f"❌ [ERROR] 父子分块Elasticsearch索引失败: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+
 def _cleanup_temp_files(md_file_path):
     """清理临时文件"""
     if not should_cleanup_temp_files():
@@ -347,10 +560,35 @@ def create_ragflow_resources(doc_id, kb_id, md_file_path, image_dir, update_prog
                 enhanced_text, 
                 chunk_token_num=chunking_config.get('chunk_token_num', 256),
                 min_chunk_tokens=chunking_config.get('min_chunk_tokens', 10),
-                chunking_config=chunking_config
+                chunking_config=chunking_config,
+                doc_id=doc_id,
+                kb_id=kb_id
             )
         else:
             chunks = split_markdown_to_chunks_configured(enhanced_text, chunk_token_num=256)
+        
+        # 检查是否使用了父子分块策略
+        is_parent_child = (chunking_config and 
+                          chunking_config.get('strategy') == 'parent_child')
+        
+        if is_parent_child:
+            # 获取父子分块的详细结果
+            from .utils import get_last_parent_child_result
+            parent_child_result = get_last_parent_child_result()
+            
+            if parent_child_result:
+                print(f"🎯 [INFO] 检测到父子分块策略，开始保存父子分块数据")
+                print(f"  👨 父分块数: {parent_child_result.get('total_parents', 0)}")
+                print(f"  👶 子分块数: {parent_child_result.get('total_children', 0)}")
+                
+                # 保存父子分块数据到RAGFlow数据库
+                try:
+                    _save_parent_child_to_ragflow(doc_id, kb_id, parent_child_result, update_progress)
+                    print(f"✅ [INFO] 父子分块数据保存完成")
+                except Exception as e:
+                    print(f"❌ [ERROR] 保存父子分块数据失败: {e}")
+                    import traceback
+                    traceback.print_exc()
         
         chunk_content_to_index = {chunk: i for i, chunk in enumerate(chunks)}
 
