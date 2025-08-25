@@ -15,6 +15,7 @@
 #
 import datetime
 import json
+import os
 import re
 
 import xxhash
@@ -428,150 +429,103 @@ def parent_child_split():
         def accurate_token_count(text):
             return len(encoder.encode(text))
         
-        # 通过HTTP调用KnowFlow服务获取智能分块
-        def get_smart_chunks_from_knowflow(text, chunk_token_num=128, min_chunk_tokens=10):
-            """通过HTTP API调用KnowFlow的智能分块服务"""
-            try:
-                import requests
-                import os
-                
-                knowflow_api_url = os.getenv('KNOWFLOW_API_URL', 'http://localhost:5000')
-                api_endpoint = f"{knowflow_api_url}/api/smart_chunk"
-                
-                request_data = {
-                    'text': text,
-                    'chunk_token_num': chunk_token_num,
-                    'min_chunk_tokens': min_chunk_tokens,
-                    'method': 'smart'
-                }
-                
-                response = requests.post(
-                    api_endpoint,
-                    json=request_data,
-                    headers={'Content-Type': 'application/json'},
-                    timeout=60
-                )
-                
-                if response.status_code == 200:
-                    result_data = response.json()
-                    if result_data.get('code') == 0:
-                        return result_data.get('data', {}).get('chunks', [])
-                    else:
-                        raise Exception(f"KnowFlow API Error: {result_data.get('message', 'Unknown error')}")
-                else:
-                    raise Exception(f"HTTP Error: {response.status_code}")
-                    
-            except Exception:
-                try:
-                    from rag.nlp import naive
-                    return naive.split_by_sentences(text, chunk_token_num)
-                except:
-                    return [text]
+        # 统一使用AST语义分块（通过HTTP调用KnowFlow服务）
+        parent_split_level = parent_config.get('parent_split_level', 2)
         
-        # 获取智能分块结果
-        child_chunks_content = get_smart_chunks_from_knowflow(
-            text, 
-            chunk_token_num=chunk_token_num, 
-            min_chunk_tokens=min_chunk_tokens
-        )
-        
-        # 构建子分块对象
-        import hashlib
-        
-        class SimpleChunkInfo:
-            def __init__(self, id, content, token_count, char_count, order, metadata=None):
-                self.id = id
-                self.content = content
-                self.token_count = token_count
-                self.char_count = char_count
-                self.order = order
-                self.metadata = metadata or {}
-        
-        child_chunks = []
-        for i, content in enumerate(child_chunks_content):
-            chunk_id = f"{doc_id}_child_{i:04d}_{hashlib.md5(content.encode('utf-8')).hexdigest()[:8]}"
-            child_chunks.append(SimpleChunkInfo(
-                id=chunk_id,
-                content=content,
-                token_count=accurate_token_count(content),
-                char_count=len(content),
-                order=i,
-                metadata={'chunk_type': 'child', 'chunk_method': 'child_smart'}
-            ))
-        
-        # 构建父分块
-        parent_chunks = []
-        relationships = []
-        current_parent_content = []
-        current_parent_tokens = 0
-        current_child_ids = []
-        parent_order = 0
-        parent_chunk_size = parent_config.get('parent_chunk_size', 1024)
-        
-        for child_chunk in child_chunks:
-            # 检查是否需要创建新的父分块
-            if (current_parent_tokens + child_chunk.token_count > parent_chunk_size 
-                and current_parent_content):
-                
-                # 创建父分块
-                parent_content = "\n\n".join(current_parent_content).strip()
-                parent_id = f"{doc_id}_parent_{parent_order:04d}_{hashlib.md5(parent_content.encode('utf-8')).hexdigest()[:8]}"
-                
-                parent_chunk = SimpleChunkInfo(
-                    id=parent_id,
-                    content=parent_content,
-                    token_count=accurate_token_count(parent_content),
-                    char_count=len(parent_content),
-                    order=parent_order,
-                    metadata={'chunk_type': 'parent', 'chunk_method': 'parent_smart', 'contains_children': len(current_child_ids)}
-                )
-                parent_chunks.append(parent_chunk)
-                
-                # 建立关系映射
-                for child_id in current_child_ids:
-                    relationships.append({
-                        'child_chunk_id': child_id,
-                        'parent_chunk_id': parent_chunk.id,
-                        'doc_id': doc_id,
-                        'kb_id': kb_id,
-                        'relevance_score': 100
-                    })
-                
-                # 重置状态开始新的父分块
-                current_parent_content = []
-                current_parent_tokens = 0
-                current_child_ids = []
-                parent_order += 1
+        # 通过HTTP调用KnowFlow的AST父子分块API
+        try:
+            import requests
             
-            # 添加到当前父分块
-            current_parent_content.append(child_chunk.content)
-            current_parent_tokens += child_chunk.token_count
-            current_child_ids.append(child_chunk.id)
-        
-        # 处理最后一个父分块
-        if current_parent_content:
-            parent_content = "\n\n".join(current_parent_content).strip()
-            parent_id = f"{doc_id}_parent_{parent_order:04d}_{hashlib.md5(parent_content.encode('utf-8')).hexdigest()[:8]}"
+            knowflow_api_url = os.getenv('KNOWFLOW_API_URL', 'http://localhost:5000')
+            api_endpoint = f"{knowflow_api_url}/api/ast_parent_child_chunk"
             
-            parent_chunk = SimpleChunkInfo(
-                id=parent_id,
-                content=parent_content,
-                token_count=accurate_token_count(parent_content),
-                char_count=len(parent_content),
-                order=parent_order,
-                metadata={'chunk_type': 'parent', 'chunk_method': 'parent_smart', 'contains_children': len(current_child_ids)}
+            request_data = {
+                'text': text,
+                'chunk_token_num': chunk_token_num,
+                'min_chunk_tokens': min_chunk_tokens,
+                'parent_split_level': parent_split_level,
+                'doc_id': doc_id,
+                'kb_id': kb_id
+            }
+            
+            print(f"🌐 [DEBUG] 调用KnowFlow AST分块API: {api_endpoint}")
+            print(f"📊 [DEBUG] 请求参数: chunk_token_num={chunk_token_num}, parent_split_level={parent_split_level}")
+            print(f"📝 [DEBUG] 文本前500字符: {text[:500]}...")
+            
+            response = requests.post(
+                api_endpoint,
+                json=request_data,
+                headers={'Content-Type': 'application/json'},
+                timeout=120
             )
-            parent_chunks.append(parent_chunk)
             
-            # 建立关系映射
-            for child_id in current_child_ids:
-                relationships.append({
-                    'child_chunk_id': child_id,
-                    'parent_chunk_id': parent_chunk.id,
-                    'doc_id': doc_id,
-                    'kb_id': kb_id,
-                    'relevance_score': 100
-                })
+            if response.status_code == 200:
+                result_data = response.json()
+                print(f"🔍 [DEBUG] KnowFlow AST API响应: code={result_data.get('code')}")
+                if result_data.get('code') == 0:
+                    # AST分块成功
+                    ast_data = result_data.get('data', {})
+                    parent_chunks_data = ast_data.get('parent_chunks', [])
+                    child_chunks_data = ast_data.get('child_chunks', [])
+                    relationships_ast = ast_data.get('relationships', [])
+                    print(f"📈 [DEBUG] AST分块数据: {len(parent_chunks_data)}父分块, {len(child_chunks_data)}子分块")
+                    
+                    # 构建简化的分块对象
+                    import hashlib
+                    
+                    class SimpleChunkInfo:
+                        def __init__(self, id, content, token_count, char_count, order, metadata=None):
+                            self.id = id
+                            self.content = content
+                            self.token_count = token_count
+                            self.char_count = char_count
+                            self.order = order
+                            self.metadata = metadata or {}
+                    
+                    # 转换AST分块结果为API格式
+                    parent_chunks = []
+                    for p in parent_chunks_data:
+                        parent_chunk = SimpleChunkInfo(
+                            id=p['id'],
+                            content=p['content'],
+                            token_count=accurate_token_count(p['content']),
+                            char_count=len(p['content']),
+                            order=p['order'],
+                            metadata=p.get('metadata', {})
+                        )
+                        parent_chunks.append(parent_chunk)
+                    
+                    child_chunks = []
+                    for c in child_chunks_data:
+                        child_chunk = SimpleChunkInfo(
+                            id=c['id'],
+                            content=c['content'],
+                            token_count=accurate_token_count(c['content']),
+                            char_count=len(c['content']),
+                            order=c['order'],
+                            metadata=c.get('metadata', {})
+                        )
+                        child_chunks.append(child_chunk)
+                    
+                    relationships = relationships_ast
+                    
+                    print(f"✅ [DEBUG] AST分块成功: {len(parent_chunks)} 父分块, {len(child_chunks)} 子分块")
+                    
+                else:
+                    error_msg = result_data.get('message', 'Unknown API error')
+                    print(f"❌ [ERROR] KnowFlow AST分块API返回错误: {error_msg}")
+                    raise Exception(f"KnowFlow API Error: {error_msg}")
+            else:
+                print(f"❌ [ERROR] KnowFlow AST分块HTTP请求失败: {response.status_code}")
+                print(f"  响应内容: {response.text}")
+                raise Exception(f"HTTP Error: {response.status_code}")
+            
+        except Exception as e:
+            print(f"❌ [ERROR] AST分块失败，错误: {e}")
+            import traceback
+            traceback.print_exc()
+            # 直接抛出异常，不使用fallback逻辑
+            raise Exception(f"AST父子分块调用失败: {e}")
         
         # 构建结果对象
         class SimpleParentChildResult:

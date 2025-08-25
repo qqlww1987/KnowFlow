@@ -13,9 +13,8 @@ interface ChunkingConfigProps {
     parent_config?: {
       parent_chunk_size?: number;
       parent_chunk_overlap?: number;
-      parent_separator?: string;
-      child_separator?: string;
       retrieval_mode?: 'parent' | 'child' | 'hybrid';
+      parent_split_level?: number; // AST语义分块：按照标题层级分割父分块
     };
   };
 }
@@ -30,9 +29,8 @@ export const ChunkingConfig = memo(function ChunkingConfig({
     parent_config: {
       parent_chunk_size: 1024,
       parent_chunk_overlap: 100,
-      parent_separator: '\\n\\n',
-      child_separator: '[。！？.!?]',
       retrieval_mode: 'parent',
+      parent_split_level: 2, // 默认按H2标题分割
     },
   },
 }: ChunkingConfigProps) {
@@ -145,8 +143,8 @@ export const ChunkingConfig = memo(function ChunkingConfig({
       {strategy === 'parent_child' && (
         <>
           <Alert
-            message="父子分块模式说明"
-            description="采用双层分段结构，基于Smart AST分块 + LangChain ParentDocumentRetriever实现。先通过子分块进行精确检索，然后返回对应的父分块以提供完整上下文。"
+            message="AST父子分块模式说明"
+            description="采用基于AST语义分析的双层分块结构。父分块按照Markdown标题层级（H1、H2、H3等）进行语义边界分割，确保语义完整性；子分块使用智能AST分块，保持语义连贯。检索时先通过子分块精确匹配，再返回对应的父分块提供完整上下文。"
             type="info"
             showIcon
             icon={<InfoCircleOutlined />}
@@ -229,15 +227,36 @@ export const ChunkingConfig = memo(function ChunkingConfig({
                   name={[
                     'chunking_config',
                     'parent_config',
-                    'parent_separator',
+                    'parent_split_level',
                   ]}
-                  label="父分块分隔符"
+                  label="AST分割层级"
                   initialValue={
-                    initialValues.parent_config?.parent_separator || '\\n\\n'
+                    initialValues.parent_config?.parent_split_level || 2
                   }
-                  extra="正则表达式，按段落分割"
+                  rules={[
+                    {
+                      validator: (_, value) => {
+                        if (value < 1 || value > 6) {
+                          return Promise.reject(
+                            new Error('标题层级必须在1-6之间'),
+                          );
+                        }
+                        return Promise.resolve();
+                      },
+                    },
+                  ]}
+                  extra="按H1(1), H2(2), H3(3)等标题层级分割父分块"
                 >
-                  <Input placeholder="\\n\\n" />
+                  <Select placeholder="选择标题层级">
+                    <Select.Option value={1}>H1 - 最大章节</Select.Option>
+                    <Select.Option value={2}>
+                      H2 - 主要章节（推荐）
+                    </Select.Option>
+                    <Select.Option value={3}>H3 - 子章节</Select.Option>
+                    <Select.Option value={4}>H4 - 小节</Select.Option>
+                    <Select.Option value={5}>H5 - 段落级</Select.Option>
+                    <Select.Option value={6}>H6 - 细粒度</Select.Option>
+                  </Select>
                 </Form.Item>
               </Card>
             </Col>
@@ -250,25 +269,13 @@ export const ChunkingConfig = memo(function ChunkingConfig({
               >
                 <Form.Item
                   label="子分块大小"
-                  extra="分块大小配置，用于精确检索"
+                  extra="基于AST智能分块，自动保持语义完整性"
                 >
                   <InputNumber
                     value={chunkTokenNum}
                     disabled
                     style={{ width: '100%' }}
                   />
-                </Form.Item>
-
-                <Form.Item
-                  name={['chunking_config', 'parent_config', 'child_separator']}
-                  label="子分块分隔符"
-                  initialValue={
-                    initialValues.parent_config?.child_separator ||
-                    '[。！？.!?]'
-                  }
-                  extra="正则表达式，按句子分割"
-                >
-                  <Input placeholder="[。！？.!?]" />
                 </Form.Item>
 
                 <Form.Item
@@ -292,23 +299,33 @@ export const ChunkingConfig = memo(function ChunkingConfig({
           </Row>
 
           <Alert
-            message="参数建议"
+            message="AST语义分块推荐配置"
             description={
               <ul style={{ margin: 0, paddingLeft: 20 }}>
                 <li>
-                  <strong>长文档</strong>：父分块1536，子分块384
+                  <strong>技术文档</strong>：父分块2048，H2层级，子分块512 -
+                  保持技术章节完整性
                 </li>
                 <li>
-                  <strong>短文档</strong>：父分块512，子分块128
+                  <strong>用户手册</strong>：父分块1024，H2层级，子分块256 -
+                  平衡结构与细节
                 </li>
                 <li>
-                  <strong>技术文档</strong>：父分块2048，子分块512
+                  <strong>学术论文</strong>：父分块1536，H3层级，子分块384 -
+                  精细化学术章节
                 </li>
                 <li>
-                  <strong>问答系统</strong>：使用父分块模式
+                  <strong>博客文章</strong>：父分块1024，H2层级，子分块256 -
+                  适合多主题内容
                 </li>
                 <li>
-                  <strong>精确搜索</strong>：使用子分块模式
+                  <strong>问答系统</strong>：使用父分块模式 - 获得完整语义上下文
+                </li>
+                <li>
+                  <strong>精确搜索</strong>：使用子分块模式 - 实现精准语义匹配
+                </li>
+                <li>
+                  <strong>混合检索</strong>：结合父子分块优势 - 平衡精度与上下文
                 </li>
               </ul>
             }

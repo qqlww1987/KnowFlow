@@ -60,7 +60,9 @@ def check_kb_parent_child_enabled(kb_ids):
         
         for kb_id in kb_ids:
             # 查询该知识库下是否有使用parent_child策略的文档
-            documents = DocumentService.get_by_kb_id(kb_id)
+            # 使用原始数据库查询代替DocumentService.get_by_kb_id
+            from api.db.db_models import Document
+            documents = Document.select().where(Document.kb_id == kb_id)
             
             for doc in documents:
                 if doc.parser_config:
@@ -101,59 +103,93 @@ def parent_child_retrieval(query, embd_mdl, tenant_ids, kb_ids, page, top_n, sim
         processed_parents = set()  # 避免重复的父分块
         
         for chunk in child_results.get("chunks", []):
-            child_chunk_id = chunk.get("id")
-            doc_id = chunk.get("doc_id")
+            # retrieval() returns chunks with key 'chunk_id' for the chunk identifier
+            # and 'doc_id' for the document identifier. Fall back to alternative keys if present.
+            child_chunk_id = chunk.get("chunk_id", chunk.get("id"))
+            doc_id = chunk.get("doc_id", chunk.get("document_id"))
+            logging.info("1-------------")
             if not child_chunk_id or not doc_id:
                 continue
             
-            # 检查该文档是否启用了父子分块
-            try:
-                from api.db.services.document_service import DocumentService
-                document = DocumentService.get_by_id(doc_id)
-                if not document or not document.parser_config:
-                    continue
+            # # 检查该文档是否启用了父子分块
+            # try:
+            #     from api.db.services.document_service import DocumentService
+            #     document = DocumentService.get_by_id(doc_id)
+            #     if not document or not document.parser_config:
+            #         continue
                     
-                import json
-                if isinstance(document.parser_config, str):
-                    parser_config = json.loads(document.parser_config)
-                else:
-                    parser_config = document.parser_config
+            #     import json
+            #     if isinstance(document.parser_config, str):
+            #         parser_config = json.loads(document.parser_config)
+            #     else:
+            #         parser_config = document.parser_config
                 
-                chunking_config = parser_config.get('chunking_config', {})
-                strategy = chunking_config.get('strategy', 'smart')
+            #     chunking_config = parser_config.get('chunking_config', {})
+            #     strategy = chunking_config.get('strategy', 'smart')
                 
-                # 只对父子分块策略的文档进行父子检索
-                if strategy != 'parent_child':
-                    continue
+            #     # 只对父子分块策略的文档进行父子检索
+            #     if strategy != 'parent_child':
+            #         continue
+                
+            #     # 检查retrieval_mode配置，只有parent模式才进行父子转换
+            #     parent_config = chunking_config.get('parent_config', {})
+            #     retrieval_mode = parent_config.get('retrieval_mode', 'parent')
+                
+            #     logging.info(f"Document {doc_id}: strategy={strategy}, retrieval_mode={retrieval_mode}")
+                
+            #     # 如果配置为child模式，保留子分块，不转换为父分块
+            #     if retrieval_mode != 'parent':
+            #         logging.info(f"Skipping parent-child conversion for doc {doc_id}: retrieval_mode={retrieval_mode}")
+            #         continue
                     
-            except Exception as e:
-                logging.warning(f"Failed to check document strategy for {doc_id}: {e}")
-                continue
+            # except Exception as e:
+            #     logging.warning(f"Failed to check document strategy for {doc_id}: {e}")
+            #     continue
             
             # 查询父子关系映射
             try:
                 mappings = ParentChildMapping.select().where(
                     ParentChildMapping.child_chunk_id == child_chunk_id
                 ).limit(1)
+                logging.info("2-------------")
+                logging.info("child_chunk_id=%s, doc_id=%s", child_chunk_id, doc_id)
+                count = ParentChildMapping.select().where(
+                     ParentChildMapping.child_chunk_id == child_chunk_id
+                ).count()
+                logging.info("mapping_count=%s", count)
                 
                 for mapping in mappings:
                     parent_id = mapping.parent_chunk_id
                     if parent_id in processed_parents:
                         continue
                     processed_parents.add(parent_id)
+                    logging.info("3-------------")
                     
-                    # 从ES中获取父分块内容
+                    # 获取正确的tenant_id
+                    try:
+                        from api.db.services.document_service import DocumentService
+                        tenant_id = DocumentService.get_tenant_id(mapping.doc_id)
+                        if not tenant_id:
+                            logging.warning(f"Failed to get tenant_id for doc {mapping.doc_id}")
+                            continue
+                    except Exception as e:
+                        logging.warning(f"Failed to get tenant_id for doc {mapping.doc_id}: {e}")
+                        continue
+                    
+                    # 从ES中获取父分块内容，使用正确的tenant_id构建索引名
                     parent_chunk_data = settings.docStoreConn.get(
                         parent_id, 
-                        index_name(mapping.doc_id), 
+                        index_name(tenant_id), 
                         [mapping.kb_id]
                     )
                     
                     if parent_chunk_data:
+                        logging.info(f"Successfully retrieved parent chunk {parent_id} for child {child_chunk_id}")
                         # 构建父分块数据结构，保持与标准检索结果兼容
                         parent_chunk = {
                             "id": parent_id,
                             "content_with_weight": parent_chunk_data.get("content_with_weight", ""),
+                            "content_ltks": parent_chunk_data.get("content_ltks", ""),  # 添加缺失的字段
                             "doc_id": mapping.doc_id,
                             "docnm_kwd": parent_chunk_data.get("docnm_kwd", ""),
                             "kb_id": mapping.kb_id,
@@ -167,6 +203,8 @@ def parent_child_retrieval(query, embd_mdl, tenant_ids, kb_ids, page, top_n, sim
                             "chunk_type": "parent"  # 标记为父分块
                         }
                         parent_chunks.append(parent_chunk)
+                    else:
+                        logging.warning(f"Failed to retrieve parent chunk data from ES: {parent_id}")
             
             except Exception as e:
                 logging.warning(f"Failed to get parent chunk for child {child_chunk_id}: {e}")

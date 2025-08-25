@@ -230,6 +230,81 @@ def smart_chunk():
         logger.error(f"❌ [ERROR] 智能分块API失败: {e}")
         return {"code": 500, "message": f"智能分块失败: {str(e)}"}, 500
 
+
+@app.route('/api/ast_parent_child_chunk', methods=['POST'])
+def ast_parent_child_chunk():
+    """AST父子分块API端点 - 供RAGFlow跨容器调用"""
+    try:
+        # 解析请求参数
+        data = request.get_json()
+        if not data:
+            return {"code": 400, "message": "请求数据不能为空"}, 400
+        
+        text = data.get('text', '').strip()
+        chunk_token_num = data.get('chunk_token_num', 256)
+        min_chunk_tokens = data.get('min_chunk_tokens', 10)
+        parent_split_level = data.get('parent_split_level', 2)
+        doc_id = data.get('doc_id', 'unknown')
+        kb_id = data.get('kb_id', 'unknown')
+        
+        if not text:
+            return {"code": 400, "message": "文本内容不能为空"}, 400
+        
+        logger.info(f"🎯 [DEBUG] AST父子分块API调用: 文本长度={len(text)} 字符, 子分块大小={chunk_token_num}, 父分块层级=H{parent_split_level}")
+        
+        # 导入AST父子分块函数
+        from services.knowledgebases.mineru_parse.utils import split_markdown_to_chunks_ast_parent_child
+        
+        # 执行AST父子分块
+        parent_chunks, child_chunks, relationships = split_markdown_to_chunks_ast_parent_child(
+            txt=text,
+            chunk_token_num=chunk_token_num,
+            min_chunk_tokens=min_chunk_tokens,
+            parent_config={'parent_split_level': parent_split_level},
+            doc_id=doc_id,
+            kb_id=kb_id
+        )
+        
+        logger.info(f"📊 [DEBUG] AST父子分块结果: {len(parent_chunks)} 个父分块, {len(child_chunks)} 个子分块, {len(relationships)} 个关联")
+        
+        # 转换为JSON可序列化的格式
+        parent_chunks_data = []
+        for p in parent_chunks:
+            parent_chunks_data.append({
+                'id': p.id,
+                'content': p.content,
+                'order': p.order,
+                'metadata': p.metadata
+            })
+        
+        child_chunks_data = []
+        for c in child_chunks:
+            child_chunks_data.append({
+                'id': c.id,
+                'content': c.content,
+                'order': c.order,
+                'metadata': c.metadata
+            })
+        
+        # 返回结果
+        return {
+            "code": 0,
+            "message": "AST父子分块成功",
+            "data": {
+                "parent_chunks": parent_chunks_data,
+                "child_chunks": child_chunks_data,
+                "relationships": relationships,
+                "total_parents": len(parent_chunks),
+                "total_children": len(child_chunks)
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ [ERROR] AST父子分块API失败: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"code": 500, "message": f"AST父子分块失败: {str(e)}"}, 500
+
 # 登录路由保留在主文件中
 @app.route('/api/v1/auth/login', methods=['POST'])
 def login():

@@ -53,6 +53,24 @@ python parent_child_mapper_viewer.py <doc_id> --html
 python parent_child_mapper_viewer.py <doc_id> --html --html-pairs 20
 ```
 
+#### AST预览模式
+```bash
+# 预览基于AST的父子分块效果（使用内置示例）
+python parent_child_mapper_viewer.py fake_doc_id --ast-preview
+
+# 使用外部Markdown文件进行预览
+python parent_child_mapper_viewer.py fake_doc_id --ast-preview --markdown-file path/to/your.md
+
+# 自定义分块参数
+python parent_child_mapper_viewer.py fake_doc_id --ast-preview --parent-level 3 --child-size 128
+
+# 生成AST分块HTML可视化页面
+python parent_child_mapper_viewer.py fake_doc_id --ast-preview --ast-html
+
+# 结合外部文件和HTML可视化
+python parent_child_mapper_viewer.py fake_doc_id --ast-preview --ast-html --markdown-file path/to/your.md
+```
+
 ### 输出示例
 
 #### 标准输出
@@ -102,6 +120,15 @@ HTML模式会自动在浏览器中打开一个现代化的可视化页面，提�
 - **美观界面**: 现代化渐变设计和卡片式布局
 - **详细信息**: 显示分块ID、类型、顺序、长度等元数据
 
+#### AST HTML可视化界面
+AST预览的HTML模式提供更丰富的语义分析可视化：
+- **三栏布局**: 原始文档、父分块、子分块并列显示
+- **语义标记**: 显示分块中包含的标题、表格、代码、列表等语义元素
+- **层级展示**: 清晰显示Markdown标题层级和AST结构信息
+- **关联可视化**: 直观展示父子分块之间的语义关联关系
+- **AST元数据**: 显示行号范围、节点类型、上下文层级等AST分析结果
+- **实时搜索**: 支持跨所有分块内容的实时搜索和高亮
+
 ## 技术说明
 
 ### 数据来源
@@ -135,6 +162,11 @@ HTML模式会自动在浏览器中打开一个现代化的可视化页面，提�
 | `--stats-only` | `-s` | 仅显示统计信息 |
 | `--html` | - | 打开HTML可视化页面 |
 | `--html-pairs` | - | HTML页面显示的最大映射对数量（默认20） |
+| `--ast-preview` | - | 预览基于AST的父子分块效果 |
+| `--ast-html` | - | AST预览模式下生成HTML可视化页面 |
+| `--parent-level` | - | AST预览模式下的父分块分割层级（默认2） |
+| `--child-size` | - | AST预览模式下的子分块大小（默认256） |
+| `--markdown-file` | - | 用于AST预览的Markdown文件路径 |
 | `--help` | `-h` | 显示帮助信息 |
 
 ## 依赖要求
