@@ -176,15 +176,16 @@ def parent_child_retrieval(query, embd_mdl, tenant_ids, kb_ids, page, top_n, sim
                         logging.warning(f"Failed to get tenant_id for doc {mapping.doc_id}: {e}")
                         continue
                     
-                    # 从ES中获取父分块内容，使用正确的tenant_id构建索引名
+                    # 从单独的父分块ES索引中获取父分块内容
+                    parent_index = f"{index_name(tenant_id)}_parent"
                     parent_chunk_data = settings.docStoreConn.get(
                         parent_id, 
-                        index_name(tenant_id), 
+                        parent_index, 
                         [mapping.kb_id]
                     )
                     
                     if parent_chunk_data:
-                        logging.info(f"Successfully retrieved parent chunk {parent_id} for child {child_chunk_id}")
+                        logging.info(f"Successfully retrieved parent chunk {parent_id} from separate index {parent_index} for child {child_chunk_id}")
                         # 构建父分块数据结构，保持与标准检索结果兼容
                         parent_chunk = {
                             "id": parent_id,

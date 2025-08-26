@@ -346,13 +346,13 @@ def _handle_parent_child_processing(parent_child_data, child_chunk_ids, tenant_i
         
         print(f"🔗 [Parent-Child] 开始处理 {len(parent_chunks)} 个父分块和 {len(relationships)} 个映射关系")
         
-        # 1. 生成父分块IDs并索引到ES
+        # 1. 生成父分块IDs并索引到单独的ES索引
         import uuid
         parent_ids = [str(uuid.uuid4()) for _ in parent_chunks]
         
-        print(f"📥 [Parent-Child] 索引父分块到Elasticsearch...")
-        _index_parents_to_elasticsearch_in_ragflow(doc_id, kb_id, parent_chunks, parent_ids, tenant_id, dataset_id)
-        print(f"✅ [Parent-Child] {len(parent_chunks)} 个父分块已索引到ES")
+        print(f"📥 [Parent-Child] 索引父分块到单独的Elasticsearch索引...")
+        _index_parents_to_separate_elasticsearch_in_ragflow(doc_id, kb_id, parent_chunks, parent_ids, tenant_id, dataset_id)
+        print(f"✅ [Parent-Child] {len(parent_chunks)} 个父分块已索引到单独的ES索引")
         
         # 2. 建立映射关系
         print(f"🔗 [Parent-Child] 建立父子映射关系...")
@@ -369,8 +369,8 @@ def _handle_parent_child_processing(parent_child_data, child_chunk_ids, tenant_i
         raise
 
 
-def _index_parents_to_elasticsearch_in_ragflow(doc_id, kb_id, parent_chunks, parent_ids, tenant_id, dataset_id):
-    """在RAGFlow容器中将父分块索引到Elasticsearch"""
+def _index_parents_to_separate_elasticsearch_in_ragflow(doc_id, kb_id, parent_chunks, parent_ids, tenant_id, dataset_id):
+    """在RAGFlow容器中将父分块索引到专门的ES索引，与子分块分离"""
     try:
         from datetime import datetime
         import re
@@ -382,19 +382,22 @@ def _index_parents_to_elasticsearch_in_ragflow(doc_id, kb_id, parent_chunks, par
         
         # 获取ES客户端
         from rag.nlp import search
+        from rag.nlp import rag_tokenizer
         
-        # 构建索引名（遵循RAGFlow命名规范）
-        index_name = search.index_name(tenant_id)
+        # 构建专门的父分块索引名（与子分块索引分离）
+        parent_index_name = f"{search.index_name(tenant_id)}_parent"
         
-        # 索引父分块
+        print(f"📄 [Parent-ES] 保存 {len(parent_chunks)} 个父分块到专门的ES索引: {parent_index_name}")
+        
+        # 索引父分块到专门的索引
         for i, parent_chunk in enumerate(parent_chunks):
             parent_id = parent_ids[i]
             content = parent_chunk.get('content', '')
             
-            # 使用 rag_tokenizer 进行分词处理 - 这里是关键！
+            # 使用 rag_tokenizer 进行分词处理
             content_ltks = rag_tokenizer.tokenize(content)
             
-            # 构建文档结构（遵循RAGFlow ES文档结构）
+            # 构建父分块文档结构（遵循RAGFlow ES文档结构，但存储在单独索引）
             doc_body = {
                 "id": parent_id,  # 必须包含id字段
                 "content_ltks": content_ltks,  # 使用rag_tokenizer分词
@@ -416,10 +419,12 @@ def _index_parents_to_elasticsearch_in_ragflow(doc_id, kb_id, parent_chunks, par
                 "create_timestamp_flt": datetime.now().timestamp()
             }
             
-            # 索引到ES
-            settings.docStoreConn.insert([doc_body], index_name, dataset_id)
+            # 索引到专门的父分块ES索引（与子分块索引分离）
+            settings.docStoreConn.insert([doc_body], parent_index_name, dataset_id)
         
-        print(f"📥 [Parent-Child] 已将 {len(parent_chunks)} 个父分块索引到ES索引 {index_name}")
+        print(f"✅ [Parent-ES] 成功保存 {len(parent_chunks)} 个父分块到专门的ES索引")
+        print(f"  💡 [Parent-ES] 父分块存储在 {parent_index_name}，不会出现在主检索结果中")
+        print(f"  🔍 [Parent-ES] 子分块存储在 {search.index_name(tenant_id)}，用于正常检索")
         
     except Exception as e:
         print(f"❌ [Parent-Child] 父分块ES索引失败: {e}")
