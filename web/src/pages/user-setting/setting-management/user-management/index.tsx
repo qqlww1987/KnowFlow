@@ -354,19 +354,19 @@ const UserManagementPage = () => {
       title: '邮箱',
       dataIndex: 'email',
       key: 'email',
-      width: 200,
+      width: 180,
     },
     {
       title: '创建时间',
       dataIndex: 'createTime',
       key: 'createTime',
-      width: 150,
+      width: 100,
     },
     {
       title: '更新时间',
       dataIndex: 'updateTime',
       key: 'updateTime',
-      width: 150,
+      width: 120,
     },
     {
       title: '角色',
@@ -389,15 +389,8 @@ const UserManagementPage = () => {
       key: 'action',
       fixed: 'right' as const,
       width: 320,
-      align: 'right' as const,
-      onHeaderCell: () => ({
-        style: { paddingRight: '30px' },
-      }),
       render: (_: any, record: UserData) => (
-        <Space
-          size="small"
-          style={{ justifyContent: 'flex-end', display: 'flex' }}
-        >
+        <Space size={4}>
           <Button
             type="link"
             size="small"
@@ -420,7 +413,7 @@ const UserManagementPage = () => {
             icon={<UserOutlined />}
             onClick={() => handleAssignRole(record)}
           >
-            分配角色
+            角色
           </Button>
           <Popconfirm
             title="确定删除这个用户吗？"
@@ -505,7 +498,7 @@ const UserManagementPage = () => {
           rowKey="id"
           loading={loading}
           pagination={false}
-          scroll={{ x: 1040 }}
+          scroll={{ x: 940 }}
           rowSelection={{
             selectedRowKeys,
             onChange: (selectedRowKeys: React.Key[]) =>

@@ -183,55 +183,6 @@ def generate_token(username):
     
     return token
 
-# 智能分块API端点 - 为RAGFlow提供HTTP接口
-@app.route('/api/smart_chunk', methods=['POST'])
-def smart_chunk():
-    """智能分块API端点 - 供RAGFlow跨容器调用"""
-    try:
-        # 解析请求参数
-        data = request.get_json()
-        if not data:
-            return {"code": 400, "message": "请求数据不能为空"}, 400
-        
-        text = data.get('text', '').strip()
-        chunk_token_num = data.get('chunk_token_num', 128)
-        min_chunk_tokens = data.get('min_chunk_tokens', 10)
-        method = data.get('method', 'smart')
-        
-        if not text:
-            return {"code": 400, "message": "文本内容不能为空"}, 400
-        
-        logger.info(f"🚀 [DEBUG] 智能分块API调用: 文本长度={len(text)} 字符, 分块大小={chunk_token_num}")
-        
-        # 导入智能分块函数
-        from services.knowledgebases.mineru_parse.utils import split_markdown_to_chunks_smart
-        
-        # 执行智能分块
-        chunks = split_markdown_to_chunks_smart(
-            txt=text,
-            chunk_token_num=chunk_token_num,
-            min_chunk_tokens=min_chunk_tokens
-        )
-        
-        logger.info(f"📊 [DEBUG] 智能分块结果: {len(chunks)} 个分块")
-        
-        # 返回结果
-        return {
-            "code": 0,
-            "message": "智能分块成功",
-            "data": {
-                "chunks": chunks,
-                "total_chunks": len(chunks),
-                "method": method
-            }
-        }
-        
-    except Exception as e:
-        logger.error(f"❌ [ERROR] 智能分块API失败: {e}")
-        return {"code": 500, "message": f"智能分块失败: {str(e)}"}, 500
-
-
-# AST父子分块API端点已移除 - 现在所有父子分块处理都在本地完成，不需要HTTP API
 
 # 登录路由保留在主文件中
 @app.route('/api/v1/auth/login', methods=['POST'])
