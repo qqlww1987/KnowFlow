@@ -222,17 +222,6 @@ def add_chunks_with_enhanced_batch_api(doc, chunks, md_file_path, chunk_content_
         return 0
 
 
-# add_chunks_with_positions函数已移除 - 现在统一使用 add_chunks_with_enhanced_batch_api 处理所有分块类型
-
-
-
-# 注意：_save_parent_child_to_ragflow 函数已移除
-# 现在统一使用增强的batch接口处理父子分块
-
-
-# 注意：_index_parent_child_to_elasticsearch 函数已移除
-# 现在统一使用增强的batch接口处理父子分块ES索引
-
 
 def _cleanup_temp_files(md_file_path):
     """清理临时文件"""
@@ -258,6 +247,15 @@ def create_ragflow_resources(doc_id, kb_id, md_file_path, image_dir, update_prog
         chunking_config = _get_document_chunking_config(doc_id)
         
         enhanced_text = update_markdown_image_urls(md_file_path, kb_id)
+
+        # 保存原始markdown到本地用于调试
+        try:
+            debug_md_path = f"/tmp/debug_markdown_{doc_id}_{kb_id}.md"
+            with open(debug_md_path, 'w', encoding='utf-8') as f:
+                f.write(enhanced_text)
+            print(f"🔍 [DEBUG] 原始markdown已保存到: {debug_md_path}")
+        except Exception as e:
+            pass
         
         # 传递分块配置给分块函数
         if chunking_config:
