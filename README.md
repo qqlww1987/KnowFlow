@@ -376,6 +376,7 @@ pnpm dev
 1. **文档结构分块**：基于文档原生结构进行智能分块
 2. **按标题分块**：根据标题层级自动划分内容块
 3. **RAGFlow 原分块**：保持与官方完全一致的分块规则
+4. **父子分块**：父块较大用于补充上下文，子块用于向量检索
 
 <div align="center">
   <img src="knowflow/assets/mulcontent.png" alt="图文混排示例">

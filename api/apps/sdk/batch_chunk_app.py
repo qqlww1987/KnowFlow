@@ -23,8 +23,6 @@ KnowFlow 批量 Chunk 添加插件 (集成式实现)
 
 import datetime
 import xxhash
-import re
-import sys
 import traceback
 from timeit import default_timer as timer
 import time
@@ -34,13 +32,10 @@ from flask import request, Blueprint
 from api.utils.api_utils import token_required, get_result, get_error_data_result
 from api.db.services.knowledgebase_service import KnowledgebaseService
 from api.db.services.document_service import DocumentService
-from api.db import LLMType, ParserType
+from api.db import LLMType
 from api.db.services.llm_service import TenantLLMService
 from rag.nlp import rag_tokenizer, search
-from rag.app.qa import rmPrefix, beAdoc
 from rag.prompts import keyword_extraction, question_proposal
-from rag.app.tag import label_question
-from rag.utils import rmSpace
 from graphrag.utils import get_llm_cache, set_llm_cache, chat_limiter
 from api import settings
 import trio
