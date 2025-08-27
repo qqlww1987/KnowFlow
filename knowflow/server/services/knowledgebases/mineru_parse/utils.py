@@ -422,7 +422,21 @@ def get_blocks_from_md(md_file_path):
                         
                         # 提取文本内容
                         text_content = ''
-                        if 'lines' in block:
+                        
+                        # 对于表格类型，需要从嵌套的blocks中提取HTML
+                        if block.get('type') == 'table' and 'blocks' in block:
+                            for sub_block in block['blocks']:
+                                if 'lines' in sub_block:
+                                    for line in sub_block['lines']:
+                                        if 'spans' in line:
+                                            for span in line['spans']:
+                                                if span.get('type') == 'table' and 'html' in span:
+                                                    text_content += span['html']
+                                                elif 'content' in span:
+                                                    text_content += span['content']
+                        
+                        # 对于非表格类型，使用原来的逻辑
+                        if not text_content and 'lines' in block:
                             for line in block['lines']:
                                 if 'spans' in line:
                                     for span in line['spans']:
@@ -452,7 +466,21 @@ def get_blocks_from_md(md_file_path):
                             
                             # 提取文本内容
                             text_content = ''
-                            if 'lines' in block:
+                            
+                            # 对于表格类型的block，需要从嵌套的blocks中提取HTML
+                            if block.get('type') == 'table' and 'blocks' in block:
+                                for sub_block in block['blocks']:
+                                    if 'lines' in sub_block:
+                                        for line in sub_block['lines']:
+                                            if 'spans' in line:
+                                                for span in line['spans']:
+                                                    if span.get('type') == 'table' and 'html' in span:
+                                                        text_content += span['html']
+                                                    elif 'content' in span:
+                                                        text_content += span['content']
+                            
+                            # 对于非表格类型，使用原来的逻辑
+                            if not text_content and 'lines' in block:
                                 for line in block['lines']:
                                     if 'spans' in line:
                                         for span in line['spans']:
@@ -527,6 +555,9 @@ def get_bbox_for_chunk(md_file_path, chunk_content, block_list=None, matched_glo
         if not chunk_content_clean:
             return None
 
+        # 检查chunk是否为HTML表格
+        is_chunk_table = '<table>' in chunk_content_clean and '</table>' in chunk_content_clean
+        
         # 用 difflib.SequenceMatcher 找最相似的 block
         best_idx = -1
         best_ratio = 0.0
@@ -536,7 +567,23 @@ def get_bbox_for_chunk(md_file_path, chunk_content, block_list=None, matched_glo
             block_text = block.get('text', '').strip()
             if not block_text:
                 continue
-            ratio = difflib.SequenceMatcher(None, chunk_content_clean, block_text).ratio()
+                
+            if is_chunk_table:
+                # 对于表格chunk，提取block中的HTML部分进行比较
+                if '<table>' in block_text and '</table>' in block_text:
+                    import re
+                    table_match = re.search(r'<table>.*?</table>', block_text, re.DOTALL)
+                    if table_match:
+                        block_html = table_match.group(0)
+                        ratio = difflib.SequenceMatcher(None, chunk_content_clean, block_html).ratio()
+                    else:
+                        ratio = 0.0
+                else:
+                    ratio = 0.0
+            else:
+                # 对于非表格chunk，直接比较
+                ratio = difflib.SequenceMatcher(None, chunk_content_clean, block_text).ratio()
+                
             if ratio > best_ratio:
                 best_ratio = ratio
                 best_idx = i

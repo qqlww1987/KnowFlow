@@ -838,7 +838,7 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
     MAX_CHUNKS_PER_REQUEST = 100
     DEFAULT_BATCH_SIZE = 10
     MAX_BATCH_SIZE = 50
-    MAX_CONTENT_LENGTH = 10000
+    MAX_CONTENT_LENGTH = 100000
     DB_BULK_SIZE = 10
     
     try:
