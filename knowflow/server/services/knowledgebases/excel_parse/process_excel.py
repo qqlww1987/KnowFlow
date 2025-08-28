@@ -1,7 +1,7 @@
 import time
 import logging
 from .excel_service import chunk_excel_for_knowledge_base
-from ..mineru_parse.ragflow_build import get_ragflow_doc, add_chunks_with_positions
+from ..mineru_parse.ragflow_build import get_ragflow_doc, add_chunks_with_enhanced_batch_api
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ def process_excel_entry(doc_id, file_content, kb_id, parser_config, doc_info, up
         
         # Excel 分块没有位置信息，md_file_path 设为 None，chunk_content_to_index 用索引映射
         chunk_content_to_index = {chunk: i for i, chunk in enumerate(chunks)}
-        chunk_count = add_chunks_with_positions(doc, chunks, None, chunk_content_to_index, update_progress)
+        chunk_count = add_chunks_with_enhanced_batch_api(doc, chunks, None, chunk_content_to_index, update_progress)
         
         # 注意: Excel 分块目前没有位置信息，所以不需要调用 _update_chunks_position
 
