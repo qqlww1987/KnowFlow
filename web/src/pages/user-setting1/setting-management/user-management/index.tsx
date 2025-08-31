@@ -102,7 +102,7 @@ const UserManagementPage = () => {
     setLoading(true);
     try {
       const values = searchForm.getFieldsValue();
-      const res = await request.get('/api/v1/users', {
+      const res = await request.get('/api/knowflow/v1/users', {
         params: {
           currentPage: pagination.current,
           size: pagination.pageSize,
@@ -146,7 +146,7 @@ const UserManagementPage = () => {
   const handleDeleteUser = async (userId: string) => {
     setLoading(true);
     try {
-      await request.delete(`/api/v1/users/${userId}`);
+      await request.delete(`/api/knowflow/v1/users/${userId}`);
       message.success('删除用户成功');
       await loadUserData();
     } catch (error) {
@@ -164,7 +164,9 @@ const UserManagementPage = () => {
     setLoading(true);
     try {
       await Promise.all(
-        selectedRowKeys.map((id) => request.delete(`/api/v1/users/${id}`)),
+        selectedRowKeys.map((id) =>
+          request.delete(`/api/knowflow/v1/users/${id}`),
+        ),
       );
       setSelectedRowKeys([]);
       message.success(`成功删除 ${selectedRowKeys.length} 个用户`);
@@ -188,13 +190,13 @@ const UserManagementPage = () => {
       setLoading(true);
       if (editingUser) {
         if (editingUser.id) {
-          await request.put(`/api/v1/users/${editingUser.id}`, {
+          await request.put(`/api/knowflow/v1/users/${editingUser.id}`, {
             data: values,
           });
         }
         message.success('更新用户成功');
       } else {
-        await request.post('/api/v1/users', { data: values });
+        await request.post('/api/knowflow/v1/users', { data: values });
         message.success('创建用户成功');
       }
       setUserModalVisible(false);
@@ -210,9 +212,12 @@ const UserManagementPage = () => {
     try {
       const values = await passwordForm.validateFields();
       setLoading(true);
-      await request.put(`/api/v1/users/${currentUserId}/reset-password`, {
-        data: { password: values.password },
-      });
+      await request.put(
+        `/api/knowflow/v1/users/${currentUserId}/reset-password`,
+        {
+          data: { password: values.password },
+        },
+      );
       message.success('重置密码成功');
       setResetPasswordModalVisible(false);
     } catch (error) {

@@ -88,7 +88,7 @@ const TeamManagementPage = () => {
     setLoading(true);
     try {
       const values = searchForm.getFieldsValue();
-      const res = await request.get('/api/v1/teams', {
+      const res = await request.get('/api/knowflow/v1/teams', {
         params: {
           currentPage: pagination.current,
           size: pagination.pageSize,
@@ -109,7 +109,7 @@ const TeamManagementPage = () => {
   const loadUserList = async () => {
     setUserLoading(true);
     try {
-      const res = await request.get('/api/v1/users', {
+      const res = await request.get('/api/knowflow/v1/users', {
         params: {
           currentPage: 1,
           size: 1000, // Get all users for selection
@@ -132,7 +132,7 @@ const TeamManagementPage = () => {
   const loadTeamMembers = async (teamId: string) => {
     setMemberLoading(true);
     try {
-      const res = await request.get(`/api/v1/teams/${teamId}/members`);
+      const res = await request.get(`/api/knowflow/v1/teams/${teamId}/members`);
       const data = res?.data?.data || [];
       setTeamMembers(data);
 
@@ -236,7 +236,7 @@ const TeamManagementPage = () => {
     setMemberLoading(true);
     try {
       await request.delete(
-        `/api/v1/teams/${currentTeam.id}/members/${member.userId}`,
+        `/api/knowflow/v1/teams/${currentTeam.id}/members/${member.userId}`,
       );
       message.success('移除成员成功');
       await loadTeamMembers(currentTeam.id);
@@ -251,7 +251,7 @@ const TeamManagementPage = () => {
   const handleDeleteTeam = async (teamId: string) => {
     setLoading(true);
     try {
-      await request.delete(`/api/v1/teams/${teamId}`);
+      await request.delete(`/api/knowflow/v1/teams/${teamId}`);
       message.success('删除团队成功');
       await loadTeamData();
     } catch (error) {

@@ -197,7 +197,7 @@ const KnowledgeManagementPage = () => {
   const loadKnowledgeData = async () => {
     setLoading(true);
     try {
-      const res = await request.get('/api/v1/knowledgebases', {
+      const res = await request.get('/api/knowflow/v1/knowledgebases', {
         params: {
           current_page: pagination.current, // 修正参数名
           size: pagination.pageSize,
@@ -216,7 +216,7 @@ const KnowledgeManagementPage = () => {
 
   const loadUserList = async () => {
     try {
-      const res = await request.get('/api/v1/users', {
+      const res = await request.get('/api/knowflow/v1/users', {
         params: {
           current_page: 1, // 修正参数名
           size: 1000,
@@ -243,7 +243,7 @@ const KnowledgeManagementPage = () => {
       };
 
       const res = await request.get(
-        `/api/v1/knowledgebases/${kbId}/documents`,
+        `/api/knowflow/v1/knowledgebases/${kbId}/documents`,
         { params },
       );
       const data = res?.data?.data || {};
@@ -280,7 +280,7 @@ const KnowledgeManagementPage = () => {
       }
       const values = await createForm.validateFields();
       setLoading(true);
-      await request.post('/api/v1/knowledgebases', {
+      await request.post('/api/knowflow/v1/knowledgebases', {
         data: values,
       });
       message.success('知识库创建成功');
@@ -341,7 +341,7 @@ const KnowledgeManagementPage = () => {
     }
     setLoading(true);
     try {
-      await request.delete(`/api/v1/knowledgebases/${kbId}`);
+      await request.delete(`/api/knowflow/v1/knowledgebases/${kbId}`);
       message.success('删除成功');
       loadKnowledgeData();
     } catch (error) {
@@ -363,7 +363,7 @@ const KnowledgeManagementPage = () => {
 
     setLoading(true);
     try {
-      await request.delete('/api/v1/knowledgebases/batch', {
+      await request.delete('/api/knowflow/v1/knowledgebases/batch', {
         data: { kbIds: selectedRowKeys },
       });
       setSelectedRowKeys([]);
@@ -403,7 +403,9 @@ const KnowledgeManagementPage = () => {
       return;
     }
     try {
-      await request.post(`/api/v1/knowledgebases/documents/${doc.id}/parse`);
+      await request.post(
+        `/api/knowflow/v1/knowledgebases/documents/${doc.id}/parse`,
+      );
       // 直接开始轮询进度和日志，带时间戳
       pollParseProgressWithTimestamp(doc.id);
       message.success('解析任务已提交，进度和日志将在状态标签悬浮显示');
@@ -424,7 +426,7 @@ const KnowledgeManagementPage = () => {
     while (!finished && tries < maxTries) {
       try {
         const res = await request.get(
-          `/api/v1/knowledgebases/documents/${docId}/parse/progress`,
+          `/api/knowflow/v1/knowledgebases/documents/${docId}/parse/progress`,
         );
         const response = res?.data;
         if (response?.code === 202) {
@@ -490,7 +492,7 @@ const KnowledgeManagementPage = () => {
     setChunkConfigLoading(true);
     try {
       const res = await request.get(
-        `/api/v1/documents/${docId}/chunking-config`,
+        `/api/knowflow/v1/documents/${docId}/chunking-config`,
       );
       const config = res?.data?.data?.chunking_config || {};
       setChunkConfig({
@@ -538,9 +540,12 @@ const KnowledgeManagementPage = () => {
     }
     setChunkConfigSaving(true);
     try {
-      await request.put(`/api/v1/documents/${chunkDocId}/chunking-config`, {
-        data: { chunking_config: chunkConfig },
-      });
+      await request.put(
+        `/api/knowflow/v1/documents/${chunkDocId}/chunking-config`,
+        {
+          data: { chunking_config: chunkConfig },
+        },
+      );
       message.success('分块配置保存成功');
       setChunkModalVisible(false);
       loadDocumentList(currentKnowledgeBase?.id || '');
@@ -561,7 +566,9 @@ const KnowledgeManagementPage = () => {
       cancelText: '取消',
       onOk: async () => {
         try {
-          await request.delete(`/api/v1/knowledgebases/documents/${doc.id}`);
+          await request.delete(
+            `/api/knowflow/v1/knowledgebases/documents/${doc.id}`,
+          );
           message.success('文档已从知识库移除');
           if (currentKnowledgeBase) loadDocumentList(currentKnowledgeBase.id);
         } catch (error) {
@@ -775,7 +782,7 @@ const KnowledgeManagementPage = () => {
   const loadFileList = async (page = 1, pageSize = 10) => {
     setFileLoading(true);
     try {
-      const res = await request.get('/api/v1/files', {
+      const res = await request.get('/api/knowflow/v1/files', {
         params: { current_page: page, size: pageSize }, // 修正参数名
       });
       const data = res?.data?.data || {};
@@ -806,7 +813,7 @@ const KnowledgeManagementPage = () => {
     setFileLoading(true);
     try {
       await request.post(
-        `/api/v1/knowledgebases/${currentKnowledgeBase.id}/documents`,
+        `/api/knowflow/v1/knowledgebases/${currentKnowledgeBase.id}/documents`,
         {
           data: { file_ids: selectedFileRowKeys },
         },

@@ -85,7 +85,7 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
     try {
       console.log('开始获取角色列表，知识库ID:', knowledgeBaseId);
       const result = await request.get(
-        `/api/v1/knowledgebases/${knowledgeBaseId}/permissions`,
+        `/api/knowflow/v1/knowledgebases/${knowledgeBaseId}/permissions`,
       );
 
       console.log('角色API响应状态:', result.response?.status);
@@ -118,7 +118,7 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
   const fetchUsers = async () => {
     try {
       console.log('开始获取可分配角色的用户列表...');
-      const result = await request.get('/api/v1/users/assignable', {
+      const result = await request.get('/api/knowflow/v1/users/assignable', {
         params: { currentPage: 1, size: 100 },
       });
       console.log('可分配用户API响应:', result);
@@ -141,7 +141,7 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
   const fetchTeams = async () => {
     try {
       console.log('开始获取团队列表...');
-      const result = await request.get('/api/v1/teams', {
+      const result = await request.get('/api/knowflow/v1/teams', {
         params: { currentPage: 1, size: 100 },
       });
       console.log('团队API响应:', result);
@@ -168,7 +168,7 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
     try {
       console.log('分配用户角色，数据:', values);
       const result = await request.post(
-        `/api/v1/knowledgebases/${knowledgeBaseId}/permissions/users`,
+        `/api/knowflow/v1/knowledgebases/${knowledgeBaseId}/permissions/users`,
         {
           data: values,
         },
@@ -197,7 +197,7 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
     try {
       console.log('分配团队角色，数据:', values);
       const result = await request.post(
-        `/api/v1/knowledgebases/${knowledgeBaseId}/permissions/teams`,
+        `/api/knowflow/v1/knowledgebases/${knowledgeBaseId}/permissions/teams`,
         {
           data: values,
         },
@@ -222,7 +222,7 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
   const handleRevokeUserPermission = async (userId: string) => {
     try {
       const result = await request.delete(
-        `/api/v1/knowledgebases/${knowledgeBaseId}/permissions/users/${userId}`,
+        `/api/knowflow/v1/knowledgebases/${knowledgeBaseId}/permissions/users/${userId}`,
       );
       const data = result.data;
       if (data.code === 0) {
@@ -240,7 +240,7 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
   const handleRevokeTeamPermission = async (teamId: string) => {
     try {
       const result = await request.delete(
-        `/api/v1/knowledgebases/${knowledgeBaseId}/permissions/teams/${teamId}`,
+        `/api/knowflow/v1/knowledgebases/${knowledgeBaseId}/permissions/teams/${teamId}`,
       );
       const data = result.data;
       if (data.code === 0) {

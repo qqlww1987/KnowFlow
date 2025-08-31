@@ -37,8 +37,17 @@ export default defineConfig({
     { from: 'node_modules/monaco-editor/min/vs/', to: 'dist/vs/' },
   ],
   proxy: {
-    '/api/v1': {
+    // KnowFlow API - 企业功能 API，路由到 KnowFlow 后端
+    '/api/knowflow/v1': {
       target: 'http://127.0.0.1:5000',
+      changeOrigin: true,
+      pathRewrite: {
+        '^/api/knowflow/v1': '/api/v1', // 重写路径匹配 nginx 配置
+      },
+    },
+    // RAGFlow SDK API - 对外提供的 SDK API，路由到 RAGFlow
+    '/api/v1': {
+      target: 'http://127.0.0.1:9380',
       changeOrigin: true,
     },
     '/v1': {
