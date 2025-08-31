@@ -161,9 +161,18 @@ def background_init():
     time.sleep(5)  # 等待5秒让其他服务启动
     delayed_rbac_init()
 
-# 启动后台初始化线程
-background_thread = threading.Thread(target=background_init, daemon=True)
-background_thread.start()
+# 启动后台初始化线程（仅在主工作进程中执行，避免debug模式重复）
+if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+    logger.info("主工作进程启动后台RBAC初始化线程")
+    background_thread = threading.Thread(target=background_init, daemon=True)
+    background_thread.start()
+elif os.environ.get("WERKZEUG_RUN_MAIN") is None:
+    # 非debug模式或直接运行
+    logger.info("直接启动后台RBAC初始化线程")
+    background_thread = threading.Thread(target=background_init, daemon=True)
+    background_thread.start()
+else:
+    logger.info("Werkzeug监控进程，跳过后台初始化线程")
 
 # 从环境变量获取配置
 ADMIN_USERNAME = os.getenv('MANAGEMENT_ADMIN_USERNAME', 'admin')
@@ -377,5 +386,11 @@ def health_check():
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
     logger.info(f"KnowFlow Server 启动中... 端口: {port}")
-    logger.info("RBAC将在后台自动初始化，或可通过 /api/v1/admin/rbac/init 手动初始化")
+    
+    # 检查是否是werkzeug reloader进程
+    if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+        logger.info("主工作进程启动 - RBAC将在后台自动初始化")
+    else:
+        logger.info("监控进程启动 - 等待主工作进程")
+    
     app.run(host='0.0.0.0', port=port, debug=True)
