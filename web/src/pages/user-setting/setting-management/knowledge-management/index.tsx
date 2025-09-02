@@ -144,6 +144,12 @@ const KnowledgeManagementPage = () => {
     chunk_token_num: 256,
     min_chunk_tokens: 10,
     regex_pattern: '',
+    parent_config: {
+      parent_chunk_size: 1024,
+      parent_chunk_overlap: 100,
+      parent_split_level: 2,
+      retrieval_mode: 'parent',
+    },
   });
   const [chunkConfigLoading, setChunkConfigLoading] = useState(false);
   const [chunkConfigSaving, setChunkConfigSaving] = useState(false);
@@ -500,6 +506,12 @@ const KnowledgeManagementPage = () => {
         chunk_token_num: config.chunk_token_num || 256,
         min_chunk_tokens: config.min_chunk_tokens || 10,
         regex_pattern: config.regex_pattern || '',
+        parent_config: config.parent_config || {
+          parent_chunk_size: 1024,
+          parent_chunk_overlap: 100,
+          parent_split_level: 2,
+          retrieval_mode: 'parent',
+        },
       });
     } catch (error) {
       message.error('加载分块配置失败');
@@ -537,6 +549,40 @@ const KnowledgeManagementPage = () => {
     if (chunkConfig.strategy === 'strict_regex' && !chunkConfig.regex_pattern) {
       message.error('正则分块策略需要输入正则表达式');
       return;
+    }
+    if (chunkConfig.strategy === 'parent_child') {
+      const parentConfig = chunkConfig.parent_config;
+      if (!parentConfig) {
+        message.error('父子分块策略需要配置父分块参数');
+        return;
+      }
+      if (
+        !parentConfig.parent_chunk_size ||
+        parentConfig.parent_chunk_size < 200 ||
+        parentConfig.parent_chunk_size > 4000
+      ) {
+        message.error('父分块大小必须在200-4000之间');
+        return;
+      }
+      if (
+        parentConfig.parent_chunk_overlap < 0 ||
+        parentConfig.parent_chunk_overlap > 512
+      ) {
+        message.error('父分块重叠大小必须在0-512之间');
+        return;
+      }
+      if (
+        !parentConfig.parent_split_level ||
+        parentConfig.parent_split_level < 1 ||
+        parentConfig.parent_split_level > 6
+      ) {
+        message.error('父分块分割级别必须在1-6之间');
+        return;
+      }
+      if (!parentConfig.retrieval_mode) {
+        message.error('请选择检索模式');
+        return;
+      }
     }
     setChunkConfigSaving(true);
     try {
@@ -1203,6 +1249,7 @@ const KnowledgeManagementPage = () => {
               <Option value="smart">智能分块</Option>
               <Option value="advanced">按标题分块</Option>
               <Option value="strict_regex">正则分块</Option>
+              <Option value="parent_child">父子分块</Option>
             </Select>
           </Form.Item>
           <Form.Item label="分块大小" required>
@@ -1248,6 +1295,85 @@ const KnowledgeManagementPage = () => {
                 placeholder="请输入正则表达式"
               />
             </Form.Item>
+          )}
+          {chunkConfig.strategy === 'parent_child' && (
+            <>
+              <Form.Item label="父分块大小" required>
+                <Input
+                  type="number"
+                  min={200}
+                  max={4000}
+                  value={chunkConfig.parent_config?.parent_chunk_size}
+                  onChange={(e) =>
+                    setChunkConfig((c: any) => ({
+                      ...c,
+                      parent_config: {
+                        ...c.parent_config,
+                        parent_chunk_size: Number(e.target.value),
+                      },
+                    }))
+                  }
+                  placeholder="200-4000"
+                />
+              </Form.Item>
+              <Form.Item label="父分块重叠大小" required>
+                <Input
+                  type="number"
+                  min={0}
+                  max={512}
+                  value={chunkConfig.parent_config?.parent_chunk_overlap}
+                  onChange={(e) =>
+                    setChunkConfig((c: any) => ({
+                      ...c,
+                      parent_config: {
+                        ...c.parent_config,
+                        parent_chunk_overlap: Number(e.target.value),
+                      },
+                    }))
+                  }
+                  placeholder="0-512"
+                />
+              </Form.Item>
+              <Form.Item label="父分块分割级别" required>
+                <Select
+                  value={chunkConfig.parent_config?.parent_split_level}
+                  onChange={(v) =>
+                    setChunkConfig((c: any) => ({
+                      ...c,
+                      parent_config: {
+                        ...c.parent_config,
+                        parent_split_level: v,
+                      },
+                    }))
+                  }
+                >
+                  <Option value={1}>H1 - 最大章节</Option>
+                  <Option value={2}>H2 - 主要章节（推荐）</Option>
+                  <Option value={3}>H3 - 子章节</Option>
+                  <Option value={4}>H4 - 小节</Option>
+                  <Option value={5}>H5 - 段落级</Option>
+                  <Option value={6}>H6 - 细粒度</Option>
+                </Select>
+              </Form.Item>
+              <Form.Item label="检索模式" required>
+                <Select
+                  value={chunkConfig.parent_config?.retrieval_mode}
+                  onChange={(v) =>
+                    setChunkConfig((c: any) => ({
+                      ...c,
+                      parent_config: {
+                        ...c.parent_config,
+                        retrieval_mode: v,
+                      },
+                    }))
+                  }
+                >
+                  <Option value="parent">父分块模式（推荐）</Option>
+                  <Option value="child">子分块模式</Option>
+                  <Option value="hybrid">混合模式</Option>
+                </Select>
+              </Form.Item>
+            </>
           )}
         </Form>
       </Modal>
