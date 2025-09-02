@@ -130,6 +130,7 @@ const ChunkMethodModal: React.FC<IProps> = ({
     if (visible) {
       const pages =
         parserConfig?.pages?.map((x) => ({ from: x[0], to: x[1] })) ?? [];
+
       form.setFieldsValue({
         pages: pages.length > 0 ? pages : [{ from: 1, to: 1024 }],
         parser_config: omit(parserConfig, ['pages', 'chunking_config']),
