@@ -36,7 +36,7 @@ import {
   Tag,
   message,
 } from 'antd';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import styles from './index.less';
 import { ParsingStatusCard } from './parsing-status-card';
 import PermissionModal from './permission-modal';
@@ -106,6 +106,11 @@ const KnowledgeManagementPage = () => {
   const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
   const [batchParsingLoading, setBatchParsingLoading] = useState(false);
   const [searchValue, setSearchValue] = useState('');
+
+  // 批量解析相关状态
+  const [isBatchPolling, setIsBatchPolling] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<any>(null);
+  const batchPollingInterval = useRef<NodeJS.Timeout | null>(null);
 
   const [createForm] = Form.useForm();
   const [pagination, setPagination] = useState({
@@ -199,6 +204,15 @@ const KnowledgeManagementPage = () => {
       loadDocumentList(currentKnowledgeBase.id);
     }
   }, [docPagination.current, docPagination.pageSize, docSearchValue]);
+
+  // 组件卸载时清理定时器
+  useEffect(() => {
+    return () => {
+      if (batchPollingInterval.current) {
+        clearInterval(batchPollingInterval.current);
+      }
+    };
+  }, []);
 
   const loadKnowledgeData = async () => {
     setLoading(true);
@@ -345,6 +359,13 @@ const KnowledgeManagementPage = () => {
       message.warning('您没有删除该知识库的角色');
       return;
     }
+
+    // 如果正在删除当前查看的知识库，停止批量解析轮询
+    if (currentKnowledgeBase?.id === kbId && isBatchPolling) {
+      stopBatchPolling();
+      message.info('已停止该知识库的批量解析任务');
+    }
+
     setLoading(true);
     try {
       await request.delete(`/api/knowflow/v1/knowledgebases/${kbId}`);
@@ -367,6 +388,16 @@ const KnowledgeManagementPage = () => {
       return;
     }
 
+    // 如果正在批量删除的知识库中包含当前查看的知识库，停止批量解析轮询
+    if (
+      currentKnowledgeBase &&
+      selectedRowKeys.includes(currentKnowledgeBase.id) &&
+      isBatchPolling
+    ) {
+      stopBatchPolling();
+      message.info('已停止相关知识库的批量解析任务');
+    }
+
     setLoading(true);
     try {
       await request.delete('/api/knowflow/v1/knowledgebases/batch', {
@@ -385,15 +416,153 @@ const KnowledgeManagementPage = () => {
   const handleBatchParse = async () => {
     if (!currentKnowledgeBase) return;
 
-    setBatchParsingLoading(true);
+    const kbId = currentKnowledgeBase.id;
+    const kbName = currentKnowledgeBase.name;
+
+    Modal.confirm({
+      title: '启动批量解析确认',
+      content: (
+        <div>
+          <p>确定要为知识库 "{kbName}" 启动后台批量解析吗？</p>
+          <p style={{ color: '#E6A23C', fontWeight: 'bold' }}>
+            该过程将在后台运行，您可以稍后查看结果或关闭此窗口。
+          </p>
+        </div>
+      ),
+      okText: '确定启动',
+      cancelText: '取消',
+      onOk: async () => {
+        setBatchParsingLoading(true);
+        setBatchProgress(null);
+        try {
+          const res = await request.post(
+            `/api/knowflow/v1/knowledgebases/${kbId}/batch_parse_sequential/start`,
+          );
+
+          if (res?.data?.code === 0 && res.data.data) {
+            message.success(res.data.data.message || '已成功启动批量解析任务');
+            startBatchPolling();
+            setTimeout(() => loadDocumentList(currentKnowledgeBase.id), 1500);
+          } else {
+            const errorMsg =
+              res?.data?.data?.message ||
+              res?.data?.message ||
+              '启动批量解析任务失败';
+            message.error(errorMsg);
+            setBatchParsingLoading(false);
+          }
+        } catch (error: any) {
+          message.error(
+            `启动批量解析任务时出错: ${error?.message || '网络错误'}`,
+          );
+          console.error('启动批量解析任务失败:', error);
+          setBatchParsingLoading(false);
+        } finally {
+          // 如果没有成功启动轮询，则取消加载状态
+          // 这里用延迟检查，给 startBatchPolling 时间更新 isBatchPolling
+          setTimeout(() => {
+            if (!isBatchPolling) {
+              setBatchParsingLoading(false);
+            }
+          }, 100);
+        }
+      },
+      onCancel: () => {
+        message.info('已取消批量解析操作');
+      },
+    });
+  };
+
+  // 开始轮询批量任务进度
+  const startBatchPolling = () => {
+    if (isBatchPolling || !currentKnowledgeBase) return;
+
+    console.log('开始轮询知识库的批量解析进度:', currentKnowledgeBase.id);
+    setIsBatchPolling(true);
+    setBatchProgress({
+      status: 'running',
+      message: '正在启动批量解析任务...',
+      total: 0,
+      current: 0,
+    });
+
+    // 清除可能存在的旧定时器
+    if (batchPollingInterval.current) {
+      clearInterval(batchPollingInterval.current);
+    }
+
+    // 立即执行一次获取进度，然后设置定时器
+    fetchBatchProgress();
+    batchPollingInterval.current = setInterval(fetchBatchProgress, 5000); // 每 5 秒查询一次进度
+  };
+
+  // 停止轮询批量任务进度
+  const stopBatchPolling = () => {
+    if (batchPollingInterval.current) {
+      console.log('停止批量解析进度轮询。');
+      clearInterval(batchPollingInterval.current);
+      batchPollingInterval.current = null;
+    }
+    setIsBatchPolling(false);
+    setBatchParsingLoading(false);
+  };
+
+  // 获取并更新批量任务进度
+  const fetchBatchProgress = async () => {
+    if (!currentKnowledgeBase || !viewModalVisible) {
+      stopBatchPolling();
+      return;
+    }
+
     try {
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-      message.success('批量解析已完成');
-      loadDocumentList(currentKnowledgeBase.id);
-    } catch (error) {
-      message.error('批量解析失败');
-    } finally {
-      setBatchParsingLoading(false);
+      const res = await request.get(
+        `/api/knowflow/v1/knowledgebases/${currentKnowledgeBase.id}/batch_parse_sequential/progress`,
+      );
+
+      if (res?.data?.code === 0 && res.data.data) {
+        setBatchProgress(res.data.data);
+        console.log('获取到批量进度:', res.data.data);
+
+        // 检查任务是否已完成或失败
+        if (
+          res.data.data.status === 'completed' ||
+          res.data.data.status === 'failed'
+        ) {
+          stopBatchPolling();
+          // 显示最终结果提示
+          message[res.data.data.status === 'completed' ? 'success' : 'error'](
+            res.data.data.message ||
+              (res.data.data.status === 'completed'
+                ? '批量解析已完成'
+                : '批量解析失败'),
+          );
+          // 刷新文档列表以显示最新状态
+          if (currentKnowledgeBase) {
+            loadDocumentList(currentKnowledgeBase.id);
+          }
+          // 刷新知识库列表（文档数、分块数可能变化）
+          loadKnowledgeData();
+        }
+      } else {
+        console.error(
+          '获取批量进度失败:',
+          res?.data?.message || res?.data?.data?.message,
+        );
+        if (batchProgress) {
+          setBatchProgress({
+            ...batchProgress,
+            message: `获取进度时出错: ${res?.data?.message || '请稍后...'}`,
+          });
+        }
+      }
+    } catch (error: any) {
+      console.error('请求批量进度API失败:', error);
+      if (batchProgress) {
+        setBatchProgress({
+          ...batchProgress,
+          message: `获取进度时网络错误: ${error.message || '请检查网络连接...'}`,
+        });
+      }
     }
   };
 
@@ -616,7 +785,17 @@ const KnowledgeManagementPage = () => {
             `/api/knowflow/v1/knowledgebases/documents/${doc.id}`,
           );
           message.success('文档已从知识库移除');
-          if (currentKnowledgeBase) loadDocumentList(currentKnowledgeBase.id);
+
+          // 刷新文档列表
+          if (currentKnowledgeBase) {
+            loadDocumentList(currentKnowledgeBase.id);
+
+            // 如果正在进行批量解析，刷新进度信息（因为文档数量变化了）
+            if (isBatchPolling) {
+              // 立即获取一次最新进度，更新总数
+              fetchBatchProgress();
+            }
+          }
         } catch (error) {
           message.error('移除文档失败');
         }
@@ -1037,10 +1216,23 @@ const KnowledgeManagementPage = () => {
       <Modal
         title={`知识库详情 - ${currentKnowledgeBase?.name || ''}`}
         open={viewModalVisible}
-        onCancel={() => setViewModalVisible(false)}
+        onCancel={() => {
+          stopBatchPolling();
+          setViewModalVisible(false);
+          setCurrentKnowledgeBase(null);
+          setBatchProgress(null);
+        }}
         width={1000}
         footer={[
-          <Button key="close" onClick={() => setViewModalVisible(false)}>
+          <Button
+            key="close"
+            onClick={() => {
+              stopBatchPolling();
+              setViewModalVisible(false);
+              setCurrentKnowledgeBase(null);
+              setBatchProgress(null);
+            }}
+          >
             关闭
           </Button>,
         ]}
@@ -1092,11 +1284,20 @@ const KnowledgeManagementPage = () => {
                 <Button
                   type="default"
                   icon={<ThunderboltOutlined />}
-                  loading={batchParsingLoading}
+                  loading={batchParsingLoading && !isBatchPolling}
                   onClick={handleBatchParse}
-                  disabled={documentList.length === 0 || !canWrite}
+                  disabled={
+                    documentList.length === 0 ||
+                    !canWrite ||
+                    isBatchPolling ||
+                    batchParsingLoading
+                  }
                 >
-                  {batchParsingLoading ? '正在批量解析...' : '批量解析'}
+                  {isBatchPolling
+                    ? '正在批量解析...'
+                    : batchParsingLoading
+                      ? '正在启动...'
+                      : '批量解析'}
                 </Button>
               </Space>
 
@@ -1129,11 +1330,28 @@ const KnowledgeManagementPage = () => {
               </Space>
             </div>
 
-            {batchParsingLoading && (
+            {batchProgress && (
               <Alert
-                message="正在进行批量解析"
-                description="该过程将在后台运行，您可以稍后查看结果。"
-                type="info"
+                message={batchProgress.message || '正在处理...'}
+                description={
+                  batchProgress.total > 0 &&
+                  !['starting', 'not_found'].includes(batchProgress.status) && (
+                    <div style={{ fontSize: '12px', color: '#606266' }}>
+                      处理进度: {batchProgress.current || 0} /{' '}
+                      {batchProgress.total}
+                    </div>
+                  )
+                }
+                type={
+                  batchProgress.status === 'failed' ||
+                  batchProgress.status === 'not_found'
+                    ? 'error'
+                    : batchProgress.status === 'completed'
+                      ? 'success'
+                      : batchProgress.status === 'cancelled'
+                        ? 'warning'
+                        : 'info'
+                }
                 showIcon
                 className={styles.batchAlert}
               />
