@@ -208,7 +208,7 @@ docker run -d \
 1. 拉取本项目代码：
 
 ```bash
-git clone https://github.com/weizxfree/KnowFlow.git
+git clone https://github.com/weizxfree/KnowFlowPro.git
 ```
 
 2. 进入到 `docker` 目录执行（此步骤和 RAGFlow 官方一致）：
