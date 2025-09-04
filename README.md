@@ -257,14 +257,14 @@ docker compose -f docker-compose.yml up -d
 
 #### 4. 默认管理员账户
 
-系统启动后，请使用以下默认超级管理员账户登录：
+系统启动后，可以在界面上注册用户并登录。
 
-```
-邮箱：admin@gmail.com
-密码：admin
+如需管理员功能，获取系统管理权限。运行 KnowFlow 之后，执行 `docker/set_superuser.sh` 脚本，对指定用户授权超级管理员:
+
+```bash
+ ./set_superuser.sh set xxxx@xxx.com 
 ```
 
-> 💡 **安全提示：** 首次登录后，请及时修改默认密码以确保系统安全。
 
 ### 方式二：源码部署
 
