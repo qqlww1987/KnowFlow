@@ -74,9 +74,9 @@ export default {
   parse: `${api_host}/document/parse`,
 
   // knowflow mineru parser
-  knowflow_document_parse: `/api/v1/knowledgebases/documents`,
-  knowflow_parse_progress: `/api/v1/knowledgebases/documents`,
-  knowflow_parse_cancel: `/api/v1/knowledgebases/documents`,
+  knowflow_document_parse: `/api/knowflow/v1/knowledgebases/documents`,
+  knowflow_parse_progress: `/api/knowflow/v1/knowledgebases/documents`,
+  knowflow_parse_cancel: `/api/knowflow/v1/knowledgebases/documents`,
   setMeta: `${api_host}/document/set_meta`,
 
   // chat

@@ -34,7 +34,7 @@ export const useSendNextSharedMessage = (
   addEventList: (data: IEventList, messageId: string) => void,
 ) => {
   const { from, sharedId: conversationId } = useGetSharedChatSearchParams();
-  const url = `/api/v1/${from === SharedFrom.Agent ? 'agentbots' : 'chatbots'}/${conversationId}/completions`;
+  const url = `/api/knowflow/v1/${from === SharedFrom.Agent ? 'agentbots' : 'chatbots'}/${conversationId}/completions`;
 
   const [params, setParams] = useState<any[]>([]);
 

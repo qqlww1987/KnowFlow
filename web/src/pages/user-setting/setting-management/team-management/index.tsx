@@ -122,7 +122,7 @@ const TeamManagementPage = () => {
     setLoading(true);
     try {
       const values = searchForm.getFieldsValue();
-      const res = await request.get('/api/v1/teams', {
+      const res = await request.get('/api/knowflow/v1/teams', {
         params: {
           currentPage: pagination.current,
           size: pagination.pageSize,
@@ -140,13 +140,15 @@ const TeamManagementPage = () => {
       await Promise.all(
         (list as TeamData[]).map(async (team) => {
           try {
-            const r = await request.get(`/api/v1/teams/${team.id}/roles`);
+            const r = await request.get(
+              `/api/knowflow/v1/teams/${team.id}/roles`,
+            );
             const teamRolesList = r?.data?.data ?? [];
 
             // 团队角色API返回的是TeamRole对象，需要转换为Role格式
             if (teamRolesList.length > 0) {
               // 获取所有角色信息用于匹配
-              const rolesRes = await request.get('/api/v1/rbac/roles');
+              const rolesRes = await request.get('/api/knowflow/v1/rbac/roles');
               const allRoles = rolesRes?.data?.data || [];
 
               // 根据role_code匹配角色信息
@@ -174,7 +176,7 @@ const TeamManagementPage = () => {
   const loadUserList = async () => {
     setUserLoading(true);
     try {
-      const res = await request.get('/api/v1/users', {
+      const res = await request.get('/api/knowflow/v1/users', {
         params: {
           currentPage: 1,
           size: 1000, // Get all users for selection
@@ -197,7 +199,7 @@ const TeamManagementPage = () => {
   const loadTeamMembers = async (teamId: string) => {
     setMemberLoading(true);
     try {
-      const res = await request.get(`/api/v1/teams/${teamId}/members`);
+      const res = await request.get(`/api/knowflow/v1/teams/${teamId}/members`);
       const data = res?.data?.data || [];
       setTeamMembers(data);
 
@@ -238,7 +240,7 @@ const TeamManagementPage = () => {
     try {
       const values = await teamForm.validateFields();
       setLoading(true);
-      await request.post('/api/v1/teams', {
+      await request.post('/api/knowflow/v1/teams', {
         data: {
           name: values.name,
           owner_id: values.owner_id,
@@ -265,11 +267,13 @@ const TeamManagementPage = () => {
     setCurrentTeam(team);
     try {
       // 获取所有可用角色作为选项
-      const rolesRes = await request.get('/api/v1/rbac/roles');
+      const rolesRes = await request.get('/api/knowflow/v1/rbac/roles');
       setTeamRoles(rolesRes?.data?.data || []);
 
       // 获取团队当前已分配角色，用于预选中
-      const assignedRes = await request.get(`/api/v1/teams/${team.id}/roles`);
+      const assignedRes = await request.get(
+        `/api/knowflow/v1/teams/${team.id}/roles`,
+      );
       const teamRolesList = assignedRes?.data?.data ?? [];
 
       let selectedRoleId = '';
@@ -310,7 +314,7 @@ const TeamManagementPage = () => {
       const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
       const grantedBy = userInfo.id || 'system';
 
-      await request.post(`/api/v1/teams/${currentTeam?.id}/roles`, {
+      await request.post(`/api/knowflow/v1/teams/${currentTeam?.id}/roles`, {
         data: {
           role_code: selected.code,
           resource_type: 'system', // 默认为系统级别角色
@@ -401,7 +405,7 @@ const TeamManagementPage = () => {
     setMemberLoading(true);
     try {
       await request.delete(
-        `/api/v1/teams/${currentTeam.id}/members/${member.userId}`,
+        `/api/knowflow/v1/teams/${currentTeam.id}/members/${member.userId}`,
       );
       message.success('移除成员成功');
       await loadTeamMembers(currentTeam.id);
@@ -416,7 +420,7 @@ const TeamManagementPage = () => {
   const handleDeleteTeam = async (teamId: string) => {
     setLoading(true);
     try {
-      await request.delete(`/api/v1/teams/${teamId}`);
+      await request.delete(`/api/knowflow/v1/teams/${teamId}`);
       message.success('删除团队成功');
       await loadTeamData();
     } catch (error) {
@@ -434,7 +438,9 @@ const TeamManagementPage = () => {
     setLoading(true);
     try {
       await Promise.all(
-        selectedRowKeys.map((id) => request.delete(`/api/v1/teams/${id}`)),
+        selectedRowKeys.map((id) =>
+          request.delete(`/api/knowflow/v1/teams/${id}`),
+        ),
       );
       setSelectedRowKeys([]);
       message.success(`成功删除 ${selectedRowKeys.length} 个团队`);

@@ -96,6 +96,7 @@ class MinerUFastAPIAdapter:
         backend = backend or self.backend
         
         data = {
+            'backend': backend,
             'parse_method': parse_method or self.parse_method,
             'lang_list': lang or self.lang,  # 修改为 lang_list
             'formula_enable': formula_enable if formula_enable is not None else self.formula_enable,  # 保持布尔值

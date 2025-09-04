@@ -297,41 +297,6 @@ export const ChunkingConfig = memo(function ChunkingConfig({
               </Card>
             </Col>
           </Row>
-
-          <Alert
-            message="AST语义分块推荐配置"
-            description={
-              <ul style={{ margin: 0, paddingLeft: 20 }}>
-                <li>
-                  <strong>技术文档</strong>：父分块2048，H2层级，子分块512 -
-                  保持技术章节完整性
-                </li>
-                <li>
-                  <strong>用户手册</strong>：父分块1024，H2层级，子分块256 -
-                  平衡结构与细节
-                </li>
-                <li>
-                  <strong>学术论文</strong>：父分块1536，H3层级，子分块384 -
-                  精细化学术章节
-                </li>
-                <li>
-                  <strong>博客文章</strong>：父分块1024，H2层级，子分块256 -
-                  适合多主题内容
-                </li>
-                <li>
-                  <strong>问答系统</strong>：使用父分块模式 - 获得完整语义上下文
-                </li>
-                <li>
-                  <strong>精确搜索</strong>：使用子分块模式 - 实现精准语义匹配
-                </li>
-                <li>
-                  <strong>混合检索</strong>：结合父子分块优势 - 平衡精度与上下文
-                </li>
-              </ul>
-            }
-            type="success"
-            showIcon
-          />
         </>
       )}
     </div>

@@ -24,9 +24,18 @@ export const useSubmitKnowledgeConfiguration = (form: FormInstance) => {
   const submitKnowledgeConfiguration = useCallback(async () => {
     const values = await form.validateFields();
     const avatar = await getBase64FromUploadFileList(values.avatar);
+
+    // 将 chunking_config 合并到 parser_config 中
+    const { chunking_config, parser_config, ...restValues } = values;
+    const mergedParserConfig = {
+      ...parser_config,
+      ...(chunking_config ? { chunking_config } : {}),
+    };
+
     saveKnowledgeConfiguration({
-      ...values,
+      ...restValues,
       avatar,
+      parser_config: mergedParserConfig,
     });
     navigateToDataset();
   }, [saveKnowledgeConfiguration, form, navigateToDataset]);
@@ -64,6 +73,11 @@ export const useFetchKnowledgeConfigurationOnMount = (form: FormInstance) => {
     const fileList: UploadFile[] = getUploadFileListFromBase64(
       knowledgeDetails.avatar,
     );
+
+    // 从 parser_config 中提取 chunking_config
+    const { chunking_config, ...restParserConfig } =
+      knowledgeDetails.parser_config || {};
+
     form.setFieldsValue({
       ...pick(knowledgeDetails, [
         'description',
@@ -72,9 +86,10 @@ export const useFetchKnowledgeConfigurationOnMount = (form: FormInstance) => {
         'embd_id',
         'parser_id',
         'language',
-        'parser_config',
         'pagerank',
       ]),
+      parser_config: restParserConfig,
+      chunking_config: chunking_config,
       avatar: fileList,
     });
   }, [form, knowledgeDetails]);

@@ -16,7 +16,7 @@ export async function checkKbPermission(params: {
   if (!userId || !kbId) return false;
   try {
     const res = await request.post(
-      `/api/v1/knowledgebases/${kbId}/permissions/check`,
+      `/api/knowflow/v1/knowledgebases/${kbId}/permissions/check`,
       {
         data: {
           user_id: userId,
@@ -43,12 +43,15 @@ export async function checkGlobalKbAdmin(params: {
   const { userId } = params;
   if (!userId) return false;
   try {
-    const res = await request.post('/api/v1/rbac/permissions/simple-check', {
-      data: {
-        permission_code: 'kb_admin',
-        user_id: userId,
+    const res = await request.post(
+      '/api/knowflow/v1/rbac/permissions/simple-check',
+      {
+        data: {
+          permission_code: 'kb_admin',
+          user_id: userId,
+        },
       },
-    });
+    );
     const data = res?.data;
     if (typeof data?.has_permission !== 'undefined')
       return Boolean(data?.has_permission);

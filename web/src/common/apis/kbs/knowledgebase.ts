@@ -7,7 +7,7 @@ export function getKnowledgeBaseListApi(params: {
   name?: string;
 }) {
   return request({
-    url: '/api/v1/knowledgebases',
+    url: '/api/knowflow/v1/knowledgebases',
     method: 'get',
     params,
   });
@@ -16,7 +16,7 @@ export function getKnowledgeBaseListApi(params: {
 // 获取知识库详情
 export function getKnowledgeBaseDetailApi(id: string) {
   return request({
-    url: `/api/v1/knowledgebases/${id}`,
+    url: `/api/knowflow/v1/knowledgebases/${id}`,
     method: 'get',
   });
 }
@@ -30,7 +30,7 @@ export function createKnowledgeBaseApi(data: {
   creator_id: string;
 }) {
   return request({
-    url: '/api/v1/knowledgebases',
+    url: '/api/knowflow/v1/knowledgebases',
     method: 'post',
     data,
   });
@@ -47,7 +47,7 @@ export function updateKnowledgeBaseApi(
   },
 ) {
   return request({
-    url: `/api/v1/knowledgebases/${id}`,
+    url: `/api/knowflow/v1/knowledgebases/${id}`,
     method: 'put',
     data,
   });
@@ -56,7 +56,7 @@ export function updateKnowledgeBaseApi(
 // 删除知识库
 export function deleteKnowledgeBaseApi(id: string) {
   return request({
-    url: `/api/v1/knowledgebases/${id}`,
+    url: `/api/knowflow/v1/knowledgebases/${id}`,
     method: 'delete',
   });
 }
@@ -64,7 +64,7 @@ export function deleteKnowledgeBaseApi(id: string) {
 // 批量删除知识库
 export function batchDeleteKnowledgeBaseApi(ids: string[]) {
   return request({
-    url: '/api/v1/knowledgebases/batch',
+    url: '/api/knowflow/v1/knowledgebases/batch',
     method: 'delete',
     data: { kbIds: ids },
   });
@@ -76,7 +76,7 @@ export function addDocumentToKnowledgeBaseApi(data: {
   file_ids: string[];
 }) {
   return request({
-    url: `/api/v1/knowledgebases/${data.kb_id}/documents`,
+    url: `/api/knowflow/v1/knowledgebases/${data.kb_id}/documents`,
     method: 'post',
     data: { file_ids: data.file_ids },
   });
@@ -85,7 +85,7 @@ export function addDocumentToKnowledgeBaseApi(data: {
 // 获取系统 Embedding 配置
 export function getSystemEmbeddingConfigApi() {
   return request({
-    url: '/api/v1/knowledgebases/system_embedding_config', // 确认 API 路径前缀是否正确
+    url: '/api/knowflow/v1/knowledgebases/system_embedding_config', // 确认 API 路径前缀是否正确
     method: 'get',
   });
 }
@@ -97,7 +97,7 @@ export function setSystemEmbeddingConfigApi(data: {
   api_key?: string;
 }) {
   return request({
-    url: '/api/v1/knowledgebases/system_embedding_config', // 确认 API 路径前缀是否正确
+    url: '/api/knowflow/v1/knowledgebases/system_embedding_config', // 确认 API 路径前缀是否正确
     method: 'post',
     data,
   });

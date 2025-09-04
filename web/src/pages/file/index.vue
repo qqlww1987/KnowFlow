@@ -115,7 +115,7 @@ async function handleDownload(row: FileData) {
     console.log(`开始下载文件: ${row.id} ${row.name}`)
 
     // 直接使用fetch API进行文件下载
-    const response = await fetch(`/api/v1/files/${row.id}/download`, {
+    const response = await fetch(`/api/knowflow/v1/files/${row.id}/download`, {
       method: "GET",
       headers: {
         Accept: "application/octet-stream"

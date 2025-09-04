@@ -81,7 +81,7 @@ const UserConfigPage = () => {
   const loadConfigData = async () => {
     setLoading(true);
     try {
-      const res = await request.get('/api/v1/tenants', {
+      const res = await request.get('/api/knowflow/v1/tenants', {
         params: {
           currentPage: pagination.current,
           size: pagination.pageSize,
@@ -124,7 +124,7 @@ const UserConfigPage = () => {
       const values = await editForm.validateFields();
       setLoading(true);
       if (currentConfig) {
-        await request.put(`/api/v1/tenants/${currentConfig.id}`, {
+        await request.put(`/api/knowflow/v1/tenants/${currentConfig.id}`, {
           data: values,
         });
         message.success('修改配置成功');
