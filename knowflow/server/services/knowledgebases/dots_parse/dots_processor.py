@@ -529,19 +529,29 @@ class DOTSProcessor:
                 page_number = element.get('page_number')
                 
                 if bbox and page_number is not None and len(bbox) == 4:
-                    # 转换为Mineru格式：[page_idx, x1, x2, y1, y2]
-                    # DOTS page_number是1开始，需要转换为0开始的页面索引
-                    # DOTS bbox: [x1, y1, x2, y2] -> Mineru: [page_idx, x1, x2, y1, y2]
+                    # 关键修复：DPI 缩放问题
+                    # DOTS 使用 pdf2image 200 DPI 转换，而 MinerU 使用 PDF 原生坐标 72 DPI
+                    # 需要进行 DPI 缩放转换: DOTS坐标 * (72/200) = PDF坐标
+                    
+                    dpi_scale_factor = 72.0 / 200.0  # PDF标准 72 DPI / DOTS图像 200 DPI
+                    
+                    # 缩放 DOTS 图像坐标到 PDF 坐标
+                    pdf_x1 = bbox[0] * dpi_scale_factor
+                    pdf_y1 = bbox[1] * dpi_scale_factor  
+                    pdf_x2 = bbox[2] * dpi_scale_factor
+                    pdf_y2 = bbox[3] * dpi_scale_factor
+                    
+                    # 按照 MinerU utils.py:621 的格式: [page_number, bbox[0], bbox[2], bbox[1], bbox[3]]
                     mineru_position = [
                         page_number - 1,  # 转换为0开始的页面索引
-                        int(bbox[0]),     # x1 (左边界)
-                        int(bbox[2]),     # x2 (右边界)  
-                        int(bbox[1]),     # y1 (上边界)
-                        int(bbox[3])      # y2 (下边界)
+                        int(pdf_x1),     # x1 (左边界) - DPI缩放后
+                        int(pdf_x2),     # x2 (右边界) - DPI缩放后
+                        int(pdf_y1),     # y1 (上边界) - DPI缩放后  
+                        int(pdf_y2)      # y2 (下边界) - DPI缩放后
                     ]
                     positions.append(mineru_position)
                     
-                    logger.debug(f"DOTS坐标转换: DOTS={bbox} page={page_number} -> Mineru={mineru_position}")
+                    logger.debug(f"DOTS坐标转换: 原始={bbox} -> DPI缩放({dpi_scale_factor:.3f}) -> PDF={mineru_position}")
                 else:
                     logger.warning(f"无效的DOTS坐标数据: bbox={bbox}, page_number={page_number}")
             
