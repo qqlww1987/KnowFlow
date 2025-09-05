@@ -93,6 +93,7 @@ class ParserType(StrEnum):
     KG = "knowledge_graph"
     TAG = "tag"
     MINERU = "mineru"
+    DOTS = "dots"
 
 
 class FileSource(StrEnum):

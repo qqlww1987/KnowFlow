@@ -7,8 +7,14 @@
 # 2. 所有配置项都可以在启动时通过环境变量覆盖。
 #    覆盖规则: 大写 + 双下划线替换层级。
 #    示例: 要覆盖 app.dev_mode, 设置环境变量 KNOWFLOW_APP_DEV_MODE=true
+#    DOTS: 设置环境变量 DOTS_VLLM_URL=http://your-service:port
 #
 # =======================================================
+
+# 默认解析器配置
+# 'mineru': 使用MinerU进行文档解析（默认）
+# 'dots': 使用DOTS OCR进行文档解析
+default_parser: "mineru"
 
 app:
   # 开发模式
@@ -130,6 +136,32 @@ mineru:
       # SGLang 服务器地址（vlm-sglang-client 后端需要）
       # Docker部署时同样需要使用宿主机IP或容器网络地址
       server_url: "http://host.docker.internal:30000"
+
+# =======================================================
+# DOTS OCR 文档解析配置
+# =======================================================
+dots:
+  # VLLM 服务配置
+  vllm:
+    # DOTS OCR 服务地址
+    # 远程服务示例: http://8.134.177.47:30001
+    # 本地服务示例: http://localhost:30001
+    url: "http://8.134.177.47:30001"
+    
+    # 模型名称（根据部署配置调整）
+    model_name: "dotsocr-model"
+    
+    # 请求超时时间（秒）
+    timeout: 300
+    
+    # 生成参数
+    temperature: 0.1
+    top_p: 1.0
+    max_completion_tokens: 16384
+  
+  # DOTS处理配置
+  dev_mode: false
+  cleanup_temp_files: true
 
 
 

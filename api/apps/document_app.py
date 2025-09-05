@@ -485,17 +485,42 @@ def run():
                 doc["tenant_id"] = tenant_id
 
                 doc_parser = doc.get("parser_id", ParserType.NAIVE)
-                if doc_parser == ParserType.TABLE:
-                    kb_id = doc.get("kb_id")
-                    if not kb_id:
-                        continue
-                    if kb_id not in kb_table_num_map:
-                        count = DocumentService.count_by_kb_id(kb_id=kb_id, keywords="", run_status=[TaskStatus.DONE], types=[])
-                        kb_table_num_map[kb_id] = count
-                        if kb_table_num_map[kb_id] <= 0:
-                            KnowledgebaseService.delete_field_map(kb_id)
-                bucket, name = File2DocumentService.get_storage_address(doc_id=doc["id"])
-                queue_tasks(doc, bucket, name, 0)
+                
+                # 检查是否是KnowFlow专用的解析器 (DOTS/MinerU)
+                if doc_parser in [ParserType.DOTS.value, ParserType.MINERU.value]:
+                    # 调用KnowFlow的解析API而不是RAGFlow taskqueue
+                    try:
+                        import requests
+                        import json
+                        
+                        knowflow_api_url = "http://localhost:5000/api/v1/knowledgebases/documents/{}/parse".format(id)
+                        response = requests.post(knowflow_api_url, json={"async": True})
+                        
+                        if response.status_code == 200:
+                            print(f"[INFO] 文档 {id} 已提交到KnowFlow解析API (parser: {doc_parser})")
+                        else:
+                            print(f"[ERROR] KnowFlow解析API调用失败: {response.status_code} - {response.text}")
+                            # 回退到原有逻辑
+                            bucket, name = File2DocumentService.get_storage_address(doc_id=doc["id"])
+                            queue_tasks(doc, bucket, name, 0)
+                    except Exception as e:
+                        print(f"[ERROR] 调用KnowFlow解析API异常: {e}")
+                        # 回退到原有逻辑
+                        bucket, name = File2DocumentService.get_storage_address(doc_id=doc["id"])
+                        queue_tasks(doc, bucket, name, 0)
+                else:
+                    # 原有逻辑：其他解析器使用RAGFlow taskqueue
+                    if doc_parser == ParserType.TABLE:
+                        kb_id = doc.get("kb_id")
+                        if not kb_id:
+                            continue
+                        if kb_id not in kb_table_num_map:
+                            count = DocumentService.count_by_kb_id(kb_id=kb_id, keywords="", run_status=[TaskStatus.DONE], types=[])
+                            kb_table_num_map[kb_id] = count
+                            if kb_table_num_map[kb_id] <= 0:
+                                KnowledgebaseService.delete_field_map(kb_id)
+                    bucket, name = File2DocumentService.get_storage_address(doc_id=doc["id"])
+                    queue_tasks(doc, bucket, name, 0)
 
         return get_json_result(data=True)
     except Exception as e:

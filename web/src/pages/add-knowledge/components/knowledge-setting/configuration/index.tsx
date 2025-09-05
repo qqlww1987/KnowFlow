@@ -1,5 +1,6 @@
 import { DocumentParserType } from '@/constants/knowledge';
 import { useTranslate } from '@/hooks/common-hooks';
+import { useSelectParserList } from '@/hooks/user-setting-hooks';
 import { normFile } from '@/utils/file-util';
 import { PlusOutlined } from '@ant-design/icons';
 import { Button, Form, Input, Radio, Select, Space, Upload } from 'antd';
@@ -11,6 +12,7 @@ import {
 } from '../hooks';
 import { AudioConfiguration } from './audio';
 import { BookConfiguration } from './book';
+import { DOTSConfiguration } from './dots';
 import { EmailConfiguration } from './email';
 import { KnowledgeGraphConfiguration } from './knowledge-graph';
 import { LawsConfiguration } from './laws';
@@ -47,6 +49,7 @@ const ConfigurationComponentMap = {
   [DocumentParserType.Tag]: TagConfiguration,
   [DocumentParserType.KnowledgeGraph]: KnowledgeGraphConfiguration,
   [DocumentParserType.MinerU]: MinerUConfiguration,
+  [DocumentParserType.DOTS]: DOTSConfiguration,
 };
 
 function EmptyComponent() {
@@ -57,6 +60,7 @@ export const ConfigurationForm = ({ form }: { form: FormInstance }) => {
   const { submitKnowledgeConfiguration, submitLoading, navigateToDataset } =
     useSubmitKnowledgeConfiguration(form);
   const { t } = useTranslate('knowledgeConfiguration');
+  const parserList = useSelectParserList();
 
   const [finalParserId, setFinalParserId] = useState<DocumentParserType>();
   const knowledgeDetails = useFetchKnowledgeConfigurationOnMount(form);
@@ -73,7 +77,12 @@ export const ConfigurationForm = ({ form }: { form: FormInstance }) => {
 
   useEffect(() => {
     setFinalParserId(knowledgeDetails.parser_id as DocumentParserType);
-  }, [knowledgeDetails.parser_id]);
+    // 如果没有设置parser_id，设置默认值
+    if (!knowledgeDetails.parser_id && parserList.length > 0) {
+      form.setFieldsValue({ parser_id: parserList[0].value });
+      setFinalParserId(parserList[0].value as DocumentParserType);
+    }
+  }, [knowledgeDetails.parser_id, parserList, form]);
 
   return (
     <Form form={form} name="validateOnly" layout="vertical" autoComplete="off">
@@ -124,6 +133,25 @@ export const ConfigurationForm = ({ form }: { form: FormInstance }) => {
           <Radio value="me">{t('me')}</Radio>
           <Radio value="team">{t('team')}</Radio>
         </Radio.Group>
+      </Form.Item>
+
+      <Form.Item
+        name="parser_id"
+        label={t('parseMethod', 'Parse Method')}
+        rules={[
+          {
+            required: true,
+            message: t('parseMethodRequired', 'Please select a parse method'),
+          },
+        ]}
+      >
+        <Select placeholder={t('selectParseMethod', 'Select parse method')}>
+          {parserList.map((parser) => (
+            <Option key={parser.value} value={parser.value}>
+              {parser.label}
+            </Option>
+          ))}
+        </Select>
       </Form.Item>
 
       <ConfigurationComponent></ConfigurationComponent>

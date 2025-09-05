@@ -19,6 +19,7 @@ const ParserListMap = new Map([
       DocumentParserType.Qa,
       DocumentParserType.KnowledgeGraph,
       DocumentParserType.MinerU,
+      DocumentParserType.DOTS,
     ],
   ],
   [
@@ -48,7 +49,7 @@ const ParserListMap = new Map([
   [['ppt', 'pptx'], [DocumentParserType.Presentation]],
   [
     ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'tif', 'tiff', 'webp', 'svg', 'ico'],
-    [DocumentParserType.Picture],
+    [DocumentParserType.Picture, DocumentParserType.DOTS],
   ],
   [
     ['txt'],
@@ -127,6 +128,7 @@ export const useFetchParserListOnMount = (
         DocumentParserType.Qa,
         DocumentParserType.Table,
         DocumentParserType.MinerU,
+        DocumentParserType.DOTS,
       ],
       parserList,
     );

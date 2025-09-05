@@ -36,6 +36,7 @@ export const useSubmitKnowledgeConfiguration = (form: FormInstance) => {
       ...restValues,
       avatar,
       parser_config: mergedParserConfig,
+      parser_id: values.parser_id, // 确保包含 parser_id
     });
     navigateToDataset();
   }, [saveKnowledgeConfiguration, form, navigateToDataset]);

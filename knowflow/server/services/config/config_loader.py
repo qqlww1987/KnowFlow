@@ -110,10 +110,54 @@ def _load_mineru_env_vars() -> Dict[str, Any]:
         return {'mineru': mineru_env_config}
     return {}
 
+def _load_dots_env_vars() -> Dict[str, Any]:
+    """从环境变量加载DOTS相关配置"""
+    dots_env_config = {}
+    
+    # DOTS环境变量映射
+    env_mappings = {
+        # VLLM服务配置
+        'DOTS_VLLM_URL': 'vllm.url',
+        'DOTS_MODEL_NAME': 'vllm.model_name',
+        'DOTS_TIMEOUT': 'vllm.timeout',
+        'DOTS_TEMPERATURE': 'vllm.temperature',
+        'DOTS_TOP_P': 'vllm.top_p',
+        'DOTS_MAX_COMPLETION_TOKENS': 'vllm.max_completion_tokens',
+        
+        # DOTS处理配置
+        'DOTS_DEV_MODE': 'dev_mode',
+        'DOTS_CLEANUP_TEMP_FILES': 'cleanup_temp_files',
+    }
+    
+    for env_key, config_path in env_mappings.items():
+        env_value = os.environ.get(env_key)
+        if env_value is not None:
+            # 类型转换
+            if env_value.lower() in ["true", "false"]:
+                processed_value = env_value.lower() == "true"
+            elif env_value.replace('.', '').isdigit():  # 处理浮点数
+                try:
+                    processed_value = float(env_value) if '.' in env_value else int(env_value)
+                except (ValueError, TypeError):
+                    processed_value = env_value
+            else:
+                processed_value = env_value
+            
+            # 设置嵌套配置
+            parts = config_path.split('.')
+            d = dots_env_config
+            for part in parts[:-1]:
+                d = d.setdefault(part, {})
+            d[parts[-1]] = processed_value
+    
+    if dots_env_config:
+        return {'dots': dots_env_config}
+    return {}
+
 def load_configuration() -> RootConfig:
     """
     加载、合并和验证配置
-    加载顺序: 默认YAML -> 环境变量 -> MinerU环境变量
+    加载顺序: 默认YAML -> 环境变量 -> MinerU环境变量 -> DOTS环境变量
     """
     # 1. 从默认YAML文件加载
     config_data = _load_config_from_yaml(DEFAULT_CONFIG_PATH)
@@ -127,8 +171,13 @@ def load_configuration() -> RootConfig:
     mineru_env_data = _load_mineru_env_vars()
     if mineru_env_data:
         config_data = _recursive_update(config_data, mineru_env_data)
+        
+    # 4. 从DOTS环境变量加载并覆盖
+    dots_env_data = _load_dots_env_vars()
+    if dots_env_data:
+        config_data = _recursive_update(config_data, dots_env_data)
 
-    # 4. 使用Pydantic模型进行验证
+    # 5. 使用Pydantic模型进行验证
     try:
         return RootConfig.model_validate(config_data)
     except Exception as e:
@@ -154,6 +203,7 @@ CONFIG = load_configuration()
 APP_CONFIG = CONFIG.app
 EXCEL_CONFIG = CONFIG.excel
 MINERU_CONFIG = CONFIG.mineru
+DOTS_CONFIG = CONFIG.dots
 
 # 打印加载的配置（在开发模式下）
 if APP_CONFIG.dev_mode:

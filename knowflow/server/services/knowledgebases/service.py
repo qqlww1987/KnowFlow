@@ -336,7 +336,7 @@ class KnowledgebaseService:
                     0,  # chunk_num
                     0.7,  # similarity_threshold
                     0.3,  # vector_similarity_weight
-                    "naive",  # parser_id
+                    data.get("parser_id", "naive"),  # parser_id
                     default_parser_config,  # parser_config
                     0,  # pagerank
                     "1",  # status
@@ -649,10 +649,17 @@ class KnowledgebaseService:
                 create_time = int(current_datetime.timestamp() * 1000)  # 毫秒级时间戳
                 current_date = current_datetime.strftime("%Y-%m-%d %H:%M:%S")  # 格式化日期字符串
 
-                # 设置默认值
-                default_parser_id = "naive"
+                # 获取知识库的parser_id和parser_config，如果没有则使用默认值
+                kb_parser_id = kb.get("parser_id", "naive")
+                kb_parser_config = kb.get("parser_config")
+                if isinstance(kb_parser_config, str):
+                    try:
+                        kb_parser_config = json.loads(kb_parser_config)
+                    except:
+                        kb_parser_config = None
+                
                 default_parser_config = json.dumps(
-                    {
+                    kb_parser_config or {
                         "chunk_token_num": 512,
                         "delimiter": "\n!?;。；！？",
                         "auto_keywords": 0,
@@ -695,7 +702,7 @@ class KnowledgebaseService:
                     current_date,  # ID和时间
                     None,
                     kb_id,
-                    default_parser_id,
+                    kb_parser_id,
                     default_parser_config,
                     default_source_type,  # thumbnail到source_type
                     file_type,
