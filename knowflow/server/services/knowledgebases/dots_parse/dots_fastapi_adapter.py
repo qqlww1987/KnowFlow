@@ -246,14 +246,26 @@ class DOTSFastAPIAdapter:
                     
                     # 尝试解析JSON内容
                     try:
-                        if content.strip().startswith('{'):
-                            parsed_json = json.loads(content.strip())
-                            return {
-                                'success': True,
-                                'raw_response': content,
-                                'layout_data': parsed_json,
-                                'layout_elements': parsed_json.get('layout_elements', [])
-                            }
+                        content_stripped = content.strip()
+                        if content_stripped.startswith('{') or content_stripped.startswith('['):
+                            parsed_json = json.loads(content_stripped)
+                            
+                            # 如果返回的是数组（layout_elements的直接数组）
+                            if isinstance(parsed_json, list):
+                                return {
+                                    'success': True,
+                                    'raw_response': content,
+                                    'layout_data': {'layout_elements': parsed_json},
+                                    'layout_elements': parsed_json
+                                }
+                            # 如果返回的是对象
+                            else:
+                                return {
+                                    'success': True,
+                                    'raw_response': content,
+                                    'layout_data': parsed_json,
+                                    'layout_elements': parsed_json.get('layout_elements', [])
+                                }
                         else:
                             # 非JSON格式，返回原始文本
                             return {
