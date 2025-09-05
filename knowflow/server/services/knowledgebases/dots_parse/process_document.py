@@ -173,8 +173,13 @@ def process_document_with_dots(doc_id: str, file_path: str, kb_id: str,
         if update_progress:
             update_progress(0.4, "处理OCR解析结果")
         
-        # 4. 处理DOTS解析结果
-        processor_result = process_dots_result(document_results)
+        # 4. 处理DOTS解析结果（使用智能分块策略）
+        processor_result = process_dots_result(
+            document_results,
+            chunk_token_num=256,  # 可以从配置中获取
+            min_chunk_tokens=10,
+            chunking_strategy='smart'  # 使用智能分块策略
+        )
         
         if not processor_result['success']:
             raise Exception("DOTS结果处理失败")
