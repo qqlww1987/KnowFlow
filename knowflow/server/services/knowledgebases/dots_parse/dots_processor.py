@@ -35,16 +35,28 @@ class DOTSLayoutElement:
         self.page_number = element_data.get('page_number', 1)  # 添加页面编号
         
         # 计算元素面积和位置信息
-        if len(self.bbox) == 4:
-            self.x1, self.y1, self.x2, self.y2 = self.bbox
-            self.width = self.x2 - self.x1
-            self.height = self.y2 - self.y1
+        if len(self.bbox) == 4 and all(isinstance(coord, (int, float)) for coord in self.bbox):
+            # 确保坐标是数值类型
+            self.x1, self.y1, self.x2, self.y2 = [float(coord) for coord in self.bbox]
+            self.width = abs(self.x2 - self.x1)
+            self.height = abs(self.y2 - self.y1)
             self.area = self.width * self.height
             self.center_x = (self.x1 + self.x2) / 2
             self.center_y = (self.y1 + self.y2) / 2
+            
+            # 确保坐标顺序正确 (x1 <= x2, y1 <= y2)
+            if self.x1 > self.x2:
+                self.x1, self.x2 = self.x2, self.x1
+            if self.y1 > self.y2:
+                self.y1, self.y2 = self.y2, self.y1
+            
+            # 更新bbox以保持一致性
+            self.bbox = [self.x1, self.y1, self.x2, self.y2]
         else:
+            logger.warning(f"无效的DOTS bbox数据: {self.bbox}")
             self.width = self.height = self.area = 0
             self.center_x = self.center_y = 0
+            self.x1 = self.y1 = self.x2 = self.y2 = 0
     
     def to_markdown(self) -> str:
         """将元素转换为Markdown格式
@@ -409,16 +421,21 @@ class DOTSProcessor:
         sorted_elements = sorted(self.elements, key=lambda e: (e.page_number, e.center_y, e.center_x))
         
         for i, element in enumerate(sorted_elements):
-            element_data = {
-                'bbox': element.bbox,  # DOTS格式 [x1, y1, x2, y2] 
-                'category': element.category,
-                'text': element.text,
-                'page_number': element.page_number,  # 保持1开始的页面编号
-                'index': i
-            }
-            elements_list.append(element_data)
+            # 验证坐标数据有效性
+            if element.bbox and len(element.bbox) == 4:
+                element_data = {
+                    'bbox': element.bbox,  # DOTS格式 [x1, y1, x2, y2] 
+                    'category': element.category,
+                    'text': element.text,
+                    'page_number': element.page_number,  # 保持1开始的页面编号
+                    'index': i
+                }
+                elements_list.append(element_data)
+                logger.debug(f"DOTS元素 {i}: bbox={element.bbox}, page={element.page_number}, text='{element.text[:50]}...'")
+            else:
+                logger.warning(f"跳过无效DOTS元素 {i}: bbox={element.bbox}")
         
-        logger.info(f"准备了 {len(elements_list)} 个DOTS元素用于坐标映射")
+        logger.info(f"准备了 {len(elements_list)} 个有效DOTS元素用于坐标映射")
         return elements_list
     
     def _get_chunk_coordinates_from_dots(self, chunk_content: str, elements_list: List[Dict[str, Any]], 
@@ -511,17 +528,22 @@ class DOTSProcessor:
                 bbox = element.get('bbox')  # DOTS格式 [x1, y1, x2, y2]
                 page_number = element.get('page_number')
                 
-                if bbox and page_number is not None:
+                if bbox and page_number is not None and len(bbox) == 4:
                     # 转换为Mineru格式：[page_idx, x1, x2, y1, y2]
-                    # DOTS page_number是1开始，需要转换为0开始
+                    # DOTS page_number是1开始，需要转换为0开始的页面索引
+                    # DOTS bbox: [x1, y1, x2, y2] -> Mineru: [page_idx, x1, x2, y1, y2]
                     mineru_position = [
                         page_number - 1,  # 转换为0开始的页面索引
-                        bbox[0],  # x1
-                        bbox[2],  # x2  
-                        bbox[1],  # y1
-                        bbox[3]   # y2
+                        int(bbox[0]),     # x1 (左边界)
+                        int(bbox[2]),     # x2 (右边界)  
+                        int(bbox[1]),     # y1 (上边界)
+                        int(bbox[3])      # y2 (下边界)
                     ]
                     positions.append(mineru_position)
+                    
+                    logger.debug(f"DOTS坐标转换: DOTS={bbox} page={page_number} -> Mineru={mineru_position}")
+                else:
+                    logger.warning(f"无效的DOTS坐标数据: bbox={bbox}, page_number={page_number}")
             
             # 记录已匹配的元素索引
             matched_indices.update(matched_element_indices)

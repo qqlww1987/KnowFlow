@@ -101,12 +101,9 @@ class RAGFlowIntegration:
         chunk_content_to_index = {content: i for i, content in enumerate(chunk_contents)}
         
         try:
-            # 直接调用mineru的add_chunks_with_enhanced_batch_api
-            chunk_count = add_chunks_with_enhanced_batch_api(
-                self.doc, 
-                chunk_contents, 
-                None,  # 没有md_file_path，设为None
-                chunk_content_to_index, 
+            # 使用DOTS专用的batch API调用，直接传递包含坐标信息的batch_chunks
+            chunk_count = self._add_dots_chunks_with_batch_api(
+                batch_chunks, 
                 update_progress
             )
             
@@ -116,6 +113,93 @@ class RAGFlowIntegration:
         except Exception as e:
             logger.error(f"使用batch API创建chunks失败: {e}")
             raise
+    
+    def _add_dots_chunks_with_batch_api(self, batch_chunks: List[Dict[str, Any]], 
+                                       update_progress: Optional[Callable] = None) -> int:
+        """使用batch API添加DOTS chunks，保持坐标信息
+        
+        Args:
+            batch_chunks: 包含坐标信息的batch数据
+            update_progress: 进度更新回调
+            
+        Returns:
+            int: 成功添加的分块数量
+        """
+        if not batch_chunks:
+            if update_progress:
+                update_progress(0.8, "没有chunks需要添加")
+            return 0
+        
+        if update_progress:
+            update_progress(0.8, f"开始批量添加{len(batch_chunks)}个DOTS chunks...")
+        
+        try:
+            import requests
+            import json
+            
+            # 获取API基本信息（复用mineru的方式）
+            base_url = self.doc.rag.api_url
+            headers = self.doc.rag.authorization_header
+            
+            # 构建请求数据
+            request_data = {
+                "chunks": batch_chunks,
+                "batch_size": 20
+            }
+            
+            # 调用增强的batch接口
+            api_url = f"{base_url}/datasets/{self.doc.dataset_id}/documents/{self.doc.id}/chunks/batch"
+            logger.info(f"🔗 发送DOTS batch请求到: {api_url}")
+            logger.debug(f"📦 发送 {len(batch_chunks)} 个chunks，其中 {sum(1 for c in batch_chunks if c.get('positions'))} 个有坐标信息")
+            
+            response = requests.post(api_url, json=request_data, headers=headers)
+            
+            logger.info(f"📥 DOTS batch接口响应状态码: {response.status_code}")
+            
+            if response.status_code == 200:
+                try:
+                    result = response.json()
+                    if result.get("code") == 0:
+                        # 批量添加成功
+                        data = result.get("data", {})
+                        added = data.get("total_added", 0)
+                        failed = data.get("total_failed", 0)
+                        
+                        logger.info(f"✅ DOTS batch接口处理完成: 成功 {added} 个，失败 {failed} 个")
+                        
+                        # 统计坐标信息
+                        coords_count = sum(1 for chunk in batch_chunks if chunk.get('positions'))
+                        logger.info(f"📍 包含坐标信息的分块: {coords_count}/{len(batch_chunks)}")
+                        
+                        if update_progress:
+                            update_progress(0.95, f"DOTS batch处理完成: 成功 {added}/{len(batch_chunks)} chunks")
+                        return added
+                    else:
+                        # 批量添加失败
+                        error_msg = result.get("message", "Unknown error")
+                        logger.error(f"❌ DOTS batch接口失败: {error_msg}")
+                        if update_progress:
+                            update_progress(0.95, f"DOTS batch处理失败: {error_msg}")
+                        return 0
+                except json.JSONDecodeError:
+                    logger.error(f"❌ DOTS batch接口响应解析失败")
+                    if update_progress:
+                        update_progress(0.95, "响应解析失败")
+                    return 0
+            else:
+                logger.error(f"❌ DOTS batch接口HTTP错误: {response.status_code}")
+                logger.error(f"响应内容: {response.text[:500]}")
+                if update_progress:
+                    update_progress(0.95, f"HTTP错误: {response.status_code}")
+                return 0
+                
+        except Exception as e:
+            if update_progress:
+                update_progress(0.95, f"DOTS batch处理异常: {str(e)}")
+            logger.error(f"❌ DOTS batch处理异常: {e}")
+            import traceback
+            traceback.print_exc()
+            return 0
     
     def save_markdown_to_minio(self, markdown_content: str, 
                               bucket_name: Optional[str] = None) -> Optional[str]:
