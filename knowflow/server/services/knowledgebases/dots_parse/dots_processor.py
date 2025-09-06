@@ -201,7 +201,8 @@ class DOTSProcessor:
     def generate_chunks(self, chunk_token_num: int = 256, min_chunk_tokens: int = 10, 
                        chunking_strategy: str = 'smart', 
                        enable_coordinates: bool = True, 
-                       output_dir: str = None) -> Dict[str, Any]:
+                       output_dir: str = None,
+                       chunking_config: Optional[dict] = None) -> Dict[str, Any]:
         """生成用于RAGFlow的文本分块（基于完整Markdown，使用DOTS坐标数据+Mineru算法）
         
         Args:
@@ -210,6 +211,7 @@ class DOTSProcessor:
             chunking_strategy: 分块策略 ('smart', 'advanced', 'basic')
             enable_coordinates: 是否启用坐标映射
             output_dir: 图片输出目录（可选）
+            chunking_config: 完整分块配置（用于复杂分块策略）
             
         Returns:
             dict: 包含分块数据和提取图片的字典
@@ -232,7 +234,8 @@ class DOTSProcessor:
                 complete_markdown, 
                 chunk_token_num=chunk_token_num,
                 min_chunk_tokens=min_chunk_tokens,
-                strategy=chunking_strategy
+                strategy=chunking_strategy,
+                chunking_config=chunking_config
             )
             
             # 3. 准备DOTS元素列表用于坐标映射
@@ -294,7 +297,8 @@ class DOTSProcessor:
     
     def generate_chunks_from_markdown(self, markdown_content: str, chunk_token_num: int = 256, 
                                      min_chunk_tokens: int = 10, chunking_strategy: str = 'smart', 
-                                     enable_coordinates: bool = True) -> Dict[str, Any]:
+                                     enable_coordinates: bool = True, 
+                                     chunking_config: Optional[dict] = None) -> Dict[str, Any]:
         """基于已处理的markdown内容生成分块（用于图片URL已更新后的情况）
         
         Args:
@@ -318,7 +322,8 @@ class DOTSProcessor:
                 markdown_content, 
                 chunk_token_num=chunk_token_num,
                 min_chunk_tokens=min_chunk_tokens,
-                strategy=chunking_strategy
+                strategy=chunking_strategy,
+                chunking_config=chunking_config
             )
             
             # 准备DOTS元素列表用于坐标映射
@@ -379,7 +384,8 @@ class DOTSProcessor:
             return {'chunks': fallback_chunks}
     
     def _split_markdown_smart(self, markdown_text: str, chunk_token_num: int = 256, 
-                             min_chunk_tokens: int = 10, strategy: str = 'smart') -> List[str]:
+                             min_chunk_tokens: int = 10, strategy: str = 'smart',
+                             chunking_config: Optional[dict] = None) -> List[str]:
         """智能Markdown分块（复用Mineru的分块逻辑）
         
         Args:
@@ -387,35 +393,22 @@ class DOTSProcessor:
             chunk_token_num: 目标分块大小
             min_chunk_tokens: 最小分块大小
             strategy: 分块策略
+            chunking_config: 完整分块配置（用于复杂策略）
             
         Returns:
             分块内容列表
         """
         try:
-            # 复用mineru的分块函数
-            from ..mineru_parse.utils import (
-                split_markdown_to_chunks_smart,
-                split_markdown_to_chunks_advanced,
-                split_markdown_to_chunks
-            )
+            # 复用mineru的统一分块接口，支持完整配置
+            from ..mineru_parse.utils import split_markdown_to_chunks_configured
             
-            if strategy == 'smart':
-                chunks = split_markdown_to_chunks_smart(
-                    markdown_text, 
-                    chunk_token_num=chunk_token_num,
-                    min_chunk_tokens=min_chunk_tokens
-                )
-            elif strategy == 'advanced':
-                chunks = split_markdown_to_chunks_advanced(
-                    markdown_text,
-                    chunk_token_num=chunk_token_num,
-                    min_chunk_tokens=min_chunk_tokens
-                )
-            else:  # basic
-                chunks = split_markdown_to_chunks(
-                    markdown_text,
-                    chunk_token_num=chunk_token_num
-                )
+            # 传递完整的分块配置给Mineru函数
+            chunks = split_markdown_to_chunks_configured(
+                markdown_text,
+                chunk_token_num=chunk_token_num,
+                min_chunk_tokens=min_chunk_tokens,
+                chunking_config=chunking_config  # 传递完整配置
+            )
             
             logger.info(f"使用{strategy}策略分块完成，生成 {len(chunks)} 个分块")
             return chunks
@@ -425,6 +418,7 @@ class DOTSProcessor:
             return self._simple_markdown_chunking(markdown_text, chunk_token_num)
         except Exception as e:
             logger.error(f"分块处理异常: {e}")
+            logger.debug(f"chunking_config: {chunking_config}")
             return self._simple_markdown_chunking(markdown_text, chunk_token_num)
     
     def _simple_markdown_chunking(self, text: str, chunk_size: int) -> List[str]:
@@ -725,7 +719,8 @@ def process_dots_result(document_results: List[Dict[str, Any]],
                        min_chunk_tokens: int = 10,
                        chunking_strategy: str = 'smart',
                        kb_id: str = None,
-                       temp_dir: str = None) -> Dict[str, Any]:
+                       temp_dir: str = None,
+                       chunking_config: Optional[dict] = None) -> Dict[str, Any]:
     """处理DOTS文档解析结果的便捷函数
     
     Args:
@@ -736,6 +731,7 @@ def process_dots_result(document_results: List[Dict[str, Any]],
         chunking_strategy: 分块策略 ('smart', 'advanced', 'basic')
         kb_id: 知识库ID
         temp_dir: 临时目录
+        chunking_config: 完整的分块配置（包含策略和参数）
         
     Returns:
         dict: 包含处理结果的字典
@@ -798,7 +794,8 @@ def process_dots_result(document_results: List[Dict[str, Any]],
         chunk_token_num=chunk_token_num,
         min_chunk_tokens=min_chunk_tokens,
         chunking_strategy=chunking_strategy,
-        enable_coordinates=True  # 启用坐标映射
+        enable_coordinates=True,  # 启用坐标映射
+        chunking_config=chunking_config  # 传递完整分块配置
     )
     chunks = result['chunks']
     

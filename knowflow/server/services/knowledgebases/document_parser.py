@@ -211,7 +211,8 @@ def perform_parse(doc_id, doc_info, file_info, embedding_config):
                         'llm_name': embedding_model_name,
                         'api_base': embedding_api_base,
                         'api_key': embedding_api_key
-                    }
+                    },
+                    parser_config=parser_config  # 传递完整的解析器配置
                 )
             
             if selected_engine == 'mineru':

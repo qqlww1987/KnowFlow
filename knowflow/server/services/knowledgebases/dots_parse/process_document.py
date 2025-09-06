@@ -99,7 +99,8 @@ def _process_pdf_to_images(file_path: str, adapter, update_progress: Optional[Ca
 
 def process_document_with_dots(doc_id: str, file_path: str, kb_id: str, 
                               update_progress: Optional[Callable] = None,
-                              embedding_config: Optional[dict] = None) -> int:
+                              embedding_config: Optional[dict] = None,
+                              parser_config: Optional[dict] = None) -> int:
     """使用DOTS OCR处理文档的主入口函数
     
     Args:
@@ -108,6 +109,7 @@ def process_document_with_dots(doc_id: str, file_path: str, kb_id: str,
         kb_id: 知识库ID  
         update_progress: 进度更新回调函数
         embedding_config: 嵌入模型配置
+        parser_config: 解析器配置（包含分块策略设置）
         
     Returns:
         int: 生成的文档块数量
@@ -180,17 +182,37 @@ def process_document_with_dots(doc_id: str, file_path: str, kb_id: str,
         if update_progress:
             update_progress(0.4, "处理OCR解析结果")
         
-        # 4. 处理DOTS解析结果（使用智能分块策略）
+        # 4. 处理DOTS解析结果（使用前端配置的分块策略）
+        # 从parser_config中提取分块配置
+        chunking_config = {}
+        chunk_token_num = 256
+        min_chunk_tokens = 10
+        chunking_strategy = 'smart'
+        
+        if parser_config:
+            # 优先使用parser_config中的chunking_config
+            if 'chunking_config' in parser_config:
+                chunking_config = parser_config['chunking_config']
+                chunk_token_num = chunking_config.get('chunk_token_num', 256)
+                min_chunk_tokens = chunking_config.get('min_chunk_tokens', 10)
+                chunking_strategy = chunking_config.get('strategy', 'smart')
+                logger.info(f"DOTS分块配置: strategy={chunking_strategy}, chunk_size={chunk_token_num}, min_size={min_chunk_tokens}")
+            # 向后兼容：直接从parser_config中获取
+            elif 'chunk_token_num' in parser_config:
+                chunk_token_num = parser_config.get('chunk_token_num', 256)
+                logger.info(f"使用parser_config中的chunk_token_num: {chunk_token_num}")
+        
         # 创建临时目录用于图片处理
         import tempfile
         with tempfile.TemporaryDirectory() as temp_dir:
             processor_result = process_dots_result(
                 document_results,
-                chunk_token_num=256,  # 可以从配置中获取
-                min_chunk_tokens=10,
-                chunking_strategy='smart',  # 使用智能分块策略
+                chunk_token_num=chunk_token_num,
+                min_chunk_tokens=min_chunk_tokens,
+                chunking_strategy=chunking_strategy,
                 kb_id=kb_id,  # 传递知识库ID用于图片上传
-                temp_dir=temp_dir  # 传递临时目录用于图片处理
+                temp_dir=temp_dir,  # 传递临时目录用于图片处理
+                chunking_config=chunking_config  # 传递完整分块配置
             )
         
         if not processor_result['success']:
