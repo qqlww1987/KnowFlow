@@ -166,7 +166,34 @@ def PILimage_to_base64(image: Image.Image) -> str:
     return f"data:image/png;base64,{img_base64}"
 
 
-def layoutjson2md(image: Image.Image, cells: list, text_key: str = 'text', no_page_hf: bool = False) -> str:
+def save_image_to_local(image: Image.Image, output_dir: str, filename: str) -> str:
+    """
+    Save PIL Image to local directory and return relative path
+    
+    Args:
+        image: PIL Image object
+        output_dir: Directory to save images
+        filename: Image filename
+        
+    Returns:
+        str: Relative path to saved image
+    """
+    import os
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # 确保文件名有 .png 扩展名
+    if not filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+        filename = f"{filename}.png"
+    
+    image_path = os.path.join(output_dir, filename)
+    image.save(image_path, format="PNG")
+    
+    # 返回相对路径
+    return filename
+
+
+def layoutjson2md(image: Image.Image, cells: list, text_key: str = 'text', no_page_hf: bool = False, 
+                  output_dir: str = None) -> tuple:
     """
     Converts a layout JSON format to Markdown.
     
@@ -177,11 +204,14 @@ def layoutjson2md(image: Image.Image, cells: list, text_key: str = 'text', no_pa
         cells: A list of dictionaries, each representing a layout cell.
         text_key: The key for the text field in the cell dictionary.
         no_page_hf: If True, skips page headers and footers.
+        output_dir: Directory to save extracted images (optional).
         
     Returns:
-        str: The text in Markdown format.
+        tuple: (markdown_text, extracted_images_list)
+               extracted_images_list contains relative paths of saved images
     """
     text_items = []
+    extracted_images = []
 
     for i, cell in enumerate(cells):
         x1, y1, x2, y2 = [int(coord) for coord in cell['bbox']]
@@ -192,8 +222,17 @@ def layoutjson2md(image: Image.Image, cells: list, text_key: str = 'text', no_pa
         
         if cell['category'] == 'Picture':
             image_crop = image.crop((x1, y1, x2, y2))
-            image_base64 = PILimage_to_base64(image_crop)
-            text_items.append(f"![]({image_base64})")
+            
+            if output_dir:
+                # 保存图片到本地目录并返回相对路径
+                image_filename = f"image_{i}_{x1}_{y1}.png"
+                relative_path = save_image_to_local(image_crop, output_dir, image_filename)
+                extracted_images.append(relative_path)
+                text_items.append(f"![]({relative_path})")
+            else:
+                # 如果没有指定输出目录，使用 base64 编码
+                image_base64 = PILimage_to_base64(image_crop)
+                text_items.append(f"![]({image_base64})")
         elif cell['category'] == 'Formula':
             text_items.append(get_formula_in_markdown(text))
         else:            
@@ -201,7 +240,7 @@ def layoutjson2md(image: Image.Image, cells: list, text_key: str = 'text', no_pa
             text_items.append(f"{text}")
 
     markdown_text = '\n\n'.join(text_items)
-    return markdown_text
+    return markdown_text, extracted_images
 
 
 def fix_streamlit_formulas(md: str) -> str:

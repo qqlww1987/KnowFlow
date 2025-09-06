@@ -62,6 +62,8 @@ def _process_pdf_to_images(file_path: str, adapter, update_progress: Optional[Ca
                 page_result = adapter.parse_image(img_bytes)
                 page_result['page_number'] = page_num + 1
                 page_result['source_type'] = 'pdf_page'
+                # 保存原始PIL图像用于后续图片裁剪
+                page_result['page_image'] = image
                 document_results.append(page_result)
                 
                 logger.info(f"完成第{page_num + 1}页解析")
@@ -165,7 +167,12 @@ def process_document_with_dots(doc_id: str, file_path: str, kb_id: str,
             with open(file_path, 'rb') as f:
                 image_bytes = f.read()
             
+            # 加载PIL图像用于后续图片裁剪
+            from PIL import Image
+            page_image = Image.open(file_path)
+            
             image_result = adapter.parse_image(image_bytes)
+            image_result['page_image'] = page_image
             document_results = [image_result]  # 包装为列表
         else:
             raise ValueError(f"不支持的文件类型: {file_ext}")
@@ -174,12 +181,17 @@ def process_document_with_dots(doc_id: str, file_path: str, kb_id: str,
             update_progress(0.4, "处理OCR解析结果")
         
         # 4. 处理DOTS解析结果（使用智能分块策略）
-        processor_result = process_dots_result(
-            document_results,
-            chunk_token_num=256,  # 可以从配置中获取
-            min_chunk_tokens=10,
-            chunking_strategy='smart'  # 使用智能分块策略
-        )
+        # 创建临时目录用于图片处理
+        import tempfile
+        with tempfile.TemporaryDirectory() as temp_dir:
+            processor_result = process_dots_result(
+                document_results,
+                chunk_token_num=256,  # 可以从配置中获取
+                min_chunk_tokens=10,
+                chunking_strategy='smart',  # 使用智能分块策略
+                kb_id=kb_id,  # 传递知识库ID用于图片上传
+                temp_dir=temp_dir  # 传递临时目录用于图片处理
+            )
         
         if not processor_result['success']:
             raise Exception("DOTS结果处理失败")

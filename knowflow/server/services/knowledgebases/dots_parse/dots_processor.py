@@ -11,6 +11,9 @@ DOTS OCR 结果处理器
 
 import json
 import logging
+import os
+import difflib
+import tempfile
 from typing import Dict, List, Any, Optional, Callable
 from pathlib import Path
 from PIL import Image
@@ -132,24 +135,28 @@ class DOTSProcessor:
         logger.info(f"文档处理完成，共 {len(all_elements)} 个元素，{len(document_results)} 页")
         return all_elements
     
-    def to_markdown(self) -> str:
+    def to_markdown(self, output_dir: str = None) -> tuple:
         """将所有元素转换为Markdown格式的文档（使用DOTS官方方法）
         
+        Args:
+            output_dir: 图片输出目录，可选
+            
         Returns:
-            str: 完整的Markdown文档
+            tuple: (markdown_text, extracted_images_list)
         """
         if not self.elements or not self.pages_data:
-            return ""
+            return "", []
         
         if not DOTS_FORMATTER_AVAILABLE:
             logger.error("DOTS format_transformer 不可用，无法生成 markdown")
-            return ""
+            return "", []
         
         try:
             # 使用 DOTS 官方方法生成 markdown
             markdown_parts = []
+            all_extracted_images = []
             
-            for page_data in self.pages_data:
+            for page_idx, page_data in enumerate(self.pages_data):
                 # 检查页面是否有有效的布局元素
                 layout_elements = page_data.get('layout_elements', [])
                 if not layout_elements:
@@ -165,24 +172,36 @@ class DOTSProcessor:
                     }
                     cells.append(cell)
                 
-                # 创建虚拟图像对象（DOTS 官方方法需要，但我们主要用文本）
-                image_dims = page_data.get('image_dimensions', {'width': 1240, 'height': 1754})
-                dummy_image = Image.new('RGB', (image_dims['width'], image_dims['height']), 'white')
+                # 获取页面图像对象
+                page_image = page_data.get('page_image')
+                if page_image is None:
+                    # 如果没有页面图像，创建虚拟图像
+                    image_dims = page_data.get('image_dimensions', {'width': 1240, 'height': 1754})
+                    page_image = Image.new('RGB', (image_dims['width'], image_dims['height']), 'white')
                 
                 # 使用官方方法生成 markdown（no_page_hf=True 去除页眉页脚）
-                page_markdown = layoutjson2md(dummy_image, cells, text_key='text', no_page_hf=True)
+                page_markdown, page_images = layoutjson2md(
+                    page_image, cells, text_key='text', no_page_hf=True, output_dir=output_dir
+                )
+                
                 if page_markdown.strip():
                     markdown_parts.append(page_markdown.strip())
+                
+                # 收集提取的图片
+                if page_images:
+                    all_extracted_images.extend(page_images)
             
-            return '\n\n'.join(markdown_parts)
+            final_markdown = '\n\n'.join(markdown_parts)
+            return final_markdown, all_extracted_images
             
         except Exception as e:
             logger.error(f"DOTS 官方 markdown 转换失败: {e}")
-            return ""
+            return "", []
     
     def generate_chunks(self, chunk_token_num: int = 256, min_chunk_tokens: int = 10, 
                        chunking_strategy: str = 'smart', 
-                       enable_coordinates: bool = True) -> List[Dict[str, Any]]:
+                       enable_coordinates: bool = True, 
+                       output_dir: str = None) -> Dict[str, Any]:
         """生成用于RAGFlow的文本分块（基于完整Markdown，使用DOTS坐标数据+Mineru算法）
         
         Args:
@@ -190,18 +209,19 @@ class DOTSProcessor:
             min_chunk_tokens: 最小分块大小（token数）
             chunking_strategy: 分块策略 ('smart', 'advanced', 'basic')
             enable_coordinates: 是否启用坐标映射
+            output_dir: 图片输出目录（可选）
             
         Returns:
-            list: 分块数据列表
+            dict: 包含分块数据和提取图片的字典
         """
         if not self.elements:
-            return []
+            return {'chunks': [], 'extracted_images': []}
         
         # 1. 生成完整的Markdown文档
-        complete_markdown = self.to_markdown()
+        complete_markdown, extracted_images = self.to_markdown(output_dir=output_dir)
         if not complete_markdown.strip():
             logger.warning("完整Markdown内容为空")
-            return []
+            return {'chunks': [], 'extracted_images': []}
         
         logger.info(f"基于完整Markdown进行分块，文档长度: {len(complete_markdown)} 字符")
         
@@ -255,6 +275,8 @@ class DOTSProcessor:
                         except Exception as coord_e:
                             logger.warning(f"分块 {i} 坐标获取失败: {coord_e}")
                             chunk_data['has_coordinates'] = False
+                    else:
+                        chunk_data['has_coordinates'] = False
                     
                     chunks.append(chunk_data)
             
@@ -263,11 +285,98 @@ class DOTSProcessor:
                 coords_count = sum(1 for c in chunks if c.get('has_coordinates', False))
                 logger.info(f"成功为 {coords_count}/{len(chunks)} 个分块获取了坐标信息")
             
-            return chunks
+            return {'chunks': chunks, 'extracted_images': extracted_images}
             
         except Exception as e:
             logger.error(f"智能分块失败: {e}，回退到简单分块")
-            return self._generate_chunks_fallback(complete_markdown, chunk_token_num)
+            fallback_chunks = self._generate_chunks_fallback(complete_markdown, chunk_token_num)
+            return {'chunks': fallback_chunks, 'extracted_images': extracted_images}
+    
+    def generate_chunks_from_markdown(self, markdown_content: str, chunk_token_num: int = 256, 
+                                     min_chunk_tokens: int = 10, chunking_strategy: str = 'smart', 
+                                     enable_coordinates: bool = True) -> Dict[str, Any]:
+        """基于已处理的markdown内容生成分块（用于图片URL已更新后的情况）
+        
+        Args:
+            markdown_content: 已处理的markdown内容（图片URL已更新）
+            chunk_token_num: 分块大小（token数）
+            min_chunk_tokens: 最小分块大小（token数）
+            chunking_strategy: 分块策略 ('smart', 'advanced', 'basic')
+            enable_coordinates: 是否启用坐标映射
+            
+        Returns:
+            dict: 包含分块数据的字典
+        """
+        if not self.elements or not markdown_content.strip():
+            return {'chunks': []}
+        
+        logger.info(f"基于已处理markdown进行分块，文档长度: {len(markdown_content)} 字符")
+        
+        try:
+            # 调用智能分块函数（类似原来的实现）
+            chunk_contents = self._split_markdown_smart(
+                markdown_content, 
+                chunk_token_num=chunk_token_num,
+                min_chunk_tokens=min_chunk_tokens,
+                strategy=chunking_strategy
+            )
+            
+            # 准备DOTS元素列表用于坐标映射
+            dots_elements_list = None
+            if enable_coordinates:
+                dots_elements_list = self._prepare_dots_elements_for_coordinate_mapping()
+            
+            # 转换为RAGFlow格式的分块
+            chunks = []
+            matched_global_indices = set()  # 跟踪已匹配的元素索引
+            
+            for i, content in enumerate(chunk_contents):
+                if content.strip():
+                    # 基本信息
+                    page_number = self._extract_page_number(content)
+                    chunk_data = {
+                        'id': i,
+                        'content': content.strip(),
+                        'page_number': page_number,
+                        'start_pos': 0,  # 基于完整markdown的分块，位置信息简化
+                        'end_pos': len(content),
+                        'element_count': self._count_elements_in_chunk(content),
+                        'chunking_strategy': chunking_strategy
+                    }
+                    
+                    # 获取坐标信息（使用DOTS数据+Mineru算法）
+                    if enable_coordinates and dots_elements_list:
+                        try:
+                            positions = self._get_chunk_coordinates_from_dots(
+                                content.strip(), 
+                                dots_elements_list,
+                                matched_global_indices
+                            )
+                            if positions:
+                                chunk_data['positions'] = positions
+                                chunk_data['has_coordinates'] = True
+                                logger.debug(f"分块 {i} 获取到 {len(positions)} 个DOTS坐标")
+                            else:
+                                chunk_data['has_coordinates'] = False
+                        except Exception as coord_e:
+                            logger.warning(f"分块 {i} 坐标获取失败: {coord_e}")
+                            chunk_data['has_coordinates'] = False
+                    else:
+                        chunk_data['has_coordinates'] = False
+                    
+                    chunks.append(chunk_data)
+            
+            logger.info(f"使用{chunking_strategy}策略生成 {len(chunks)} 个文本分块")
+            if enable_coordinates:
+                coords_count = sum(1 for c in chunks if c.get('has_coordinates', False))
+                logger.info(f"成功为 {coords_count}/{len(chunks)} 个分块获取了坐标信息")
+            
+            return {'chunks': chunks}
+            
+        except Exception as e:
+            logger.error(f"智能分块失败: {e}，回退到简单分块")
+            fallback_chunks = self._generate_chunks_fallback(markdown_content, chunk_token_num)
+            return {'chunks': fallback_chunks}
     
     def _split_markdown_smart(self, markdown_text: str, chunk_token_num: int = 256, 
                              min_chunk_tokens: int = 10, strategy: str = 'smart') -> List[str]:
@@ -574,7 +683,7 @@ class DOTSProcessor:
         output_path.mkdir(parents=True, exist_ok=True)
         
         # 保存Markdown文档
-        markdown_content = self.to_markdown()
+        markdown_content, _ = self.to_markdown()
         with open(output_path / 'dots_output.md', 'w', encoding='utf-8') as f:
             f.write(markdown_content)
         
@@ -614,7 +723,9 @@ def process_dots_result(document_results: List[Dict[str, Any]],
                        debug_output_dir: Optional[str] = None,
                        chunk_token_num: int = 256,
                        min_chunk_tokens: int = 10,
-                       chunking_strategy: str = 'smart') -> Dict[str, Any]:
+                       chunking_strategy: str = 'smart',
+                       kb_id: str = None,
+                       temp_dir: str = None) -> Dict[str, Any]:
     """处理DOTS文档解析结果的便捷函数
     
     Args:
@@ -623,6 +734,8 @@ def process_dots_result(document_results: List[Dict[str, Any]],
         chunk_token_num: 分块大小（token数）
         min_chunk_tokens: 最小分块大小（token数）
         chunking_strategy: 分块策略 ('smart', 'advanced', 'basic')
+        kb_id: 知识库ID
+        temp_dir: 临时目录
         
     Returns:
         dict: 包含处理结果的字典
@@ -632,14 +745,65 @@ def process_dots_result(document_results: List[Dict[str, Any]],
     # 处理解析结果
     elements = processor.process_document_results(document_results)
     
-    # 生成Markdown和分块（使用新的智能分块方法，包含坐标映射）
-    markdown_content = processor.to_markdown()
-    chunks = processor.generate_chunks(
+    # 第一步：生成包含相对路径图片的markdown和提取图片
+    image_output_dir = None
+    if temp_dir and kb_id:
+        image_output_dir = os.path.join(temp_dir, 'images')
+    
+    # 生成markdown并提取图片
+    if image_output_dir:
+        markdown_content, extracted_images = processor.to_markdown(output_dir=image_output_dir)
+    else:
+        markdown_content, extracted_images = processor.to_markdown()
+    
+    # 第二步：如果有图片，先处理图片上传和URL更新，然后再进行分块
+    if extracted_images and kb_id and temp_dir:
+        try:
+            # 复用MinerU的图片处理逻辑
+            from ..mineru_parse.minio_server import upload_directory_to_minio
+            from ..mineru_parse.mineru_test import update_markdown_image_urls
+            
+            # 检查图片目录是否存在
+            if os.path.exists(image_output_dir):
+                # 上传图片到MinIO
+                success = upload_directory_to_minio(kb_id, image_output_dir)
+                
+                if success:
+                    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8') as tmp_file:
+                        tmp_file.write(markdown_content)
+                        tmp_md_path = tmp_file.name
+                    
+                    # 更新markdown中的图片URL
+                    updated_markdown = update_markdown_image_urls(tmp_md_path, kb_id)
+                    
+                    if updated_markdown:
+                        markdown_content = updated_markdown
+                        logger.info(f"已更新 {len(extracted_images)} 个图片URL为MinIO格式")
+                    
+                    # 清理临时文件
+                    os.unlink(tmp_md_path)
+                else:
+                    logger.warning("图片上传失败，使用原始markdown")
+            else:
+                logger.warning(f"图片输出目录不存在: {image_output_dir}")
+                
+        except Exception as e:
+            logger.warning(f"图片处理失败，使用原始markdown: {e}")
+            import traceback
+            logger.debug(f"图片处理异常详情: {traceback.format_exc()}")
+    
+    # 第三步：基于处理后的markdown（已包含正确的图片URL）进行分块
+    result = processor.generate_chunks_from_markdown(
+        markdown_content=markdown_content,
         chunk_token_num=chunk_token_num,
         min_chunk_tokens=min_chunk_tokens,
         chunking_strategy=chunking_strategy,
         enable_coordinates=True  # 启用坐标映射
     )
+    chunks = result['chunks']
+    
+    # 图片处理已在分块之前完成，这里只记录结果
+    logger.info(f"分块生成完成: {len(chunks)} 个分块, 包含图片: {len(extracted_images)} 个")
     
     # 保存调试信息（如果指定了输出目录）
     if debug_output_dir:
@@ -653,6 +817,7 @@ def process_dots_result(document_results: List[Dict[str, Any]],
         'pages_count': len(set(e.page_number for e in elements)),
         'markdown_content': markdown_content,
         'chunks': chunks,
+        'extracted_images': extracted_images,
         'chunking_strategy': chunking_strategy,
         'processor': processor  # 返回处理器实例以便进一步操作
     }
