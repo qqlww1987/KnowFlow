@@ -3,19 +3,27 @@
 """
 DOTS OCR 结果处理器
 
-将DOTS OCR的JSON结果转换为RAGFlow兼容的格式，支持:
+使用 DOTS 官方方法将 OCR 结果转换为 RAGFlow 兼容的格式，支持:
 - 布局元素提取和分类
-- Markdown格式转换
-- 分块生成和存储
+- 官方 Markdown 转换（自动去除页眉页脚）
+- 智能分块生成和坐标映射
 """
 
 import json
 import logging
 from typing import Dict, List, Any, Optional, Callable
 from pathlib import Path
-import difflib
+from PIL import Image
 
-# 不直接导入Mineru函数，而是复用其算法逻辑
+# 导入 DOTS 官方的 markdown 转换方法
+try:
+    from .format_transformer import layoutjson2md
+    DOTS_FORMATTER_AVAILABLE = True
+except ImportError:
+    DOTS_FORMATTER_AVAILABLE = False
+    logger.warning("DOTS format_transformer not available")
+
+# 复用 Mineru 分块算法
 
 logger = logging.getLogger(__name__)
 
@@ -58,40 +66,6 @@ class DOTSLayoutElement:
             self.center_x = self.center_y = 0
             self.x1 = self.y1 = self.x2 = self.y2 = 0
     
-    def to_markdown(self) -> str:
-        """将元素转换为Markdown格式
-        
-        Returns:
-            str: Markdown格式的文本
-        """
-        if not self.text or self.text.strip() == '':
-            return ''
-        
-        text = self.text.strip()
-        
-        # 根据类别添加Markdown标记
-        if self.category == 'Title':
-            return f"# {text}\n\n"
-        elif self.category == 'Section-header':
-            return f"## {text}\n\n"
-        elif self.category == 'List-item':
-            return f"- {text}\n"
-        elif self.category == 'Formula':
-            # LaTeX公式已经是正确格式
-            return f"$${text}$$\n\n"
-        elif self.category == 'Table':
-            # HTML表格保持原格式
-            return f"{text}\n\n"
-        elif self.category == 'Caption':
-            return f"*{text}*\n\n"
-        elif self.category == 'Footnote':
-            return f"^{text}^\n\n"
-        elif self.category in ['Page-header', 'Page-footer']:
-            # 页眉页脚用小字体
-            return f"<small>{text}</small>\n\n"
-        else:
-            # 默认文本处理
-            return f"{text}\n\n"
     
     def __repr__(self):
         return f"DOTSLayoutElement(category={self.category}, bbox={self.bbox}, text='{self.text[:50]}...')"
@@ -159,33 +133,52 @@ class DOTSProcessor:
         return all_elements
     
     def to_markdown(self) -> str:
-        """将所有元素转换为Markdown格式的文档
+        """将所有元素转换为Markdown格式的文档（使用DOTS官方方法）
         
         Returns:
             str: 完整的Markdown文档
         """
-        if not self.elements:
+        if not self.elements or not self.pages_data:
             return ""
         
-        # 按页面和位置排序元素
-        sorted_elements = sorted(self.elements, key=lambda e: (e.page_number, e.center_y, e.center_x))
+        if not DOTS_FORMATTER_AVAILABLE:
+            logger.error("DOTS format_transformer 不可用，无法生成 markdown")
+            return ""
         
-        markdown_lines = []
-        current_page = 0
-        
-        for element in sorted_elements:
-            # 添加页面分隔符
-            if element.page_number != current_page:
-                if current_page > 0:
-                    markdown_lines.append(f"\n---\n<!-- Page {element.page_number} -->\n")
-                current_page = element.page_number
+        try:
+            # 使用 DOTS 官方方法生成 markdown
+            markdown_parts = []
             
-            # 添加元素内容
-            element_md = element.to_markdown()
-            if element_md:
-                markdown_lines.append(element_md)
-        
-        return ''.join(markdown_lines)
+            for page_data in self.pages_data:
+                # 检查页面是否有有效的布局元素
+                layout_elements = page_data.get('layout_elements', [])
+                if not layout_elements:
+                    continue
+                
+                # 构造符合 DOTS 格式的 cells 数据
+                cells = []
+                for element_data in layout_elements:
+                    cell = {
+                        'bbox': element_data.get('bbox', [0, 0, 0, 0]),
+                        'category': element_data.get('category', 'Text'),
+                        'text': element_data.get('text', '')
+                    }
+                    cells.append(cell)
+                
+                # 创建虚拟图像对象（DOTS 官方方法需要，但我们主要用文本）
+                image_dims = page_data.get('image_dimensions', {'width': 1240, 'height': 1754})
+                dummy_image = Image.new('RGB', (image_dims['width'], image_dims['height']), 'white')
+                
+                # 使用官方方法生成 markdown（no_page_hf=True 去除页眉页脚）
+                page_markdown = layoutjson2md(dummy_image, cells, text_key='text', no_page_hf=True)
+                if page_markdown.strip():
+                    markdown_parts.append(page_markdown.strip())
+            
+            return '\n\n'.join(markdown_parts)
+            
+        except Exception as e:
+            logger.error(f"DOTS 官方 markdown 转换失败: {e}")
+            return ""
     
     def generate_chunks(self, chunk_token_num: int = 256, min_chunk_tokens: int = 10, 
                        chunking_strategy: str = 'smart', 
