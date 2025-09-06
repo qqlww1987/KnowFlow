@@ -86,8 +86,12 @@ const ChunkMethodModal: React.FC<IProps> = ({
       pages: values.pages?.map((x: any) => [x.from, x.to]) ?? [],
     };
 
-    // 如果是MinerU解析器，添加分块配置到parser_config中
-    if (selectedTag === DocumentParserType.MinerU && values.chunking_config) {
+    // 如果是MinerU或DOTS解析器，添加分块配置到parser_config中
+    if (
+      (selectedTag === DocumentParserType.MinerU ||
+        selectedTag === DocumentParserType.DOTS) &&
+      values.chunking_config
+    ) {
       parser_config.chunking_config = values.chunking_config;
     }
 
@@ -116,6 +120,8 @@ const ChunkMethodModal: React.FC<IProps> = ({
   const showEntityTypes = selectedTag === DocumentParserType.KnowledgeGraph;
 
   const showMinerUChunking = selectedTag === DocumentParserType.MinerU;
+
+  const showDOTSChunking = selectedTag === DocumentParserType.DOTS;
 
   const showExcelToHtml =
     selectedTag === DocumentParserType.Naive && documentExtension === 'xlsx';
@@ -328,6 +334,11 @@ const ChunkMethodModal: React.FC<IProps> = ({
           {showExcelToHtml && <ExcelToHtml></ExcelToHtml>}
         </DatasetConfigurationContainer>
         {showMinerUChunking && (
+          <DatasetConfigurationContainer>
+            <ChunkingConfig />
+          </DatasetConfigurationContainer>
+        )}
+        {showDOTSChunking && (
           <DatasetConfigurationContainer>
             <ChunkingConfig />
           </DatasetConfigurationContainer>
