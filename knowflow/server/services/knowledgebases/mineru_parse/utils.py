@@ -1285,7 +1285,11 @@ def _extract_nodes_with_header_info(tree, headers_to_split_on):
 
 def _render_node_content(node):
     """渲染单个节点的内容"""
-    if node.type == "table":
+    if node.type == "heading":
+        # 修复：保留标题的markdown格式，与smart分块保持一致
+        title_text = _extract_text_from_node(node)
+        return node.markup + " " + title_text
+    elif node.type == "table":
         return _render_table_from_ast(node)
     elif node.type == "code_block":
         return f"```{node.info or ''}\n{node.content}```"
