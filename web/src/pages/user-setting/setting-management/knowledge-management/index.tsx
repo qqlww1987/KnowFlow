@@ -55,6 +55,7 @@ interface KnowledgeBaseData {
   token_num: number;
   create_time: string;
   create_date: string;
+  parser_id?: string;
   permission_stats?: {
     user_count: number;
     team_count: number;
@@ -848,6 +849,28 @@ const KnowledgeManagementPage = () => {
       ),
     },
     {
+      title: '解析方法',
+      dataIndex: 'parser_id',
+      key: 'parser_id',
+      width: 120,
+      render: (parser: string) => {
+        const getParserDisplay = (parserId: string) => {
+          switch (parserId) {
+            case 'mineru':
+              return { text: 'MinerU', color: 'purple' };
+            case 'dots':
+              return { text: 'DOTS', color: 'cyan' };
+            case 'naive':
+              return { text: 'General', color: 'green' };
+            default:
+              return { text: parserId || 'MinerU', color: 'default' };
+          }
+        };
+        const { text, color } = getParserDisplay(parser);
+        return <Tag color={color}>{text}</Tag>;
+      },
+    },
+    {
       title: '角色配置',
       dataIndex: 'permission_stats',
       key: 'permission_stats',
@@ -1207,6 +1230,17 @@ const KnowledgeManagementPage = () => {
             <Select>
               <Option value="me">个人</Option>
               <Option value="team">团队</Option>
+            </Select>
+          </Form.Item>
+          <Form.Item
+            name="parser_id"
+            label="解析方法"
+            initialValue="mineru"
+            rules={[{ required: true, message: '请选择解析方法' }]}
+          >
+            <Select>
+              <Option value="mineru">MinerU</Option>
+              <Option value="dots">DOTS</Option>
             </Select>
           </Form.Item>
         </Form>

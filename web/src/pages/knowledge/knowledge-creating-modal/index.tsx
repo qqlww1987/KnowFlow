@@ -1,14 +1,17 @@
 import { IModalManagerChildrenProps } from '@/components/modal-manager';
-import { Form, Input, Modal } from 'antd';
+import { Form, Input, Modal, Select } from 'antd';
 import { useTranslation } from 'react-i18next';
+
+const { Option } = Select;
 
 type FieldType = {
   name?: string;
+  parser_method?: string;
 };
 
 interface IProps extends Omit<IModalManagerChildrenProps, 'showModal'> {
   loading: boolean;
-  onOk: (name: string) => void;
+  onOk: (name: string, parserMethod?: string) => void;
 }
 
 const KnowledgeCreatingModal = ({
@@ -24,7 +27,7 @@ const KnowledgeCreatingModal = ({
   const handleOk = async () => {
     const ret = await form.validateFields();
 
-    onOk(ret.name);
+    onOk(ret.name, ret.parser_method);
   };
 
   return (
@@ -49,6 +52,17 @@ const KnowledgeCreatingModal = ({
           rules={[{ required: true, message: t('namePlaceholder') }]}
         >
           <Input placeholder={t('namePlaceholder')} />
+        </Form.Item>
+        <Form.Item<FieldType>
+          label="解析方法"
+          name="parser_method"
+          initialValue="mineru"
+          rules={[{ required: true, message: '请选择解析方法' }]}
+        >
+          <Select placeholder="请选择解析方法">
+            <Option value="mineru">MinerU</Option>
+            <Option value="dots">DOTS</Option>
+          </Select>
         </Form.Item>
       </Form>
     </Modal>

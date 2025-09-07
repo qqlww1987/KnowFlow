@@ -46,7 +46,8 @@ class KnowledgebaseService:
                 k.update_date,
                 k.doc_num,
                 k.language,
-                k.permission
+                k.permission,
+                k.parser_id
             FROM knowledgebase k
         """
         params = []
@@ -650,7 +651,7 @@ class KnowledgebaseService:
                 current_date = current_datetime.strftime("%Y-%m-%d %H:%M:%S")  # 格式化日期字符串
 
                 # 获取知识库的parser_id和parser_config，如果没有则使用默认值
-                kb_parser_id = kb.get("parser_id", "naive")
+                kb_parser_id = kb.get("parser_id", "mineru")
                 kb_parser_config = kb.get("parser_config")
                 if isinstance(kb_parser_config, str):
                     try:
@@ -864,10 +865,13 @@ class KnowledgebaseService:
             conn = cls._get_db_connection()
             cursor = conn.cursor(dictionary=True)
 
-            # 查询文档信息
+            # 查询文档信息和知识库的解析方法
             doc_query = """
-                SELECT d.id, d.name, d.location, d.type, d.kb_id, d.parser_id, d.parser_config, d.created_by
+                SELECT d.id, d.name, d.location, d.type, d.kb_id, 
+                       COALESCE(k.parser_id, d.parser_id, 'mineru') as parser_id, 
+                       d.parser_config, d.created_by
                 FROM document d
+                JOIN knowledgebase k ON d.kb_id = k.id
                 WHERE d.id = %s
             """
             cursor.execute(doc_query, (doc_id,))

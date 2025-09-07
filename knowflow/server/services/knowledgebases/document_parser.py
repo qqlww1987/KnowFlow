@@ -9,23 +9,31 @@ from database import DB_CONFIG, get_minio_client
 from ..config.config_loader import CONFIG
 
 
-def _get_parser_engine(parser_config: dict) -> str:
-    """根据配置选择解析引擎
+def _get_parser_engine(parser_id: str, parser_config: dict) -> str:
+    """根据知识库的parser_id和配置选择解析引擎
     
     Args:
+        parser_id: 知识库的解析方法ID
         parser_config: 解析器配置字典
         
     Returns:
         str: 解析引擎名称 ('mineru' 或 'dots')
     """
-    # 1. 检查解析配置中是否指定了引擎
+    # 1. 优先使用知识库设置的解析方法
+    if parser_id:
+        engine = parser_id.lower()
+        if engine in ['mineru', 'dots']:
+            print(f"[Parser-INFO] 使用知识库指定的解析引擎: {engine}")
+            return engine
+    
+    # 2. 检查解析配置中是否指定了引擎
     if 'parser_engine' in parser_config:
         engine = parser_config['parser_engine'].lower()
         if engine in ['mineru', 'dots']:
             print(f"[Parser-INFO] 使用配置指定的解析引擎: {engine}")
             return engine
     
-    # 2. 使用全局默认配置
+    # 3. 使用全局默认配置
     default_engine = getattr(CONFIG, 'default_parser', 'mineru').lower()
     print(f"[Parser-INFO] 使用默认解析引擎: {default_engine}")
     
@@ -195,7 +203,8 @@ def perform_parse(doc_id, doc_info, file_info, embedding_config):
             update_progress(0.2, "OCR开始")
 
             # === 选择解析引擎 ===
-            selected_engine = _get_parser_engine(parser_config)
+            parser_id = doc_info.get('parser_id', 'mineru')
+            selected_engine = _get_parser_engine(parser_id, parser_config)
             print(f"[Parser-INFO] 选择的解析引擎: {selected_engine}")
 
             if selected_engine == 'dots':
