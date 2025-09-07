@@ -91,9 +91,9 @@ def _log_performance_stats(operation_name, start_time, end_time, item_count, add
     if duration > 60:  # 超过1分钟
         print(f"[性能警告] {operation_name} 处理时间过长: {duration:.2f}s")
 
-def add_chunks_with_enhanced_batch_api(doc, chunks, md_file_path, chunk_content_to_index, update_progress, parent_child_data=None):
+def add_chunks_with_enhanced_batch_api(doc, chunks, md_file_path, chunk_content_to_index, update_progress, parent_child_data=None, chunks_with_coordinates=None):
     """
-    使用增强的batch接口处理分块（支持父子分块）
+    使用增强的batch接口处理分块（支持父子分块和坐标传递）
     
     Args:
         doc: RAGFlow文档对象
@@ -102,6 +102,7 @@ def add_chunks_with_enhanced_batch_api(doc, chunks, md_file_path, chunk_content_
         chunk_content_to_index: 分块内容到索引的映射
         update_progress: 进度更新回调
         parent_child_data: 父子分块数据（可选）
+        chunks_with_coordinates: 包含坐标信息的分块数据（可选，用于DOTS等没有md文件的情况）
     
     Returns:
         int: 成功添加的分块数量
@@ -134,19 +135,38 @@ def add_chunks_with_enhanced_batch_api(doc, chunks, md_file_path, chunk_content_
                 chunk_data["top_int"] = original_index  # 使用原始索引保证顺序
                 
                 # 尝试获取精确位置信息（作为额外的位置数据，不影响排序）
-                if md_file_path is not None:
+                position_found = False
+                
+                # 优先从chunks_with_coordinates获取坐标（DOTS等情况）
+                if chunks_with_coordinates and i < len(chunks_with_coordinates):
+                    chunk_with_coord = chunks_with_coordinates[i]
+                    if chunk_with_coord and chunk_with_coord.get('positions'):
+                        chunk_data["positions"] = chunk_with_coord['positions']
+                        print(f"📍 chunk {original_index}: DOTS坐标 ({len(chunk_with_coord['positions'])} 个位置) + 索引排序 (page=1, top={original_index})")
+                        position_found = True
+                
+                # 如果没有直接坐标，尝试从md文件获取（MinerU情况）
+                if not position_found and md_file_path is not None:
                     try:
                         position_int_temp = get_bbox_for_chunk(md_file_path, chunk.strip())
                         if position_int_temp is not None:
                             # 有完整位置信息时，仅添加positions，不覆盖排序字段
                             chunk_data["positions"] = position_int_temp
                             print(f"📍 chunk {original_index}: 找到精确坐标 ({len(position_int_temp)} 个位置) + 索引排序 (page=1, top={original_index})")
+                            position_found = True
                         else:
                             print(f"📍 chunk {original_index}: 使用索引排序 (page=1, top={original_index})")
                     except Exception as pos_e:
                         print(f"📍 chunk {original_index}: 坐标获取异常，使用索引排序 (page=1, top={original_index})")
-                else:
-                    print(f"📍 chunk {original_index}: 无MD文件，使用索引排序 (page=1, top={original_index})")
+                
+                # 如果都没有找到坐标
+                if not position_found:
+                    if md_file_path is None and chunks_with_coordinates is None:
+                        print(f"📍 chunk {original_index}: 无MD文件和坐标数据，使用索引排序 (page=1, top={original_index})")
+                    elif chunks_with_coordinates is None:
+                        print(f"📍 chunk {original_index}: 无坐标数据，使用索引排序 (page=1, top={original_index})")
+                    else:
+                        print(f"📍 chunk {original_index}: 坐标数据为空，使用索引排序 (page=1, top={original_index})")
                 
                 batch_chunks.append(chunk_data)
         

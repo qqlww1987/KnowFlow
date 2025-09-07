@@ -212,14 +212,24 @@ def process_document_with_dots(doc_id: str, file_path: str, kb_id: str,
                 chunking_strategy=chunking_strategy,
                 kb_id=kb_id,  # 传递知识库ID用于图片上传
                 temp_dir=temp_dir,  # 传递临时目录用于图片处理
-                chunking_config=chunking_config  # 传递完整分块配置
+                chunking_config=chunking_config,  # 传递完整分块配置
+                doc_id=doc_id  # 传递文档ID（父子分块需要）
             )
         
         if not processor_result['success']:
             raise Exception("DOTS结果处理失败")
         
+        # 检查是否为父子分块并更新进度信息
+        chunk_count = processor_result.get('total_chunks', len(processor_result.get('chunks', [])))
+        is_parent_child = processor_result.get('is_parent_child', False)
+        
         if update_progress:
-            update_progress(0.6, f"生成了 {processor_result['chunks'].__len__()} 个文档块")
+            progress_msg = f"生成了 {chunk_count} 个文档块"
+            if is_parent_child:
+                total_parents = processor_result.get('total_parents', 0)
+                total_children = processor_result.get('total_children', 0)
+                progress_msg += f" (父块:{total_parents}, 子块:{total_children})"
+            update_progress(0.6, progress_msg)
         
         # 5. 创建RAGFlow资源
         chunk_count = create_ragflow_resources(
@@ -230,16 +240,24 @@ def process_document_with_dots(doc_id: str, file_path: str, kb_id: str,
             embedding_config=embedding_config
         )
         
+        # 最终进度更新
         if update_progress:
-            update_progress(1.0, f"DOTS OCR解析完成，生成 {chunk_count} 个文档块")
+            final_msg = f"DOTS OCR解析完成，生成 {chunk_count} 个文档块"
+            if is_parent_child:
+                final_msg += f" (父子分块模式)"
+            update_progress(1.0, final_msg)
         
-        logger.info(f"DOTS文档处理完成: doc_id={doc_id}, chunks={chunk_count}")
+        logger.info(f"DOTS文档统一处理完成: doc_id={doc_id}, chunks={chunk_count}, "
+                   f"strategy={processor_result.get('chunking_strategy', 'unknown')}, "
+                   f"parent_child={is_parent_child}")
         return chunk_count
         
     except Exception as e:
-        logger.error(f"DOTS文档处理失败: doc_id={doc_id}, error={e}")
+        logger.error(f"DOTS文档统一处理失败: doc_id={doc_id}, error={e}")
+        import traceback
+        traceback.print_exc()
         if update_progress:
-            update_progress(None, f"DOTS解析失败: {str(e)}")
+            update_progress(None, f"DOTS统一解析失败: {str(e)}")
         raise
 
 def is_dots_supported_file(file_path: str) -> bool:
