@@ -274,7 +274,8 @@ def perform_parse(doc_id, doc_info, file_info, embedding_config):
             final_message = "表格解析完成"
         else:
             # 根据使用的解析引擎生成相应的完成消息
-            engine_name = _get_parser_engine(parser_config).upper()
+            parser_id = doc_info.get('parser_id', 'mineru')
+            engine_name = _get_parser_engine(parser_id, parser_config).upper()
             final_message = f"{engine_name} 文档解析完成"
 
         _update_document_progress(doc_id,  progress=1.0, run='3', chunk_count=chunk_count, process_duration=process_duration, message=final_message)
