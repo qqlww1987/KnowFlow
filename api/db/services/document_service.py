@@ -463,36 +463,138 @@ class DocumentService(CommonService):
     @classmethod
     @DB.connection_context()
     def accessible(cls, doc_id, user_id):
-        docs = cls.model.select(
-            cls.model.id).join(
-            Knowledgebase, on=(
-                    Knowledgebase.id == cls.model.kb_id)
-        ).join(UserTenant, on=(UserTenant.tenant_id == Knowledgebase.tenant_id)
-               ).where(cls.model.id == doc_id, UserTenant.user_id == user_id).paginate(0, 1)
-        docs = docs.dicts()
-        if not docs:
-            return False
-        return True
+        """
+        检查用户是否有文档访问权限
+        文档权限继承知识库的读取权限
+        """        
+        # 🎯 通过文档获取知识库ID
+        try:
+            doc = cls.model.select(cls.model.kb_id).where(cls.model.id == doc_id).first()
+            if not doc:
+                return False
+                
+            kb_id = doc.kb_id
+            
+            # 🎯 使用RBAC检查知识库读取权限
+            from api.utils.rbac_utils import check_rbac_permission, RBACPermissionType, RBACResourceType
+            from api.db.services.user_service import UserTenantService
+            
+            # 获取用户的tenant_id
+            tenant_id = None
+            try:
+                user_tenants = UserTenantService.query(user_id=user_id)
+                if user_tenants:
+                    tenant_id = user_tenants[0].tenant_id
+            except Exception:
+                pass
+            
+            has_permission = check_rbac_permission(
+                user_id=user_id,
+                resource_type=RBACResourceType.KNOWLEDGEBASE,
+                resource_id=kb_id,
+                permission_type=RBACPermissionType.KB_READ,
+                tenant_id=tenant_id
+            )
+            
+            if has_permission:
+                return True
+                
+            # 🎯 回退到原始权限检查逻辑
+            docs = cls.model.select(
+                cls.model.id).join(
+                Knowledgebase, on=(
+                        Knowledgebase.id == cls.model.kb_id)
+            ).join(UserTenant, on=(UserTenant.tenant_id == Knowledgebase.tenant_id)
+                   ).where(cls.model.id == doc_id, UserTenant.user_id == user_id).paginate(0, 1)
+            docs = docs.dicts()
+            return len(docs) > 0
+            
+        except Exception as e:
+            import logging
+            logging.warning(f"Error in document accessible check: {e}")
+            # 发生异常时回退到原始检查
+            docs = cls.model.select(
+                cls.model.id).join(
+                Knowledgebase, on=(
+                        Knowledgebase.id == cls.model.kb_id)
+            ).join(UserTenant, on=(UserTenant.tenant_id == Knowledgebase.tenant_id)
+                   ).where(cls.model.id == doc_id, UserTenant.user_id == user_id).paginate(0, 1)
+            docs = docs.dicts()
+            return len(docs) > 0
 
     @classmethod
     @DB.connection_context()
     def accessible4deletion(cls, doc_id, user_id):
-        docs = cls.model.select(cls.model.id
-                                ).join(
-            Knowledgebase, on=(
-                    Knowledgebase.id == cls.model.kb_id)
-        ).join(
-            UserTenant, on=(
-                    (UserTenant.tenant_id == Knowledgebase.created_by) & (UserTenant.user_id == user_id))
-        ).where(
-            cls.model.id == doc_id,
-            UserTenant.status == StatusEnum.VALID.value,
-            ((UserTenant.role == UserTenantRole.NORMAL) | (UserTenant.role == UserTenantRole.OWNER))
-        ).paginate(0, 1)
-        docs = docs.dicts()
-        if not docs:
-            return False
-        return True
+        """
+        检查用户是否有文档删除权限
+        文档删除权限继承知识库的管理权限
+        """
+        # 🎯 通过文档获取知识库ID
+        try:
+            doc = cls.model.select(cls.model.kb_id).where(cls.model.id == doc_id).first()
+            if not doc:
+                return False
+                
+            kb_id = doc.kb_id
+            
+            # 🎯 使用RBAC检查知识库管理权限
+            from api.utils.rbac_utils import check_rbac_permission, RBACPermissionType, RBACResourceType
+            from api.db.services.user_service import UserTenantService
+            
+            # 获取用户的tenant_id
+            tenant_id = None
+            try:
+                user_tenants = UserTenantService.query(user_id=user_id)
+                if user_tenants:
+                    tenant_id = user_tenants[0].tenant_id
+            except Exception:
+                pass
+            
+            has_permission = check_rbac_permission(
+                user_id=user_id,
+                resource_type=RBACResourceType.KNOWLEDGEBASE,
+                resource_id=kb_id,
+                permission_type=RBACPermissionType.KB_WRITE,
+                tenant_id=tenant_id
+            )
+            
+            if has_permission:
+                return True
+                
+            # 🎯 回退到原始权限检查逻辑（知识库创建者权限）
+            docs = cls.model.select(cls.model.id
+                                    ).join(
+                Knowledgebase, on=(
+                        Knowledgebase.id == cls.model.kb_id)
+            ).join(
+                UserTenant, on=(
+                        (UserTenant.tenant_id == Knowledgebase.created_by) & (UserTenant.user_id == user_id))
+            ).where(
+                cls.model.id == doc_id,
+                UserTenant.status == StatusEnum.VALID.value,
+                ((UserTenant.role == UserTenantRole.NORMAL) | (UserTenant.role == UserTenantRole.OWNER))
+            ).paginate(0, 1)
+            docs = docs.dicts()
+            return len(docs) > 0
+            
+        except Exception as e:
+            import logging
+            logging.warning(f"Error in document accessible4deletion check: {e}")
+            # 发生异常时回退到原始检查
+            docs = cls.model.select(cls.model.id
+                                    ).join(
+                Knowledgebase, on=(
+                        Knowledgebase.id == cls.model.kb_id)
+            ).join(
+                UserTenant, on=(
+                        (UserTenant.tenant_id == Knowledgebase.created_by) & (UserTenant.user_id == user_id))
+            ).where(
+                cls.model.id == doc_id,
+                UserTenant.status == StatusEnum.VALID.value,
+                ((UserTenant.role == UserTenantRole.NORMAL) | (UserTenant.role == UserTenantRole.OWNER))
+            ).paginate(0, 1)
+            docs = docs.dicts()
+            return len(docs) > 0
 
     @classmethod
     @DB.connection_context()
