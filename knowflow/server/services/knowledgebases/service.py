@@ -868,7 +868,7 @@ class KnowledgebaseService:
             # 查询文档信息和知识库的解析方法
             doc_query = """
                 SELECT d.id, d.name, d.location, d.type, d.kb_id, 
-                       COALESCE(k.parser_id, d.parser_id, 'mineru') as parser_id, 
+                       COALESCE(d.parser_id, k.parser_id, 'mineru') as parser_id, 
                        d.parser_config, d.created_by
                 FROM document d
                 JOIN knowledgebase k ON d.kb_id = k.id
