@@ -29,7 +29,7 @@ from peewee import fn
 from api import settings
 from api.constants import IMG_BASE64_PREFIX, FILE_NAME_LEN_LIMIT
 from api.db import FileType, LLMType, ParserType, StatusEnum, TaskStatus, UserTenantRole
-from api.db.db_models import DB, Document, Knowledgebase, Task, Tenant, UserTenant, File2Document, File
+from api.db.db_models import DB, Document, Knowledgebase, Task, Tenant, UserTenant, File2Document, File, ParentChildMapping
 from api.db.db_utils import bulk_insert_into_db
 from api.db.services.common_service import CommonService
 from api.db.services.knowledgebase_service import KnowledgebaseService
@@ -242,8 +242,19 @@ class DocumentService(CommonService):
     def remove_document(cls, doc, tenant_id):
         from api.db.services.task_service import TaskService
         cls.clear_chunk_num(doc.id)
+        
         try:
-            TaskService.filter_delete(Task.doc_id == doc.id)
+            # 1. 清理任务
+            TaskService.filter_delete([Task.doc_id == doc.id])
+            logging.info(f"Cleaned tasks for document {doc.id}")
+            
+            # 2. 清理父子映射表
+            deleted_mappings = ParentChildMapping.delete().where(
+                ParentChildMapping.doc_id == doc.id
+            ).execute()
+            logging.info(f"Cleaned {deleted_mappings} parent-child mappings for document {doc.id}")
+            
+            # 3. 获取所有子分块ID用于清理存储
             page = 0
             page_size = 1000
             all_chunk_ids = []
@@ -256,14 +267,30 @@ class DocumentService(CommonService):
                     break
                 all_chunk_ids.extend(chunk_ids)
                 page += 1
+            
+            # 4. 清理存储中的分块文件
             for cid in all_chunk_ids:
                 if STORAGE_IMPL.obj_exist(doc.kb_id, cid):
                     STORAGE_IMPL.rm(doc.kb_id, cid)
+            
+            # 5. 清理缩略图
             if doc.thumbnail and not doc.thumbnail.startswith(IMG_BASE64_PREFIX):
                 if STORAGE_IMPL.obj_exist(doc.kb_id, doc.thumbnail):
                     STORAGE_IMPL.rm(doc.kb_id, doc.thumbnail)
+            
+            # 6. 清理ES子分块索引
             settings.docStoreConn.delete({"doc_id": doc.id}, search.index_name(tenant_id), doc.kb_id)
+            logging.info(f"Cleaned child chunks from ES index for document {doc.id}")
+            
+            # 7. 清理ES父分块索引
+            parent_index = f"{search.index_name(tenant_id)}_parent"
+            try:
+                settings.docStoreConn.delete({"doc_id": doc.id}, parent_index, doc.kb_id)
+                logging.info(f"Cleaned parent chunks from ES index {parent_index} for document {doc.id}")
+            except Exception as e:
+                logging.warning(f"Failed to clean parent chunks for document {doc.id}: {e}")
 
+            # 8. 清理图相关数据
             graph_source = settings.docStoreConn.getFields(
                 settings.docStoreConn.search(["source_id"], [], {"kb_id": doc.kb_id, "knowledge_graph_kwd": ["graph"]}, [], OrderByExpr(), 0, 1, search.index_name(tenant_id), [doc.kb_id]), ["source_id"]
             )
@@ -276,8 +303,13 @@ class DocumentService(CommonService):
                                              search.index_name(tenant_id), doc.kb_id)
                 settings.docStoreConn.delete({"kb_id": doc.kb_id, "knowledge_graph_kwd": ["entity", "relation", "graph", "subgraph", "community_report"], "must_not": {"exists": "source_id"}},
                                              search.index_name(tenant_id), doc.kb_id)
-        except Exception:
-            pass
+                logging.info(f"Cleaned graph data for document {doc.id}")
+            
+        except Exception as e:
+            logging.error(f"Failed to remove document {doc.id}: {str(e)}")
+            raise e  # 不再忽略错误，让调用者知道删除失败
+        
+        # 9. 删除数据库记录
         return cls.delete_by_id(doc.id)
 
     @classmethod

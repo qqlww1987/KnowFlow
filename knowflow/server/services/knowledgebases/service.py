@@ -774,83 +774,120 @@ class KnowledgebaseService:
     def delete_document(cls, doc_id):
         """删除文档"""
         try:
-            conn = cls._get_db_connection()
-            cursor = conn.cursor(dictionary=True)
+          conn = cls._get_db_connection()
+          cursor = conn.cursor(dictionary=True)
 
-            # 先检查文档是否存在
-            # check_query = """
-            #     SELECT 
-            #         d.kb_id, 
-            #         kb.created_by AS tenant_id  -- 获取 tenant_id (knowledgebase的创建者)
-            #     FROM document d
-            #     JOIN knowledgebase kb ON d.kb_id = kb.id -- JOIN knowledgebase 表
-            #     WHERE d.id = %s
-            # """
-            check_query = """
-                SELECT 
-                    d.kb_id, 
-                    d.created_by AS tenant_id
-                FROM document d
-                WHERE d.id = %s
-            """
-            cursor.execute(check_query, (doc_id,))
-            doc_data = cursor.fetchone()
+          # 先检查文档是否存在
+          check_query = """
+              SELECT
+                  d.kb_id,
+                  d.created_by AS tenant_id
+              FROM document d
+              WHERE d.id = %s
+          """
+          cursor.execute(check_query, (doc_id,))
+          doc_data = cursor.fetchone()
 
-            if not doc_data:
-                print(f"[INFO] 文档 {doc_id} 在数据库中未找到。")
-                return False
+          if not doc_data:
+              print(f"[INFO] 文档 {doc_id} 在数据库中未找到。")
+              return False
 
-            kb_id = doc_data["kb_id"]
+          kb_id = doc_data["kb_id"]
+          tenant_id_for_cleanup = doc_data["tenant_id"]
 
-            # 删除文件到文档的映射
-            f2d_query = "DELETE FROM file2document WHERE document_id = %s"
-            cursor.execute(f2d_query, (doc_id,))
+          # 1. 删除任务表记录
+          task_query = "DELETE FROM task WHERE doc_id = %s"
+          cursor.execute(task_query, (doc_id,))
+          task_deleted = cursor.rowcount
+          print(f"[DB-SUCCESS] 删除了 {task_deleted} 个任务记录")
 
-            # 删除文档
-            doc_query = "DELETE FROM document WHERE id = %s"
-            cursor.execute(doc_query, (doc_id,))
+          # 2. 删除父子映射表记录
+          parent_child_query = "DELETE FROM parent_child_mapping WHERE doc_id = %s"
+          cursor.execute(parent_child_query, (doc_id,))
+          mapping_deleted = cursor.rowcount
+          print(f"[DB-SUCCESS] 删除了 {mapping_deleted} 个父子映射记录")
 
-            # 更新知识库文档数量
-            update_query = """
-                UPDATE knowledgebase 
-                SET doc_num = doc_num - 1,
-                    update_date = %s
-                WHERE id = %s
-            """
-            current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            cursor.execute(update_query, (current_date, kb_id))
+          # 3. 删除文件到文档的映射
+          f2d_query = "DELETE FROM file2document WHERE document_id = %s"
+          cursor.execute(f2d_query, (doc_id,))
+          f2d_deleted = cursor.rowcount
+          print(f"[DB-SUCCESS] 删除了 {f2d_deleted} 个文件映射记录")
 
-            conn.commit()
-            cursor.close()
-            conn.close()
+          # 4. 删除文档记录
+          doc_query = "DELETE FROM document WHERE id = %s"
+          cursor.execute(doc_query, (doc_id,))
+          print(f"[DB-SUCCESS] 删除了文档记录 {doc_id}")
 
-            es_client = get_es_client()
-            tenant_id_for_cleanup = doc_data["tenant_id"]
+          # 5. 更新知识库文档数量
+          update_query = """
+              UPDATE knowledgebase
+              SET doc_num = doc_num - 1,
+                  update_date = %s
+              WHERE id = %s
+          """
+          current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+          cursor.execute(update_query, (current_date, kb_id))
+          print(f"[DB-SUCCESS] 更新了知识库 {kb_id} 的文档计数")
 
-            # 删除 Elasticsearch 中的相关文档块
-            if es_client and tenant_id_for_cleanup:
-                es_index_name = f"ragflow_{tenant_id_for_cleanup}"
-                try:
-                    if es_client.indices.exists(index=es_index_name):
-                        query_body = {"query": {"term": {"doc_id": doc_id}}}
-                        resp = es_client.delete_by_query(
-                            index=es_index_name,
-                            body=query_body,
-                            refresh=True,  # 确保立即生效
-                            ignore_unavailable=True,  # 如果索引在此期间被删除
-                        )
-                        deleted_count = resp.get("deleted", 0)
-                        print(f"[ES-SUCCESS] 从索引 {es_index_name} 中删除 {deleted_count} 个与 doc_id {doc_id} 相关的块。")
-                    else:
-                        print(f"[ES-INFO] 索引 {es_index_name} 不存在，跳过 ES 清理 for doc_id {doc_id}。")
-                except Exception as es_err:
-                    print(f"[ES-ERROR] 清理 ES 块 for doc_id {doc_id} (index {es_index_name}) 失败: {str(es_err)}")
+          # 提交数据库事务
+          conn.commit()
+          cursor.close()
+          conn.close()
 
-            return True
+          # 6. 清理Elasticsearch中的数据
+          es_client = get_es_client()
+          if es_client and tenant_id_for_cleanup:
 
+              # 6.1 清理子分块索引
+              es_index_name = f"ragflow_{tenant_id_for_cleanup}"
+              try:
+                  if es_client.indices.exists(index=es_index_name):
+                      query_body = {"query": {"term": {"doc_id": doc_id}}}
+                      resp = es_client.delete_by_query(
+                          index=es_index_name,
+                          body=query_body,
+                          refresh=True,
+                          ignore_unavailable=True,
+                      )
+                      deleted_count = resp.get("deleted", 0)
+                      print(f"[ES-SUCCESS] 从子分块索引 {es_index_name} 中删除 {deleted_count} 个分块")
+                  else:
+                      print(f"[ES-INFO] 子分块索引 {es_index_name} 不存在，跳过清理")
+              except Exception as es_err:
+                  print(f"[ES-ERROR] 清理子分块索引失败: {str(es_err)}")
+
+              # 6.2 清理父分块索引
+              parent_index_name = f"ragflow_{tenant_id_for_cleanup}_parent"
+              try:
+                  if es_client.indices.exists(index=parent_index_name):
+                      query_body = {"query": {"term": {"doc_id": doc_id}}}
+                      resp = es_client.delete_by_query(
+                          index=parent_index_name,
+                          body=query_body,
+                          refresh=True,
+                          ignore_unavailable=True,
+                      )
+                      deleted_parent_count = resp.get("deleted", 0)
+                      print(f"[ES-SUCCESS] 从父分块索引 {parent_index_name} 中删除 {deleted_parent_count} 个父分块")
+                  else:
+                      print(f"[ES-INFO] 父分块索引 {parent_index_name} 不存在，跳过清理")
+              except Exception as es_err:
+                  print(f"[ES-ERROR] 清理父分块索引失败: {str(es_err)}")
+
+          print(f"[SUCCESS] 文档 {doc_id} 删除完成，所有相关数据已清理")
+          return True
+          
         except Exception as e:
-            print(f"[ERROR] 删除文档失败: {str(e)}")
-            raise Exception(f"删除文档失败: {str(e)}")
+          print(f"[ERROR] 删除文档失败: {str(e)}")
+          # 如果数据库操作已开始，尝试回滚
+          try:
+              if 'conn' in locals():
+                  conn.rollback()
+                  cursor.close()
+                  conn.close()
+          except:
+              pass
+          raise Exception(f"删除文档失败: {str(e)}")
 
     @classmethod
     def parse_document(cls, doc_id):
