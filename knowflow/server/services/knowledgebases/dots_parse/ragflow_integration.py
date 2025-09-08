@@ -133,8 +133,6 @@ class RAGFlowIntegration:
         logger.info(f"DOTS父子分块处理: {len(parent_child_data.get('parent_chunks', []))}父块, "
                    f"{len(child_chunks_data)}子块, {len(parent_child_data.get('relationships', []))}映射关系")
         
-        # 直接调用MinerU的增强batch API
-        from ..mineru_parse.ragflow_build import add_chunks_with_enhanced_batch_api
         
         # 传递带坐标信息的分块数据给batch API
         return self._call_enhanced_batch_api_with_coordinates(
@@ -148,8 +146,6 @@ class RAGFlowIntegration:
                                                  update_progress: Callable) -> int:
         """调用增强batch API，确保坐标信息被正确传递"""
         try:
-            # 导入MinerU的增强batch API
-            from ..mineru_parse.ragflow_build import add_chunks_with_enhanced_batch_api
             
             # 准备子分块内容和索引映射
             child_chunks_content = []
