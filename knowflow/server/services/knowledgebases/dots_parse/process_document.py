@@ -182,38 +182,32 @@ def process_document_with_dots(doc_id: str, file_path: str, kb_id: str,
         if update_progress:
             update_progress(0.4, "处理OCR解析结果")
         
-        # 4. 处理DOTS解析结果（使用前端配置的分块策略）
-        # 从parser_config中提取分块配置
-        chunking_config = {}
-        chunk_token_num = 256
-        min_chunk_tokens = 10
-        chunking_strategy = 'smart'
-        
+        # 4. 处理DOTS解析结果（使用统一分块接口）
+        # 从 parser_config 中提取分块配置
+        chunking_config = None
         if parser_config:
-            # 优先使用parser_config中的chunking_config
+            # 优先使用 parser_config 中的 chunking_config
             if 'chunking_config' in parser_config:
                 chunking_config = parser_config['chunking_config']
-                chunk_token_num = chunking_config.get('chunk_token_num', 256)
-                min_chunk_tokens = chunking_config.get('min_chunk_tokens', 10)
-                chunking_strategy = chunking_config.get('strategy', 'smart')
-                logger.info(f"DOTS分块配置: strategy={chunking_strategy}, chunk_size={chunk_token_num}, min_size={min_chunk_tokens}")
-            # 向后兼容：直接从parser_config中获取
+                logger.info(f"DOTS分块配置: {chunking_config}")
+            # 向后兼容：直接从 parser_config 中获取
             elif 'chunk_token_num' in parser_config:
-                chunk_token_num = parser_config.get('chunk_token_num', 256)
-                logger.info(f"使用parser_config中的chunk_token_num: {chunk_token_num}")
+                chunking_config = {
+                    'strategy': 'smart',
+                    'chunk_token_num': parser_config.get('chunk_token_num', 256),
+                    'min_chunk_tokens': parser_config.get('min_chunk_tokens', 10)
+                }
+                logger.info(f"使用兼容配置: {chunking_config}")
         
         # 创建临时目录用于图片处理
         import tempfile
         with tempfile.TemporaryDirectory() as temp_dir:
             processor_result = process_dots_result(
                 document_results,
-                chunk_token_num=chunk_token_num,
-                min_chunk_tokens=min_chunk_tokens,
-                chunking_strategy=chunking_strategy,
-                kb_id=kb_id,  # 传递知识库ID用于图片上传
-                temp_dir=temp_dir,  # 传递临时目录用于图片处理
-                chunking_config=chunking_config,  # 传递完整分块配置
-                doc_id=doc_id  # 传递文档ID（父子分块需要）
+                kb_id=kb_id,
+                temp_dir=temp_dir,
+                chunking_config=chunking_config,
+                doc_id=doc_id
             )
         
         if not processor_result['success']:

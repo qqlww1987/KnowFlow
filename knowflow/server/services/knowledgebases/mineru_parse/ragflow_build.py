@@ -6,10 +6,10 @@ import json
 from dotenv import load_dotenv
 from .minio_server import upload_directory_to_minio
 from .mineru_test import update_markdown_image_urls
-from .utils import split_markdown_to_chunks_configured, get_bbox_for_chunk, update_document_progress, should_cleanup_temp_files
+from .utils import split_markdown_to_chunks_configured, get_bbox_for_chunk, should_cleanup_temp_files
 from ..utils import _get_kb_tenant_id, _get_tenant_api_key, _validate_base_url
 from database import get_db_connection
-from datetime import datetime
+
 
 # 性能优化配置参数
 CHUNK_PROCESSING_CONFIG = {
@@ -69,27 +69,6 @@ def _get_document_chunking_config(doc_id):
         if conn:
             conn.close()
 
-def _log_performance_stats(operation_name, start_time, end_time, item_count, additional_info=None):
-    """记录性能统计信息"""
-    if not CHUNK_PROCESSING_CONFIG.get('enable_performance_stats', True):
-        return
-        
-    duration = end_time - start_time
-    throughput = item_count / duration if duration > 0 else 0
-    
-    stats_msg = f"[性能统计] {operation_name}: "
-    stats_msg += f"耗时 {duration:.2f}s, "
-    stats_msg += f"处理 {item_count} 项, "
-    stats_msg += f"吞吐量 {throughput:.2f} 项/秒"
-    
-    if additional_info:
-        stats_msg += f", {additional_info}"
-    
-    print(stats_msg)
-    
-    # 如果耗时过长，记录警告
-    if duration > 60:  # 超过1分钟
-        print(f"[性能警告] {operation_name} 处理时间过长: {duration:.2f}s")
 
 def add_chunks_with_enhanced_batch_api(doc, chunks, md_file_path, chunk_content_to_index, update_progress, parent_child_data=None, chunks_with_coordinates=None):
     """
@@ -107,7 +86,6 @@ def add_chunks_with_enhanced_batch_api(doc, chunks, md_file_path, chunk_content_
     Returns:
         int: 成功添加的分块数量
     """
-    start_time = time.time()
     
     if not chunks:
         update_progress(0.8, "没有chunks需要添加")

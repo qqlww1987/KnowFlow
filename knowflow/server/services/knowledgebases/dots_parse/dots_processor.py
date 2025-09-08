@@ -24,9 +24,7 @@ try:
     DOTS_FORMATTER_AVAILABLE = True
 except ImportError:
     DOTS_FORMATTER_AVAILABLE = False
-    logger.warning("DOTS format_transformer not available")
-
-# 复用 Mineru 分块算法
+    logging.getLogger(__name__).warning("DOTS format_transformer not available")
 
 logger = logging.getLogger(__name__)
 
@@ -198,50 +196,15 @@ class DOTSProcessor:
             logger.error(f"DOTS 官方 markdown 转换失败: {e}")
             return "", []
     
-    def generate_chunks(self, chunk_token_num: int = 256, min_chunk_tokens: int = 10, 
-                       chunking_strategy: str = 'smart', 
-                       enable_coordinates: bool = True, 
-                       output_dir: str = None,
-                       chunking_config: Optional[dict] = None,
-                       doc_id: str = None,
-                       kb_id: str = None) -> Dict[str, Any]:
-        """生成用于RAGFlow的文本分块（使用统一分块接口，完全复用MinerU策略）
-        
-        Args:
-            chunk_token_num: 分块大小（token数）
-            min_chunk_tokens: 最小分块大小（token数）
-            chunking_strategy: 分块策略 ('smart', 'advanced', 'basic', 'parent_child')
-            enable_coordinates: 是否启用坐标映射
-            output_dir: 图片输出目录（可选）
-            chunking_config: 完整分块配置（用于复杂分块策略）
-            doc_id: 文档ID（父子分块需要）
-            kb_id: 知识库ID（父子分块需要）
-            
-        Returns:
-            dict: 包含分块数据和提取图片的字典
-        """
-        logger.warning("[DEPRECATED] generate_chunks 方法已废弃，请使用 generate_chunks_unified")
-        return self.generate_chunks_unified(
-            chunk_token_num=chunk_token_num,
-            min_chunk_tokens=min_chunk_tokens,
-            chunking_config=chunking_config,
-            doc_id=doc_id,
-            kb_id=kb_id,
-            output_dir=output_dir
-        )
     
-    def generate_chunks_unified(self, chunk_token_num: int = 256, 
-                               min_chunk_tokens: int = 10, 
-                               chunking_config: Optional[dict] = None,
+    def generate_chunks_unified(self, chunking_config: Optional[dict] = None,
                                doc_id: str = None,
                                kb_id: str = None,
                                output_dir: str = None) -> Dict[str, Any]:
         """统一的分块生成方法 - 完全复用MinerU分块策略
         
         Args:
-            chunk_token_num: 分块大小（token数）
-            min_chunk_tokens: 最小分块大小（token数）
-            chunking_config: 完整分块配置（包含strategy等）
+            chunking_config: 完整分块配置（包含strategy、chunk_token_num等）
             doc_id: 文档ID（父子分块需要）
             kb_id: 知识库ID（父子分块需要）
             output_dir: 图片输出目录（可选）
@@ -267,12 +230,12 @@ class DOTSProcessor:
             # 3. 调用统一分块接口（完全复用MinerU逻辑）
             from ..common.chunking_interface import UnifiedChunkingInterface
             
-            # 准备分块配置
+            # 使用默认配置如果没有提供
             if not chunking_config:
                 chunking_config = {
                     'strategy': 'smart',
-                    'chunk_token_num': chunk_token_num,
-                    'min_chunk_tokens': min_chunk_tokens
+                    'chunk_token_num': 256,
+                    'min_chunk_tokens': 10
                 }
             
             logger.info(f"DOTS调用统一分块接口: strategy={chunking_config.get('strategy')}")
@@ -281,7 +244,7 @@ class DOTSProcessor:
                 markdown_content=markdown_content,
                 elements_data=dots_elements,
                 chunking_config=chunking_config,
-                coordinate_source='dots',  # 指定使用DOTS坐标处理
+                coordinate_source='dots',
                 doc_id=doc_id,
                 kb_id=kb_id
             )
@@ -340,109 +303,20 @@ class DOTSProcessor:
         logger.info(f"准备了 {len(elements_data)} 个有效DOTS元素用于统一坐标映射")
         return elements_data
     
-    # 保留原有方法用于向后兼容
-    def _original_generate_chunks_method(self, chunk_token_num: int = 256, min_chunk_tokens: int = 10, 
-                       chunking_strategy: str = 'smart', 
-                       enable_coordinates: bool = True, 
-                       output_dir: str = None,
-                       chunking_config: Optional[dict] = None) -> Dict[str, Any]:
-        """原有的分块方法（保留用于向后兼容）"""
-        if not self.elements:
-            return {'chunks': [], 'extracted_images': []}
-        
-        # 1. 生成完整的Markdown文档
-        complete_markdown, extracted_images = self.to_markdown(output_dir=output_dir)
-        if not complete_markdown.strip():
-            logger.warning("完整Markdown内容为空")
-            return {'chunks': [], 'extracted_images': []}
-        
-        logger.info(f"基于完整Markdown进行分块，文档长度: {len(complete_markdown)} 字符")
-        
-        # 2. 使用类似Mineru的智能分块方法
-        try:
-            # 调用智能分块函数（类似Mineru的实现）
-            chunk_contents = self._split_markdown_smart(
-                complete_markdown, 
-                chunk_token_num=chunk_token_num,
-                min_chunk_tokens=min_chunk_tokens,
-                strategy=chunking_strategy,
-                chunking_config=chunking_config
-            )
-            
-            # 3. 准备DOTS元素列表用于坐标映射
-            dots_elements_list = None
-            if enable_coordinates:
-                dots_elements_list = self._prepare_dots_elements_for_coordinate_mapping()
-            
-            # 4. 转换为RAGFlow格式的分块
-            chunks = []
-            matched_global_indices = set()  # 跟踪已匹配的元素索引
-            
-            for i, content in enumerate(chunk_contents):
-                if content.strip():
-                    # 基本信息
-                    page_number = self._extract_page_number(content)
-                    chunk_data = {
-                        'id': i,
-                        'content': content.strip(),
-                        'page_number': page_number,
-                        'start_pos': 0,  # 基于完整markdown的分块，位置信息简化
-                        'end_pos': len(content),
-                        'element_count': self._count_elements_in_chunk(content),
-                        'chunking_strategy': chunking_strategy
-                    }
-                    
-                    # 5. 获取坐标信息（使用DOTS数据+Mineru算法）
-                    if enable_coordinates and dots_elements_list:
-                        try:
-                            positions = self._get_chunk_coordinates_from_dots(
-                                content.strip(), 
-                                dots_elements_list,
-                                matched_global_indices
-                            )
-                            if positions:
-                                chunk_data['positions'] = positions
-                                chunk_data['has_coordinates'] = True
-                                logger.debug(f"分块 {i} 获取到 {len(positions)} 个DOTS坐标")
-                            else:
-                                chunk_data['has_coordinates'] = False
-                        except Exception as coord_e:
-                            logger.warning(f"分块 {i} 坐标获取失败: {coord_e}")
-                            chunk_data['has_coordinates'] = False
-                    else:
-                        chunk_data['has_coordinates'] = False
-                    
-                    chunks.append(chunk_data)
-            
-            logger.info(f"使用{chunking_strategy}策略生成 {len(chunks)} 个文本分块")
-            if enable_coordinates:
-                coords_count = sum(1 for c in chunks if c.get('has_coordinates', False))
-                logger.info(f"成功为 {coords_count}/{len(chunks)} 个分块获取了坐标信息")
-            
-            return {'chunks': chunks, 'extracted_images': extracted_images}
-            
-        except Exception as e:
-            logger.error(f"智能分块失败: {e}，回退到简单分块")
-            fallback_chunks = self._generate_chunks_fallback(complete_markdown, chunk_token_num)
-            return {'chunks': fallback_chunks, 'extracted_images': extracted_images}
     
-    def generate_chunks_from_markdown(self, markdown_content: str, chunk_token_num: int = 256, 
-                                     min_chunk_tokens: int = 10, chunking_strategy: str = 'smart', 
-                                     enable_coordinates: bool = True, 
+    def generate_chunks_from_markdown(self, markdown_content: str, 
                                      chunking_config: Optional[dict] = None,
                                      doc_id: str = None,
-                                     kb_id: str = None) -> Dict[str, Any]:
+                                     kb_id: str = None,
+                                     enable_coordinates: bool = True) -> Dict[str, Any]:
         """基于已处理的markdown内容生成分块（使用统一分块接口）
         
         Args:
             markdown_content: 已处理的markdown内容（图片URL已更新）
-            chunk_token_num: 分块大小（token数）
-            min_chunk_tokens: 最小分块大小（token数）
-            chunking_strategy: 分块策略 ('smart', 'advanced', 'basic', 'parent_child')
-            enable_coordinates: 是否启用坐标映射
             chunking_config: 完整分块配置
             doc_id: 文档ID（父子分块需要）
             kb_id: 知识库ID（父子分块需要）
+            enable_coordinates: 是否启用坐标映射
             
         Returns:
             dict: 包含分块数据的字典
@@ -459,12 +333,12 @@ class DOTSProcessor:
             # 调用统一分块接口
             from ..common.chunking_interface import UnifiedChunkingInterface
             
-            # 准备分块配置
+            # 使用默认配置如果没有提供
             if not chunking_config:
                 chunking_config = {
-                    'strategy': chunking_strategy,
-                    'chunk_token_num': chunk_token_num,
-                    'min_chunk_tokens': min_chunk_tokens
+                    'strategy': 'smart',
+                    'chunk_token_num': 256,
+                    'min_chunk_tokens': 10
                 }
             
             result = UnifiedChunkingInterface.chunk_with_coordinates(
@@ -494,364 +368,12 @@ class DOTSProcessor:
             }
         
     
-    def _original_generate_chunks_from_markdown(self, markdown_content: str, chunk_token_num: int = 256, 
-                                     min_chunk_tokens: int = 10, chunking_strategy: str = 'smart', 
-                                     enable_coordinates: bool = True, 
-                                     chunking_config: Optional[dict] = None) -> Dict[str, Any]:
-        """原有的markdown分块方法（保留用于向后兼容）"""
-        if not self.elements or not markdown_content.strip():
-            return {'chunks': []}
-        
-        logger.info(f"基于已处理markdown进行分块，文档长度: {len(markdown_content)} 字符")
-        
-        try:
-            # 调用智能分块函数（类似原来的实现）
-            chunk_contents = self._split_markdown_smart(
-                markdown_content, 
-                chunk_token_num=chunk_token_num,
-                min_chunk_tokens=min_chunk_tokens,
-                strategy=chunking_strategy,
-                chunking_config=chunking_config
-            )
-            
-            # 准备DOTS元素列表用于坐标映射
-            dots_elements_list = None
-            if enable_coordinates:
-                dots_elements_list = self._prepare_dots_elements_for_coordinate_mapping()
-            
-            # 转换为RAGFlow格式的分块
-            chunks = []
-            matched_global_indices = set()  # 跟踪已匹配的元素索引
-            
-            for i, content in enumerate(chunk_contents):
-                if content.strip():
-                    # 基本信息
-                    page_number = self._extract_page_number(content)
-                    chunk_data = {
-                        'id': i,
-                        'content': content.strip(),
-                        'page_number': page_number,
-                        'start_pos': 0,  # 基于完整markdown的分块，位置信息简化
-                        'end_pos': len(content),
-                        'element_count': self._count_elements_in_chunk(content),
-                        'chunking_strategy': chunking_strategy
-                    }
-                    
-                    # 获取坐标信息（使用DOTS数据+Mineru算法）
-                    if enable_coordinates and dots_elements_list:
-                        try:
-                            positions = self._get_chunk_coordinates_from_dots(
-                                content.strip(), 
-                                dots_elements_list,
-                                matched_global_indices
-                            )
-                            if positions:
-                                chunk_data['positions'] = positions
-                                chunk_data['has_coordinates'] = True
-                                logger.debug(f"分块 {i} 获取到 {len(positions)} 个DOTS坐标")
-                            else:
-                                chunk_data['has_coordinates'] = False
-                        except Exception as coord_e:
-                            logger.warning(f"分块 {i} 坐标获取失败: {coord_e}")
-                            chunk_data['has_coordinates'] = False
-                    else:
-                        chunk_data['has_coordinates'] = False
-                    
-                    chunks.append(chunk_data)
-            
-            logger.info(f"使用{chunking_strategy}策略生成 {len(chunks)} 个文本分块")
-            if enable_coordinates:
-                coords_count = sum(1 for c in chunks if c.get('has_coordinates', False))
-                logger.info(f"成功为 {coords_count}/{len(chunks)} 个分块获取了坐标信息")
-            
-            return {'chunks': chunks}
-            
-        except Exception as e:
-            logger.error(f"智能分块失败: {e}，回退到简单分块")
-            fallback_chunks = self._generate_chunks_fallback(markdown_content, chunk_token_num)
-            return {'chunks': fallback_chunks}
     
-    def _split_markdown_smart(self, markdown_text: str, chunk_token_num: int = 256, 
-                             min_chunk_tokens: int = 10, strategy: str = 'smart',
-                             chunking_config: Optional[dict] = None) -> List[str]:
-        """智能Markdown分块（复用Mineru的分块逻辑）
-        
-        Args:
-            markdown_text: 完整的Markdown文本
-            chunk_token_num: 目标分块大小
-            min_chunk_tokens: 最小分块大小
-            strategy: 分块策略
-            chunking_config: 完整分块配置（用于复杂策略）
-            
-        Returns:
-            分块内容列表
-        """
-        try:
-            # 复用mineru的统一分块接口，支持完整配置
-            from ..mineru_parse.utils import split_markdown_to_chunks_configured
-            
-            # 传递完整的分块配置给Mineru函数
-            chunks = split_markdown_to_chunks_configured(
-                markdown_text,
-                chunk_token_num=chunk_token_num,
-                min_chunk_tokens=min_chunk_tokens,
-                chunking_config=chunking_config  # 传递完整配置
-            )
-            
-            logger.info(f"使用{strategy}策略分块完成，生成 {len(chunks)} 个分块")
-            return chunks
-            
-        except ImportError as e:
-            logger.warning(f"无法导入Mineru分块函数: {e}")
-            return self._simple_markdown_chunking(markdown_text, chunk_token_num)
-        except Exception as e:
-            logger.error(f"分块处理异常: {e}")
-            logger.debug(f"chunking_config: {chunking_config}")
-            return self._simple_markdown_chunking(markdown_text, chunk_token_num)
     
-    def _simple_markdown_chunking(self, text: str, chunk_size: int) -> List[str]:
-        """简单的Markdown分块（后备方案）"""
-        if not text:
-            return []
-            
-        # 按段落分割
-        paragraphs = text.split('\n\n')
-        chunks = []
-        current_chunk = []
-        current_size = 0
-        
-        for paragraph in paragraphs:
-            paragraph = paragraph.strip()
-            if not paragraph:
-                continue
-                
-            para_size = len(paragraph)
-            
-            if current_size + para_size > chunk_size and current_chunk:
-                # 完成当前分块
-                chunks.append('\n\n'.join(current_chunk))
-                current_chunk = [paragraph]
-                current_size = para_size
-            else:
-                current_chunk.append(paragraph)
-                current_size += para_size
-        
-        # 添加最后一个分块
-        if current_chunk:
-            chunks.append('\n\n'.join(current_chunk))
-        
-        return chunks
     
-    def _extract_page_number(self, content: str) -> int:
-        """从分块内容中提取页面编号"""
-        import re
-        # 查找页面标记 <!-- Page N -->
-        page_match = re.search(r'<!-- Page (\d+) -->', content)
-        if page_match:
-            return int(page_match.group(1))
-        
-        # 如果没有找到页面标记，返回默认页面
-        return 1
     
-    def _count_elements_in_chunk(self, content: str) -> int:
-        """统计分块中的元素数量（粗略估计）"""
-        # 统计标题、列表项、表格等结构的数量
-        import re
-        
-        count = 0
-        # 标题
-        count += len(re.findall(r'^#+\s', content, re.MULTILINE))
-        # 列表项
-        count += len(re.findall(r'^[-*+]\s', content, re.MULTILINE))
-        # 表格行
-        count += len(re.findall(r'\|.*\|', content))
-        # 公式
-        count += len(re.findall(r'\$\$.*?\$\$', content, re.DOTALL))
-        
-        # 如果没有明显结构，按段落计算
-        if count == 0:
-            count = len([p for p in content.split('\n\n') if p.strip()])
-        
-        return max(1, count)
     
-    def _generate_chunks_fallback(self, markdown_text: str, chunk_size: int) -> List[Dict[str, Any]]:
-        """后备分块方案"""
-        simple_chunks = self._simple_markdown_chunking(markdown_text, chunk_size)
-        
-        chunks = []
-        for i, content in enumerate(simple_chunks):
-            if content.strip():
-                chunks.append({
-                    'id': i,
-                    'content': content.strip(),
-                    'page_number': self._extract_page_number(content),
-                    'start_pos': 0,
-                    'end_pos': len(content),
-                    'element_count': self._count_elements_in_chunk(content),
-                    'chunking_strategy': 'fallback'
-                })
-        
-        return chunks
     
-    def _prepare_dots_elements_for_coordinate_mapping(self) -> List[Dict[str, Any]]:
-        """准备DOTS元素列表用于坐标映射（保持DOTS原始格式）
-        
-        Returns:
-            元素列表，保持DOTS的原始坐标格式
-        """
-        elements_list = []
-        
-        # 按页面和位置排序元素
-        sorted_elements = sorted(self.elements, key=lambda e: (e.page_number, e.center_y, e.center_x))
-        
-        for i, element in enumerate(sorted_elements):
-            # 验证坐标数据有效性
-            if element.bbox and len(element.bbox) == 4:
-                element_data = {
-                    'bbox': element.bbox,  # DOTS格式 [x1, y1, x2, y2] 
-                    'category': element.category,
-                    'text': element.text,
-                    'page_number': element.page_number,  # 保持1开始的页面编号
-                    'index': i
-                }
-                elements_list.append(element_data)
-                logger.debug(f"DOTS元素 {i}: bbox={element.bbox}, page={element.page_number}, text='{element.text[:50]}...'")
-            else:
-                logger.warning(f"跳过无效DOTS元素 {i}: bbox={element.bbox}")
-        
-        logger.info(f"准备了 {len(elements_list)} 个有效DOTS元素用于坐标映射")
-        return elements_list
-    
-    def _get_chunk_coordinates_from_dots(self, chunk_content: str, elements_list: List[Dict[str, Any]], 
-                                        matched_indices: set) -> Optional[List[List[int]]]:
-        """从DOTS元素中获取分块对应的坐标信息（复用Mineru匹配算法+DOTS坐标格式）
-        
-        Args:
-            chunk_content: 分块内容
-            elements_list: DOTS元素列表
-            matched_indices: 已匹配的元素索引
-            
-        Returns:
-            坐标列表，Mineru格式 [[page_idx, x1, x2, y1, y2], ...]
-        """
-        try:
-            chunk_content_clean = chunk_content.strip()
-            if not chunk_content_clean:
-                return None
-            
-            # 检查chunk是否为HTML表格
-            is_chunk_table = '<table>' in chunk_content_clean and '</table>' in chunk_content_clean
-            
-            # 用 difflib.SequenceMatcher 找最相似的元素（复用Mineru算法）
-            best_idx = -1
-            best_ratio = 0.0
-            
-            for i, element in enumerate(elements_list):
-                if i in matched_indices:
-                    continue
-                    
-                element_text = element.get('text', '').strip()
-                if not element_text:
-                    continue
-                
-                if is_chunk_table:
-                    # 对于表格chunk，检查元素是否也是表格
-                    if element.get('category') == 'Table':
-                        # 对于表格，可能需要特殊处理HTML内容
-                        if '<table>' in element_text and '</table>' in element_text:
-                            import re
-                            table_match = re.search(r'<table>.*?</table>', element_text, re.DOTALL)
-                            if table_match:
-                                element_html = table_match.group(0)
-                                ratio = difflib.SequenceMatcher(None, chunk_content_clean, element_html).ratio()
-                            else:
-                                ratio = difflib.SequenceMatcher(None, chunk_content_clean, element_text).ratio()
-                        else:
-                            ratio = difflib.SequenceMatcher(None, chunk_content_clean, element_text).ratio()
-                    else:
-                        ratio = 0.0
-                else:
-                    # 对于非表格chunk，直接比较文本内容
-                    ratio = difflib.SequenceMatcher(None, chunk_content_clean, element_text).ratio()
-                
-                if ratio > best_ratio:
-                    best_ratio = ratio
-                    best_idx = i
-            
-            if best_idx == -1 or best_ratio < 0.1:  # 阈值可调整
-                logger.debug(f"未找到足够相似的DOTS元素 (最高相似度: {best_ratio:.3f})")
-                return None
-            
-            # 从锚点扩展（复用Mineru的扩展逻辑）
-            matched_element_indices = [best_idx]
-            
-            # 向前扩展
-            for i in range(best_idx - 1, -1, -1):
-                if i in matched_indices:
-                    continue
-                element_text = elements_list[i].get('text', '').strip()
-                if element_text and element_text in chunk_content_clean:
-                    matched_element_indices.insert(0, i)
-                else:
-                    break
-            
-            # 向后扩展
-            for i in range(best_idx + 1, len(elements_list)):
-                if i in matched_indices:
-                    continue
-                element_text = elements_list[i].get('text', '').strip()
-                if element_text and element_text in chunk_content_clean:
-                    matched_element_indices.append(i)
-                else:
-                    break
-            
-            # 提取位置信息并转换为Mineru格式
-            positions = []
-            for idx in matched_element_indices:
-                element = elements_list[idx]
-                bbox = element.get('bbox')  # DOTS格式 [x1, y1, x2, y2]
-                page_number = element.get('page_number')
-                
-                if bbox and page_number is not None and len(bbox) == 4:
-                    # 关键修复：DPI 缩放问题
-                    # DOTS 使用 pdf2image 200 DPI 转换，而 MinerU 使用 PDF 原生坐标 72 DPI
-                    # 需要进行 DPI 缩放转换: DOTS坐标 * (72/200) = PDF坐标
-                    
-                    dpi_scale_factor = 72.0 / 200.0  # PDF标准 72 DPI / DOTS图像 200 DPI
-                    
-                    # 缩放 DOTS 图像坐标到 PDF 坐标
-                    pdf_x1 = bbox[0] * dpi_scale_factor
-                    pdf_y1 = bbox[1] * dpi_scale_factor  
-                    pdf_x2 = bbox[2] * dpi_scale_factor
-                    pdf_y2 = bbox[3] * dpi_scale_factor
-                    
-                    # 按照 MinerU utils.py:621 的格式: [page_number, bbox[0], bbox[2], bbox[1], bbox[3]]
-                    mineru_position = [
-                        page_number - 1,  # 转换为0开始的页面索引
-                        int(pdf_x1),     # x1 (左边界) - DPI缩放后
-                        int(pdf_x2),     # x2 (右边界) - DPI缩放后
-                        int(pdf_y1),     # y1 (上边界) - DPI缩放后  
-                        int(pdf_y2)      # y2 (下边界) - DPI缩放后
-                    ]
-                    positions.append(mineru_position)
-                    
-                    logger.debug(f"DOTS坐标转换: 原始={bbox} -> DPI缩放({dpi_scale_factor:.3f}) -> PDF={mineru_position}")
-                else:
-                    logger.warning(f"无效的DOTS坐标数据: bbox={bbox}, page_number={page_number}")
-            
-            # 记录已匹配的元素索引
-            matched_indices.update(matched_element_indices)
-            
-            if positions:
-                logger.debug(f"为chunk找到 {len(positions)} 个DOTS位置（相似度: {best_ratio:.3f}）")
-                return positions
-            else:
-                logger.debug("未能从DOTS元素提取到有效的位置信息")
-                return None
-                
-        except Exception as e:
-            logger.error(f"从DOTS获取chunk坐标失败: {e}")
-            return None
     
     
     
@@ -902,26 +424,20 @@ class DOTSProcessor:
         logger.info(f"调试信息已保存到: {output_path}")
 
 def process_dots_result(document_results: List[Dict[str, Any]], 
-                       debug_output_dir: Optional[str] = None,
-                       chunk_token_num: int = 256,
-                       min_chunk_tokens: int = 10,
-                       chunking_strategy: str = 'smart',
                        kb_id: str = None,
                        temp_dir: str = None,
                        chunking_config: Optional[dict] = None,
-                       doc_id: str = None) -> Dict[str, Any]:
+                       doc_id: str = None,
+                       debug_output_dir: Optional[str] = None) -> Dict[str, Any]:
     """处理DOTS文档解析结果的便捷函数（使用统一分块接口）
     
     Args:
         document_results: DOTS适配器返回的文档解析结果
-        debug_output_dir: 调试信息输出目录，可选
-        chunk_token_num: 分块大小（token数）
-        min_chunk_tokens: 最小分块大小（token数）
-        chunking_strategy: 分块策略 ('smart', 'advanced', 'basic', 'parent_child')
         kb_id: 知识库ID
         temp_dir: 临时目录
         chunking_config: 完整的分块配置（包含策略和参数）
         doc_id: 文档ID（父子分块需要）
+        debug_output_dir: 调试信息输出目录，可选
         
     Returns:
         dict: 包含处理结果的字典
@@ -981,13 +497,10 @@ def process_dots_result(document_results: List[Dict[str, Any]],
     # 第三步：基于处理后的markdown（已包含正确的图片URL）进行统一分块
     result = processor.generate_chunks_from_markdown(
         markdown_content=markdown_content,
-        chunk_token_num=chunk_token_num,
-        min_chunk_tokens=min_chunk_tokens,
-        chunking_strategy=chunking_strategy,
-        enable_coordinates=True,  # 启用坐标映射
-        chunking_config=chunking_config,  # 传递完整分块配置
-        doc_id=doc_id,  # 传递文档ID（父子分块需要）
-        kb_id=kb_id   # 传递知识库ID（父子分块需要）
+        chunking_config=chunking_config,
+        doc_id=doc_id,
+        kb_id=kb_id,
+        enable_coordinates=True
     )
     
     if not result.get('success', False):
@@ -1009,7 +522,7 @@ def process_dots_result(document_results: List[Dict[str, Any]],
         processor.save_debug_info(debug_output_dir)
     
     # 从统一分块结果中获取详细信息
-    chunking_strategy_used = result.get('chunking_strategy', chunking_strategy)
+    chunking_strategy_used = result.get('chunking_strategy', 'smart')
     is_parent_child = result.get('is_parent_child', False)
     
     logger.info(f"DOTS统一处理完成: {len(elements)}个元素, {len(chunks)}个分块, "
