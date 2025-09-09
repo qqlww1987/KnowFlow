@@ -61,12 +61,14 @@ interface KnowledgeBaseData {
   token_num: number;
   create_time: string;
   create_date: string;
+  created_by: string;
   parser_id?: string;
   permission_stats?: {
     user_count: number;
     team_count: number;
     total_count: number;
   };
+  creator_name?: string;
 }
 
 interface LogItem {
@@ -263,10 +265,21 @@ const KnowledgeManagementPage = () => {
   // const [parseProgressModalVisible, setParseProgressModalVisible] = useState(false);
   // const [parseDocId, setParseDocId] = useState<string | null>(null);
 
+  // 初始化时先加载用户列表，再加载知识库数据
   useEffect(() => {
-    loadKnowledgeData();
-    loadUserList();
-  }, [pagination.current, pagination.pageSize, searchValue]);
+    const initData = async () => {
+      await loadUserList();
+      await loadKnowledgeData();
+    };
+    initData();
+  }, []);
+
+  // 当分页或搜索条件变化时，只重新加载知识库数据
+  useEffect(() => {
+    if (userList.length > 0) {
+      loadKnowledgeData();
+    }
+  }, [pagination.current, pagination.pageSize, searchValue, userList]);
 
   // 监听文档分页变化
   useEffect(() => {
@@ -302,7 +315,18 @@ const KnowledgeManagementPage = () => {
         },
       });
       const data = res?.data?.data || {};
-      setKnowledgeData(data.list || []);
+      const knowledgeList = data.list || [];
+
+      // Map creator IDs to creator names
+      const enhancedList = knowledgeList.map((kb: KnowledgeBaseData) => {
+        const creator = userList.find((user) => user.id === kb.created_by);
+        return {
+          ...kb,
+          creator_name: creator?.username || kb.created_by,
+        };
+      });
+
+      setKnowledgeData(enhancedList);
       setPagination((prev) => ({ ...prev, total: data.total || 0 }));
     } catch (error) {
       message.error('加载知识库数据失败');
@@ -358,13 +382,13 @@ const KnowledgeManagementPage = () => {
 
   const handleSearch = () => {
     setPagination((prev) => ({ ...prev, current: 1 }));
-    loadKnowledgeData();
+    // loadKnowledgeData will be called automatically by useEffect when pagination changes
   };
 
   const handleReset = () => {
     setSearchValue('');
     setPagination((prev) => ({ ...prev, current: 1 }));
-    loadKnowledgeData();
+    // loadKnowledgeData will be called automatically by useEffect when pagination and searchValue change
   };
 
   const handleCreate = () => {
@@ -994,7 +1018,8 @@ const KnowledgeManagementPage = () => {
     {
       title: '序号',
       key: 'index',
-      width: 80,
+      width: 60,
+      align: 'left',
       render: (_: any, __: any, index: number) => (
         <span>
           {(pagination.current - 1) * pagination.pageSize + index + 1}
@@ -1005,6 +1030,8 @@ const KnowledgeManagementPage = () => {
       title: '知识库名称',
       dataIndex: 'name',
       key: 'name',
+      width: 200,
+      align: 'left',
       render: (text: string) => (
         <Space>
           <DatabaseOutlined />
@@ -1016,20 +1043,34 @@ const KnowledgeManagementPage = () => {
       title: '描述',
       dataIndex: 'description',
       key: 'description',
+      width: 180,
+      align: 'left',
       ellipsis: true,
+    },
+    {
+      title: '创建人',
+      dataIndex: 'creator_name',
+      key: 'creator_name',
+      width: 100,
+      align: 'left',
+      render: (name: string, record: KnowledgeBaseData) => (
+        <span>{name || record.created_by}</span>
+      ),
     },
     {
       title: '文档数量',
       dataIndex: 'doc_num',
       key: 'doc_num',
-      width: 100,
+      width: 80,
+      align: 'left',
       render: (count: number) => <Tag color="blue">{count}</Tag>,
     },
     {
       title: '语言',
       dataIndex: 'language',
       key: 'language',
-      width: 100,
+      width: 80,
+      align: 'left',
       render: (lang: string) => (
         <Tag color="geekblue">{lang === 'Chinese' ? '中文' : '英文'}</Tag>
       ),
@@ -1038,7 +1079,8 @@ const KnowledgeManagementPage = () => {
       title: '解析方法',
       dataIndex: 'parser_id',
       key: 'parser_id',
-      width: 120,
+      width: 100,
+      align: 'left',
       render: (parser: string) => {
         const getParserDisplay = (parserId: string) => {
           switch (parserId) {
@@ -1060,7 +1102,8 @@ const KnowledgeManagementPage = () => {
       title: '角色配置',
       dataIndex: 'permission_stats',
       key: 'permission_stats',
-      width: 120,
+      width: 100,
+      align: 'left',
       render: (
         stats:
           | { user_count: number; team_count: number; total_count: number }
@@ -1092,7 +1135,8 @@ const KnowledgeManagementPage = () => {
       title: '创建时间',
       dataIndex: 'create_date',
       key: 'create_date',
-      width: 180,
+      width: 150,
+      align: 'left',
     },
     {
       title: '操作',
@@ -1338,7 +1382,7 @@ const KnowledgeManagementPage = () => {
           rowKey="id"
           loading={loading}
           pagination={false}
-          scroll={{ x: 1200 }}
+          scroll={{ x: 1100 }}
           rowSelection={{
             selectedRowKeys,
             onChange: (selectedRowKeys: React.Key[]) =>

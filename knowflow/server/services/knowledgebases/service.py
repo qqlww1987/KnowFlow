@@ -47,7 +47,8 @@ class KnowledgebaseService:
                 k.doc_num,
                 k.language,
                 k.permission,
-                k.parser_id
+                k.parser_id,
+                k.created_by
             FROM knowledgebase k
         """
         params = []

@@ -1,0 +1,177 @@
+// 统一的表格样式
+.common-table-wrapper {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+
+  .search-card {
+    margin-bottom: 16px;
+
+    .ant-card-body {
+      padding: 16px 24px;
+    }
+  }
+
+  .table-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+
+    .ant-card-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 24px;
+    }
+  }
+
+  .table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .pagination-wrapper {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #f0f0f0;
+  }
+}
+
+// 统一的表格行样式
+:global(.common-table-row) {
+  &:hover {
+    background-color: #f8f9ff !important;
+  }
+
+  .ant-table-cell {
+    border-bottom: 1px solid #f5f5f5;
+    vertical-align: middle;
+    padding: 12px 16px;
+
+    .ant-tag {
+      border-radius: 6px;
+      font-size: 11px;
+      padding: 2px 8px;
+      border: none;
+      margin: 2px;
+    }
+
+    .ant-space {
+      .ant-space-item {
+        display: flex;
+        align-items: center;
+      }
+    }
+  }
+}
+
+// 统一的表格头部样式
+:global(.ant-table-thead > tr > th) {
+  background-color: #fafbfc;
+  color: #4a5568;
+  font-weight: 600;
+  border-bottom: 2px solid #e2e8f0;
+  padding: 12px 16px;
+}
+
+// 固定列阴影效果
+:global(.ant-table-ping-left) {
+  .ant-table-cell-fix-left-last::after {
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+  }
+}
+
+:global(.ant-table-ping-right) {
+  .ant-table-cell-fix-right-first::after {
+    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+  }
+}
+
+// 统一的图标样式
+.table-icon {
+  font-size: 12px;
+  margin-right: 6px;
+
+  &.primary {
+    color: #1890ff;
+  }
+
+  &.success {
+    color: #52c41a;
+  }
+
+  &.warning {
+    color: #faad14;
+  }
+
+  &.error {
+    color: #f5222d;
+  }
+
+  &.info {
+    color: #722ed1;
+  }
+}
+
+// 统一的文本样式
+.table-text {
+  font-size: 13px;
+
+  &.primary {
+    font-weight: 500;
+    color: #262626;
+  }
+
+  &.secondary {
+    color: #666;
+  }
+
+  &.small {
+    font-size: 11px;
+    color: #999;
+  }
+}
+
+// 统一的操作按钮样式
+.table-actions {
+  .ant-btn-link {
+    padding: 0 8px;
+    height: auto;
+    font-size: 12px;
+  }
+}
+
+// 响应式布局
+@media (max-width: 1200px) {
+  .common-table-wrapper .table-card .ant-table {
+    .ant-table-body {
+      overflow-x: auto;
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .common-table-wrapper {
+    .search-card .ant-card-body {
+      padding: 12px 16px;
+    }
+
+    .table-card .ant-card-body {
+      padding: 16px;
+    }
+
+    .table-header {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 12px;
+
+      & > * {
+        width: 100%;
+      }
+    }
+  }
+}
