@@ -258,15 +258,21 @@ class DocumentService(CommonService):
             page = 0
             page_size = 1000
             all_chunk_ids = []
-            while True:
-                chunks = settings.docStoreConn.search(["img_id"], [], {"doc_id": doc.id}, [], OrderByExpr(),
-                                                      page * page_size, page_size, search.index_name(tenant_id),
-                                                      [doc.kb_id])
-                chunk_ids = settings.docStoreConn.getChunkIds(chunks)
-                if not chunk_ids:
-                    break
-                all_chunk_ids.extend(chunk_ids)
-                page += 1
+            main_index = search.index_name(tenant_id)
+            
+            # 检查索引是否存在，如果不存在则跳过chunk_ids获取
+            if settings.docStoreConn.indexExist(main_index, doc.kb_id):
+                while True:
+                    chunks = settings.docStoreConn.search(["img_id"], [], {"doc_id": doc.id}, [], OrderByExpr(),
+                                                          page * page_size, page_size, main_index,
+                                                          [doc.kb_id])
+                    chunk_ids = settings.docStoreConn.getChunkIds(chunks)
+                    if not chunk_ids:
+                        break
+                    all_chunk_ids.extend(chunk_ids)
+                    page += 1
+            else:
+                logging.warning(f"ES index {main_index} does not exist, skipping chunk IDs retrieval for document {doc.id}")
             
             # 4. 清理存储中的分块文件
             for cid in all_chunk_ids:
@@ -279,31 +285,40 @@ class DocumentService(CommonService):
                     STORAGE_IMPL.rm(doc.kb_id, doc.thumbnail)
             
             # 6. 清理ES子分块索引
-            settings.docStoreConn.delete({"doc_id": doc.id}, search.index_name(tenant_id), doc.kb_id)
-            logging.info(f"Cleaned child chunks from ES index for document {doc.id}")
+            if settings.docStoreConn.indexExist(main_index, doc.kb_id):
+                settings.docStoreConn.delete({"doc_id": doc.id}, main_index, doc.kb_id)
+                logging.info(f"Cleaned child chunks from ES index {main_index} for document {doc.id}")
+            else:
+                logging.warning(f"ES index {main_index} does not exist, skipping child chunks cleanup for document {doc.id}")
             
             # 7. 清理ES父分块索引
             parent_index = f"{search.index_name(tenant_id)}_parent"
             try:
-                settings.docStoreConn.delete({"doc_id": doc.id}, parent_index, doc.kb_id)
-                logging.info(f"Cleaned parent chunks from ES index {parent_index} for document {doc.id}")
+                if settings.docStoreConn.indexExist(parent_index, doc.kb_id):
+                    settings.docStoreConn.delete({"doc_id": doc.id}, parent_index, doc.kb_id)
+                    logging.info(f"Cleaned parent chunks from ES index {parent_index} for document {doc.id}")
+                else:
+                    logging.info(f"ES parent index {parent_index} does not exist, skipping parent chunks cleanup for document {doc.id}")
             except Exception as e:
                 logging.warning(f"Failed to clean parent chunks for document {doc.id}: {e}")
 
             # 8. 清理图相关数据
-            graph_source = settings.docStoreConn.getFields(
-                settings.docStoreConn.search(["source_id"], [], {"kb_id": doc.kb_id, "knowledge_graph_kwd": ["graph"]}, [], OrderByExpr(), 0, 1, search.index_name(tenant_id), [doc.kb_id]), ["source_id"]
-            )
-            if len(graph_source) > 0 and doc.id in list(graph_source.values())[0]["source_id"]:
-                settings.docStoreConn.update({"kb_id": doc.kb_id, "knowledge_graph_kwd": ["entity", "relation", "graph", "subgraph", "community_report"], "source_id": doc.id},
-                                             {"remove": {"source_id": doc.id}},
-                                             search.index_name(tenant_id), doc.kb_id)
-                settings.docStoreConn.update({"kb_id": doc.kb_id, "knowledge_graph_kwd": ["graph"]},
-                                             {"removed_kwd": "Y"},
-                                             search.index_name(tenant_id), doc.kb_id)
-                settings.docStoreConn.delete({"kb_id": doc.kb_id, "knowledge_graph_kwd": ["entity", "relation", "graph", "subgraph", "community_report"], "must_not": {"exists": "source_id"}},
-                                             search.index_name(tenant_id), doc.kb_id)
-                logging.info(f"Cleaned graph data for document {doc.id}")
+            if settings.docStoreConn.indexExist(main_index, doc.kb_id):
+                graph_source = settings.docStoreConn.getFields(
+                    settings.docStoreConn.search(["source_id"], [], {"kb_id": doc.kb_id, "knowledge_graph_kwd": ["graph"]}, [], OrderByExpr(), 0, 1, main_index, [doc.kb_id]), ["source_id"]
+                )
+                if len(graph_source) > 0 and doc.id in list(graph_source.values())[0]["source_id"]:
+                    settings.docStoreConn.update({"kb_id": doc.kb_id, "knowledge_graph_kwd": ["entity", "relation", "graph", "subgraph", "community_report"], "source_id": doc.id},
+                                                 {"remove": {"source_id": doc.id}},
+                                                 main_index, doc.kb_id)
+                    settings.docStoreConn.update({"kb_id": doc.kb_id, "knowledge_graph_kwd": ["graph"]},
+                                                 {"removed_kwd": "Y"},
+                                                 main_index, doc.kb_id)
+                    settings.docStoreConn.delete({"kb_id": doc.kb_id, "knowledge_graph_kwd": ["entity", "relation", "graph", "subgraph", "community_report"], "must_not": {"exists": "source_id"}},
+                                                 main_index, doc.kb_id)
+                    logging.info(f"Cleaned graph data for document {doc.id}")
+            else:
+                logging.info(f"ES index {main_index} does not exist, skipping graph data cleanup for document {doc.id}")
             
         except Exception as e:
             logging.error(f"Failed to remove document {doc.id}: {str(e)}")
