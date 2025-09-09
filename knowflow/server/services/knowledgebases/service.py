@@ -895,12 +895,113 @@ class KnowledgebaseService:
         conn = None
         cursor = None
         try:
+            # 检查是否为重新解析，如果是则先清理现有数据
+            conn = cls._get_db_connection()
+            cursor = conn.cursor(dictionary=True)
+
+            # 检查文档是否已有分块数据
+            check_query = """
+                SELECT
+                    d.chunk_num,
+                    d.created_by AS tenant_id,
+                    d.name,
+                    d.progress
+                FROM document d
+                WHERE d.id = %s
+            """
+            cursor.execute(check_query, (doc_id,))
+            doc_data = cursor.fetchone()
+
+            if not doc_data:
+                raise Exception("文档不存在")
+
+            # 如果文档已有分块数据（chunk_num > 0），先清理
+            if doc_data["chunk_num"] > 0:
+                print(f"[REPARSE] 检测到文档已有 {doc_data['chunk_num']} 个分块，开始清理数据...")
+                
+                # 1. 重置文档的分块数量为 0
+                reset_query = """
+                    UPDATE document 
+                    SET chunk_num = 0,
+                        progress = 0.0,
+                        progress_msg = '清理现有数据中...'
+                    WHERE id = %s
+                """
+                cursor.execute(reset_query, (doc_id,))
+                print(f"[REPARSE] 已重置文档 {doc_id} 的分块数量为 0")
+
+                # 2. 删除任务表相关记录
+                task_query = "DELETE FROM task WHERE doc_id = %s"
+                cursor.execute(task_query, (doc_id,))
+                task_deleted = cursor.rowcount
+                print(f"[REPARSE] 删除了 {task_deleted} 个历史任务记录")
+
+                # 3. 删除父子映射表记录
+                parent_child_query = "DELETE FROM parent_child_mapping WHERE doc_id = %s"
+                cursor.execute(parent_child_query, (doc_id,))
+                mapping_deleted = cursor.rowcount
+                print(f"[REPARSE] 删除了 {mapping_deleted} 个父子映射记录")
+
+                # 提交数据库更改
+                conn.commit()
+                cursor.close()
+                conn.close()
+                conn = None
+
+                # 4. 清理Elasticsearch中的数据（参照 delete_document 的实现）
+                es_client = get_es_client()
+                if es_client and doc_data["tenant_id"]:
+                    tenant_id_for_cleanup = doc_data["tenant_id"]
+
+                    # 4.1 清理子分块索引
+                    es_index_name = f"ragflow_{tenant_id_for_cleanup}"
+                    try:
+                        if es_client.indices.exists(index=es_index_name):
+                            query_body = {"query": {"term": {"doc_id": doc_id}}}
+                            resp = es_client.delete_by_query(
+                                index=es_index_name,
+                                body=query_body,
+                                refresh=True,
+                                ignore_unavailable=True,
+                            )
+                            deleted_count = resp.get("deleted", 0)
+                            print(f"[REPARSE] 从子分块索引 {es_index_name} 中删除 {deleted_count} 个分块")
+                        else:
+                            print(f"[REPARSE] 子分块索引 {es_index_name} 不存在，跳过清理")
+                    except Exception as es_err:
+                        print(f"[REPARSE-ERROR] 清理子分块索引失败: {str(es_err)}")
+
+                    # 4.2 清理父分块索引
+                    parent_index_name = f"ragflow_{tenant_id_for_cleanup}_parent"
+                    try:
+                        if es_client.indices.exists(index=parent_index_name):
+                            query_body = {"query": {"term": {"doc_id": doc_id}}}
+                            resp = es_client.delete_by_query(
+                                index=parent_index_name,
+                                body=query_body,
+                                refresh=True,
+                                ignore_unavailable=True,
+                            )
+                            deleted_parent_count = resp.get("deleted", 0)
+                            print(f"[REPARSE] 从父分块索引 {parent_index_name} 中删除 {deleted_parent_count} 个父分块")
+                        else:
+                            print(f"[REPARSE] 父分块索引 {parent_index_name} 不存在，跳过清理")
+                    except Exception as es_err:
+                        print(f"[REPARSE-ERROR] 清理父分块索引失败: {str(es_err)}")
+
+                print(f"[REPARSE] 文档 {doc_data['name']} 的数据清理完成，开始重新解析...")
+
+                # 重新获取数据库连接
+                conn = cls._get_db_connection()
+                cursor = conn.cursor(dictionary=True)
+
             # 立即更新文档状态为"正在解析"，确保UI及时显示
             _update_document_progress(doc_id, run="1", progress=0.0, message="开始解析文档...")
             
             # 获取文档和文件信息
-            conn = cls._get_db_connection()
-            cursor = conn.cursor(dictionary=True)
+            if not conn:
+                conn = cls._get_db_connection()
+                cursor = conn.cursor(dictionary=True)
 
             # 查询文档信息和知识库的解析方法
             doc_query = """
@@ -1006,7 +1107,7 @@ class KnowledgebaseService:
             cursor = conn.cursor(dictionary=True)
 
             query = """
-                SELECT progress, progress_msg, status, run
+                SELECT progress, progress_msg, status, run, chunk_num
                 FROM document
                 WHERE id = %s
             """
@@ -1029,6 +1130,7 @@ class KnowledgebaseService:
                 "message": result.get("progress_msg", ""),
                 "status": result.get("status", "0"),
                 "running": result.get("run", "0"),
+                "chunk_num": result.get("chunk_num", 0),
             }
 
         except Exception as e:

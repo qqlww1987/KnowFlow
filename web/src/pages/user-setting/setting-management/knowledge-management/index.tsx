@@ -37,6 +37,12 @@ import {
   message,
 } from 'antd';
 import React, { useEffect, useRef, useState } from 'react';
+import {
+  BatchParseMonitor,
+  startBatchParsing,
+  type BatchParsingState,
+  type DocumentProgress,
+} from './batch-parse-helper';
 import styles from './index.less';
 import { ParsingStatusCard } from './parsing-status-card';
 import PermissionModal from './permission-modal';
@@ -105,13 +111,28 @@ const KnowledgeManagementPage = () => {
     useState<KnowledgeBaseData | null>(null);
 
   const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
-  const [batchParsingLoading, setBatchParsingLoading] = useState(false);
   const [searchValue, setSearchValue] = useState('');
 
-  // 批量解析相关状态
-  const [isBatchPolling, setIsBatchPolling] = useState(false);
-  const [batchProgress, setBatchProgress] = useState<any>(null);
-  const batchPollingInterval = useRef<NodeJS.Timeout | null>(null);
+  // 批量解析状态和监控器
+  const [batchParsingStatus, setBatchParsingStatus] = useState<{
+    isActive: boolean;
+    totalDocuments: number;
+    completedDocuments: number;
+    currentDocumentName: string | null;
+    message: string;
+    error: string | null;
+    startTime: number | null;
+  }>({
+    isActive: false,
+    totalDocuments: 0,
+    completedDocuments: 0,
+    currentDocumentName: null,
+    message: '',
+    error: null,
+    startTime: null,
+  });
+
+  const batchMonitor = useRef<any>(null);
 
   const [createForm] = Form.useForm();
   const [pagination, setPagination] = useState({
@@ -141,7 +162,55 @@ const KnowledgeManagementPage = () => {
   const [fileLoading, setFileLoading] = useState(false);
 
   // 解析和分块规则相关状态
-  const [parseLoading, setParseLoading] = useState(false);
+  const [parseLoadingMap, setParseLoadingMap] = useState<
+    Record<string, boolean>
+  >({});
+  // 轮询定时器管理
+  const [pollingTimers, setPollingTimers] = useState<
+    Record<string, { timerId?: NodeJS.Timeout; isActive: boolean }>
+  >({});
+
+  // 管理单个文档的解析状态
+  const setDocumentParseLoading = (docId: string, loading: boolean) => {
+    setParseLoadingMap((prev) => ({
+      ...prev,
+      [docId]: loading,
+    }));
+  };
+
+  const isDocumentParsing = (docId: string) => {
+    return parseLoadingMap[docId] || false;
+  };
+
+  // 管理轮询定时器
+  const setPollingTimer = (
+    docId: string,
+    timerId?: NodeJS.Timeout,
+    isActive: boolean = true,
+  ) => {
+    setPollingTimers((prev) => ({
+      ...prev,
+      [docId]: { timerId, isActive },
+    }));
+  };
+
+  const clearPollingTimer = (docId: string) => {
+    const timer = pollingTimers[docId];
+    if (timer?.timerId) {
+      clearTimeout(timer.timerId);
+    }
+    if (timer?.isActive) {
+      setPollingTimers((prev) => {
+        const newTimers = { ...prev };
+        delete newTimers[docId];
+        return newTimers;
+      });
+    }
+  };
+
+  const isPollingActive = (docId: string) => {
+    return pollingTimers[docId]?.isActive || false;
+  };
   const [chunkModalVisible, setChunkModalVisible] = useState(false);
   const [chunkDocId, setChunkDocId] = useState<string | null>(null);
   const [chunkDocName, setChunkDocName] = useState<string | null>(null);
@@ -209,11 +278,18 @@ const KnowledgeManagementPage = () => {
   // 组件卸载时清理定时器
   useEffect(() => {
     return () => {
-      if (batchPollingInterval.current) {
-        clearInterval(batchPollingInterval.current);
+      if (batchMonitor.current) {
+        batchMonitor.current.stop();
       }
+      // 清理所有文档轮询定时器
+      Object.keys(pollingTimers).forEach((docId) => {
+        const timer = pollingTimers[docId];
+        if (timer?.timerId) {
+          clearTimeout(timer.timerId);
+        }
+      });
     };
-  }, []);
+  }, [pollingTimers]);
 
   const loadKnowledgeData = async () => {
     setLoading(true);
@@ -268,7 +344,10 @@ const KnowledgeManagementPage = () => {
         { params },
       );
       const data = res?.data?.data || {};
-      setDocumentList(data.list || []);
+      const documentList = data.list || [];
+      setDocumentList(documentList);
+
+      // 文档状态已通过批量解析系统统一管理，无需单独轮询
       setDocPagination((prev) => ({ ...prev, total: data.total || 0 }));
     } catch (error) {
       message.error('加载文档列表失败');
@@ -361,9 +440,9 @@ const KnowledgeManagementPage = () => {
       return;
     }
 
-    // 如果正在删除当前查看的知识库，停止批量解析轮询
-    if (currentKnowledgeBase?.id === kbId && isBatchPolling) {
-      stopBatchPolling();
+    // 如果正在删除当前查看的知识库，停止批量解析监控
+    if (currentKnowledgeBase?.id === kbId && batchParsingStatus.isActive) {
+      stopBatchProgressMonitoring();
       message.info('已停止该知识库的批量解析任务');
     }
 
@@ -389,13 +468,13 @@ const KnowledgeManagementPage = () => {
       return;
     }
 
-    // 如果正在批量删除的知识库中包含当前查看的知识库，停止批量解析轮询
+    // 如果正在批量删除的知识库中包含当前查看的知识库，停止批量解析监控
     if (
       currentKnowledgeBase &&
       selectedRowKeys.includes(currentKnowledgeBase.id) &&
-      isBatchPolling
+      batchParsingStatus.isActive
     ) {
-      stopBatchPolling();
+      stopBatchProgressMonitoring();
       message.info('已停止相关知识库的批量解析任务');
     }
 
@@ -414,6 +493,7 @@ const KnowledgeManagementPage = () => {
     }
   };
 
+  // 新的批量解析处理函数
   const handleBatchParse = async () => {
     if (!currentKnowledgeBase) return;
 
@@ -424,201 +504,265 @@ const KnowledgeManagementPage = () => {
       title: '启动批量解析确认',
       content: (
         <div>
-          <p>确定要为知识库 "{kbName}" 启动后台批量解析吗？</p>
+          <p>确定要为知识库 "{kbName}" 启动批量解析吗？</p>
           <p style={{ color: '#E6A23C', fontWeight: 'bold' }}>
-            该过程将在后台运行，您可以稍后查看结果或关闭此窗口。
+            批量解析将按顺序处理所有文档，请耐心等待完成。
           </p>
         </div>
       ),
       okText: '确定启动',
       cancelText: '取消',
       onOk: async () => {
-        setBatchParsingLoading(true);
-        setBatchProgress(null);
         try {
-          const res = await request.post(
-            `/api/knowflow/v1/knowledgebases/${kbId}/batch_parse_sequential/start`,
-          );
+          const success = await startBatchParsing(kbId, request);
 
-          if (res?.data?.code === 0 && res.data.data) {
-            message.success(res.data.data.message || '已成功启动批量解析任务');
-            startBatchPolling();
-            setTimeout(() => loadDocumentList(currentKnowledgeBase.id), 1500);
+          if (success) {
+            message.success('批量解析任务已启动');
+            // 开始监控进度
+            startBatchProgressMonitoring(kbId);
           } else {
-            const errorMsg =
-              res?.data?.data?.message ||
-              res?.data?.message ||
-              '启动批量解析任务失败';
-            message.error(errorMsg);
-            setBatchParsingLoading(false);
+            message.error('启动批量解析失败');
           }
         } catch (error: any) {
-          message.error(
-            `启动批量解析任务时出错: ${error?.message || '网络错误'}`,
-          );
-          console.error('启动批量解析任务失败:', error);
-          setBatchParsingLoading(false);
-        } finally {
-          // 如果没有成功启动轮询，则取消加载状态
-          // 这里用延迟检查，给 startBatchPolling 时间更新 isBatchPolling
-          setTimeout(() => {
-            if (!isBatchPolling) {
-              setBatchParsingLoading(false);
-            }
-          }, 100);
+          message.error(`启动批量解析时出错: ${error?.message || '网络错误'}`);
+          console.error('启动批量解析失败:', error);
         }
       },
-      onCancel: () => {
-        message.info('已取消批量解析操作');
-      },
     });
   };
 
-  // 开始轮询批量任务进度
-  const startBatchPolling = () => {
-    if (isBatchPolling || !currentKnowledgeBase) return;
-
-    console.log('开始轮询知识库的批量解析进度:', currentKnowledgeBase.id);
-    setIsBatchPolling(true);
-    setBatchProgress({
-      status: 'running',
-      message: '正在启动批量解析任务...',
-      total: 0,
-      current: 0,
-    });
-
-    // 清除可能存在的旧定时器
-    if (batchPollingInterval.current) {
-      clearInterval(batchPollingInterval.current);
+  // 开始批量解析进度监控
+  const startBatchProgressMonitoring = (kbId: string) => {
+    // 停止旧的监控器
+    if (batchMonitor.current) {
+      batchMonitor.current.stop();
     }
 
-    // 立即执行一次获取进度，然后设置定时器
-    fetchBatchProgress();
-    batchPollingInterval.current = setInterval(fetchBatchProgress, 5000); // 每 5 秒查询一次进度
-  };
+    // 创建新的监控器
+    batchMonitor.current = new BatchParseMonitor(
+      kbId,
+      request,
+      (state: BatchParsingState) => {
+        setBatchParsingStatus(state);
 
-  // 停止轮询批量任务进度
-  const stopBatchPolling = () => {
-    if (batchPollingInterval.current) {
-      console.log('停止批量解析进度轮询。');
-      clearInterval(batchPollingInterval.current);
-      batchPollingInterval.current = null;
-    }
-    setIsBatchPolling(false);
-    setBatchParsingLoading(false);
-  };
+        // 如果完成了，显示结果并刷新列表
+        if (!state.isActive) {
+          const isSuccess = !state.error;
+          message[isSuccess ? 'success' : 'error'](state.message);
 
-  // 获取并更新批量任务进度
-  const fetchBatchProgress = async () => {
-    if (!currentKnowledgeBase || !viewModalVisible) {
-      stopBatchPolling();
-      return;
-    }
-
-    try {
-      const res = await request.get(
-        `/api/knowflow/v1/knowledgebases/${currentKnowledgeBase.id}/batch_parse_sequential/progress`,
-      );
-
-      if (res?.data?.code === 0 && res.data.data) {
-        setBatchProgress(res.data.data);
-        console.log('获取到批量进度:', res.data.data);
-
-        // 检查任务是否已完成或失败
-        if (
-          res.data.data.status === 'completed' ||
-          res.data.data.status === 'failed'
-        ) {
-          stopBatchPolling();
-          // 显示最终结果提示
-          message[res.data.data.status === 'completed' ? 'success' : 'error'](
-            res.data.data.message ||
-              (res.data.data.status === 'completed'
-                ? '批量解析已完成'
-                : '批量解析失败'),
-          );
-          // 刷新文档列表以显示最新状态
+          // 刷新文档列表和知识库列表
           if (currentKnowledgeBase) {
             loadDocumentList(currentKnowledgeBase.id);
+            loadKnowledgeData();
           }
-          // 刷新知识库列表（文档数、分块数可能变化）
-          loadKnowledgeData();
         }
-      } else {
-        console.error(
-          '获取批量进度失败:',
-          res?.data?.message || res?.data?.data?.message,
+      },
+      (documents: DocumentProgress[]) => {
+        console.log(
+          '[UI] 文档更新回调被调用，接收到文档数量:',
+          documents.length,
         );
-        if (batchProgress) {
-          setBatchProgress({
-            ...batchProgress,
-            message: `获取进度时出错: ${res?.data?.message || '请稍后...'}`,
+        console.log('[UI] 接收到的文档数据:', documents);
+
+        // 更新文档列表状态，与批量解析进度联动
+        setDocumentList((prevList) => {
+          console.log('[UI] 当前文档列表长度:', prevList.length);
+
+          const updatedList = prevList.map((doc) => {
+            const updatedDoc = documents.find((d) => d.id === doc.id);
+            if (updatedDoc) {
+              console.log(`[UI] 更新文档: ${doc.name}`, {
+                progress: `${doc.progress} -> ${updatedDoc.progress}`,
+                chunk_num: `${doc.chunk_num} -> ${updatedDoc.chunk_num}`,
+                run: `${doc.run} -> ${updatedDoc.run}`,
+              });
+
+              return {
+                ...doc,
+                progress: updatedDoc.progress,
+                chunk_num: updatedDoc.chunk_num,
+                run: updatedDoc.run,
+                status: updatedDoc.status,
+                // 如果有新的解析消息，添加到日志中
+                logs:
+                  updatedDoc.message &&
+                  updatedDoc.message !== doc.logs?.[0]?.message
+                    ? [
+                        {
+                          time: new Date().toLocaleTimeString(),
+                          message: updatedDoc.message,
+                        },
+                        ...(doc.logs || []).slice(0, 19),
+                      ]
+                    : doc.logs,
+              };
+            }
+            return doc;
           });
-        }
-      }
-    } catch (error: any) {
-      console.error('请求批量进度API失败:', error);
-      if (batchProgress) {
-        setBatchProgress({
-          ...batchProgress,
-          message: `获取进度时网络错误: ${error.message || '请检查网络连接...'}`,
+
+          console.log('[UI] 文档列表更新完成');
+          return updatedList;
         });
-      }
+      },
+      // 传递当前分页信息
+      {
+        current: docPagination.current,
+        pageSize: docPagination.pageSize,
+      },
+    );
+
+    // 启动监控
+    batchMonitor.current.start();
+  };
+
+  // 停止批量解析监控
+  const stopBatchProgressMonitoring = () => {
+    if (batchMonitor.current) {
+      batchMonitor.current.stop();
+      batchMonitor.current = null;
     }
+
+    setBatchParsingStatus((prev) => ({
+      ...prev,
+      isActive: false,
+    }));
   };
 
   // 解析文档
   const handleParseDocument = async (doc: DocumentData) => {
-    if (doc.progress === 1) {
-      message.warning('文档已完成解析，无需再重复解析');
-      return;
-    }
     const allowed = await canDo('write');
     if (!allowed) {
-      message.warning('您没有解析文档的角色');
+      message.warning('您没有解析文档的权限');
       return;
     }
-    try {
-      await request.post(
-        `/api/knowflow/v1/knowledgebases/documents/${doc.id}/parse`,
-      );
-      // 直接开始轮询进度和日志，带时间戳
-      pollParseProgressWithTimestamp(doc.id);
-      message.success('解析任务已提交，进度和日志将在状态标签悬浮显示');
-    } catch (error) {
-      message.error('解析任务提交失败');
+
+    // 如果文档已完成解析，显示确认对话框
+    if (doc.progress === 1) {
+      Modal.confirm({
+        title: '确认重新解析',
+        content: (
+          <div>
+            <p>
+              确定要重新解析文档 "<strong>{doc.name}</strong>" 吗？
+            </p>
+            <p style={{ color: '#ff4d4f', marginTop: 8 }}>
+              注意：此操作会清空该文档的所有现有分块数据，分块数量将重置为
+              0，然后重新开始解析过程。
+            </p>
+          </div>
+        ),
+        okText: '确认重新解析',
+        cancelText: '取消',
+        okType: 'danger',
+        onOk: async () => {
+          await performParse(doc);
+        },
+      });
+    } else {
+      // 未解析或解析中的文档直接解析
+      await performParse(doc);
     }
   };
 
-  // 轮询解析进度（带时间戳日志）
-  const pollParseProgressWithTimestamp = async (
-    docId: string,
-    interval = 2000,
-    maxTries = 60,
-  ) => {
+  // 执行解析的具体逻辑
+  const performParse = async (doc: DocumentData) => {
+    try {
+      // 设置解析状态为活跃
+      setDocumentParseLoading(doc.id, true);
+
+      // 如果是重新解析（已完成的文档），立即更新前端显示的分块数量为0
+      if (doc.progress === 1) {
+        setDocumentList((prevList) =>
+          prevList.map((item) =>
+            item.id === doc.id ? { ...item, chunk_num: 0, progress: 0 } : item,
+          ),
+        );
+      }
+
+      await request.post(
+        `/api/knowflow/v1/knowledgebases/documents/${doc.id}/parse`,
+      );
+
+      // 开始轮询进度
+      pollParseProgressWithTimestamp(doc.id);
+      message.success(
+        doc.progress === 1 ? '重新解析任务已提交' : '解析任务已提交',
+      );
+    } catch (error) {
+      message.error(
+        doc.progress === 1 ? '重新解析任务提交失败' : '解析任务提交失败',
+      );
+      // 出错时立即恢复按钮状态和清理定时器
+      setDocumentParseLoading(doc.id, false);
+      clearPollingTimer(doc.id);
+    }
+    // 注意：不在这里设置 loading 为 false，而是在轮询完成后设置
+  };
+
+  // 简化的轮询解析进度
+  const pollParseProgressWithTimestamp = async (docId: string) => {
+    let polling = true;
     let tries = 0;
-    let finished = false;
-    let lastMessage = '';
-    while (!finished && tries < maxTries) {
+    const maxTries = 60;
+    const interval = 2000;
+
+    console.log(
+      `[DEBUG] 单文档轮询开始 - docId: ${docId}, maxTries: ${maxTries}, interval: ${interval}ms`,
+    );
+
+    const poll = async () => {
+      console.log(
+        `[DEBUG] 单文档轮询执行 - docId: ${docId}, tries: ${tries}, polling: ${polling}`,
+      );
+
+      if (!polling || tries >= maxTries) {
+        // 超时或被停止，清理状态
+        console.log(
+          `[DEBUG] 单文档轮询停止 - docId: ${docId}, reason: ${!polling ? 'polling=false' : 'max tries reached'}, tries: ${tries}`,
+        );
+        setDocumentParseLoading(docId, false);
+        clearPollingTimer(docId);
+        return;
+      }
+
+      tries++;
+
       try {
+        console.log(
+          `[DEBUG] 单文档轮询API调用 - docId: ${docId}, tries: ${tries}`,
+        );
         const res = await request.get(
           `/api/knowflow/v1/knowledgebases/documents/${docId}/parse/progress`,
         );
         const response = res?.data;
-        if (response?.code === 202) {
-          // 解析进行中
-          tries++;
-          await new Promise((resolve) => setTimeout(resolve, interval));
-          continue;
-        }
+        console.log(
+          `[DEBUG] 单文档轮询API响应 - docId: ${docId}, response:`,
+          response,
+        );
+
         if (response?.code === 0) {
           const data = response.data || {};
-          setDocumentList((prev) =>
-            prev.map((item) => {
+          console.log(`[DEBUG] 单文档轮询数据解析 - docId: ${docId}, data:`, {
+            progress: data.progress,
+            chunk_num: data.chunk_num,
+            running: data.running,
+            status: data.status,
+            message: data.message,
+          });
+
+          // 更新文档状态
+          setDocumentList((prev) => {
+            console.log(
+              `[DEBUG] 单文档轮询状态更新前 - docId: ${docId}, documentList长度:`,
+              prev.length,
+            );
+            const updated = prev.map((item) => {
               if (item.id === docId) {
+                console.log(
+                  `[DEBUG] 找到目标文档更新 - docId: ${docId}, 当前progress: ${item.progress} -> ${data.progress}, 当前chunk_num: ${item.chunk_num} -> ${data.chunk_num}`,
+                );
                 let logs: LogItem[] = item.logs ?? [];
-                if (data.message && data.message !== lastMessage) {
-                  lastMessage = data.message;
+                if (data.message) {
                   const now = new Date();
                   const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
                   logs = [
@@ -629,28 +773,69 @@ const KnowledgeManagementPage = () => {
                 return {
                   ...item,
                   progress: data.progress ?? item.progress,
+                  chunk_num: data.chunk_num ?? item.chunk_num,
                   logs,
                 };
               }
               return item;
-            }),
+            });
+            console.log(`[DEBUG] 单文档轮询状态更新完成 - docId: ${docId}`);
+            return updated;
+          });
+
+          // 检查是否完成
+          if (
+            data.running === '3' ||
+            data.progress === 1 ||
+            data.status === '3'
+          ) {
+            console.log(
+              `[DEBUG] 单文档轮询检测到完成 - docId: ${docId}, running: ${data.running}, progress: ${data.progress}, status: ${data.status}`,
+            );
+            polling = false;
+            setDocumentParseLoading(docId, false);
+            clearPollingTimer(docId);
+            return;
+          }
+        } else {
+          console.log(
+            `[DEBUG] 单文档轮询API响应码非0 - docId: ${docId}, code: ${response?.code}`,
           );
-          if (data.running === '3' || data.progress === 1) {
-            finished = true;
-            if (currentKnowledgeBase) loadDocumentList(currentKnowledgeBase.id);
-            break;
-          }
-          if (data.status === '3') {
-            finished = true;
-            break;
-          }
         }
-      } catch (e) {
-        // 忽略错误，继续轮询
+
+        // 继续轮询
+        if (polling) {
+          console.log(
+            `[DEBUG] 单文档轮询继续 - docId: ${docId}, 下次执行间隔: ${interval}ms`,
+          );
+          const timerId = setTimeout(poll, interval);
+          setPollingTimer(docId, timerId, true);
+        }
+      } catch (error) {
+        console.log(
+          `[DEBUG] 单文档轮询API错误 - docId: ${docId}, error:`,
+          error,
+        );
+        // 出错也继续轮询
+        if (polling) {
+          console.log(`[DEBUG] 单文档轮询错误后继续 - docId: ${docId}`);
+          const timerId = setTimeout(poll, interval);
+          setPollingTimer(docId, timerId, true);
+        }
       }
-      tries++;
-      await new Promise((resolve) => setTimeout(resolve, interval));
-    }
+    };
+
+    // 开始轮询
+    console.log(`[DEBUG] 单文档轮询初始化完成，开始执行 - docId: ${docId}`);
+    setPollingTimer(docId, undefined, true);
+    poll();
+
+    // 返回停止函数
+    return () => {
+      console.log(`[DEBUG] 单文档轮询手动停止 - docId: ${docId}`);
+      polling = false;
+      clearPollingTimer(docId);
+    };
   };
 
   // 分块规则弹窗
@@ -782,6 +967,11 @@ const KnowledgeManagementPage = () => {
       cancelText: '取消',
       onOk: async () => {
         try {
+          // 清理文档对应的轮询定时器
+          clearPollingTimer(doc.id);
+          // 清理解析状态
+          setDocumentParseLoading(doc.id, false);
+
           await request.delete(
             `/api/knowflow/v1/knowledgebases/documents/${doc.id}`,
           );
@@ -791,11 +981,7 @@ const KnowledgeManagementPage = () => {
           if (currentKnowledgeBase) {
             loadDocumentList(currentKnowledgeBase.id);
 
-            // 如果正在进行批量解析，刷新进度信息（因为文档数量变化了）
-            if (isBatchPolling) {
-              // 立即获取一次最新进度，更新总数
-              fetchBatchProgress();
-            }
+            // 文档删除后，批量解析状态会自动更新，无需手动刷新
           }
         } catch (error) {
           message.error('移除文档失败');
@@ -978,7 +1164,11 @@ const KnowledgeManagementPage = () => {
       key: 'status',
       width: 120,
       render: (_: any, record: DocumentData) => (
-        <ParsingStatusCard record={record} />
+        <ParsingStatusCard
+          record={record}
+          isBatchParsing={batchParsingStatus.isActive}
+          currentBatchDocument={batchParsingStatus.currentDocumentName}
+        />
       ),
     },
     {
@@ -990,11 +1180,18 @@ const KnowledgeManagementPage = () => {
           <Button
             type="link"
             size="small"
-            icon={<PlayCircleOutlined />}
-            loading={parseLoading}
+            icon={
+              record.progress === 1 ? (
+                <ReloadOutlined />
+              ) : (
+                <PlayCircleOutlined />
+              )
+            }
+            loading={isDocumentParsing(record.id)}
+            disabled={isDocumentParsing(record.id) || record.run === '1'}
             onClick={() => handleParseDocument(record)}
           >
-            解析
+            {record.progress === 1 ? '重新解析' : '解析'}
           </Button>
           <Button
             type="link"
@@ -1251,20 +1448,24 @@ const KnowledgeManagementPage = () => {
         title={`知识库详情 - ${currentKnowledgeBase?.name || ''}`}
         open={viewModalVisible}
         onCancel={() => {
-          stopBatchPolling();
+          // 批量解析可以在后台继续运行
           setViewModalVisible(false);
-          setCurrentKnowledgeBase(null);
-          setBatchProgress(null);
+          // 只有在批量解析完成时才清空 currentKnowledgeBase
+          if (!batchParsingStatus.isActive) {
+            setCurrentKnowledgeBase(null);
+          }
         }}
         width={1000}
         footer={[
           <Button
             key="close"
             onClick={() => {
-              stopBatchPolling();
+              // 批量解析可以在后台继续运行
               setViewModalVisible(false);
-              setCurrentKnowledgeBase(null);
-              setBatchProgress(null);
+              // 只有在批量解析完成时才清空 currentKnowledgeBase
+              if (!batchParsingStatus.isActive) {
+                setCurrentKnowledgeBase(null);
+              }
             }}
           >
             关闭
@@ -1318,20 +1519,15 @@ const KnowledgeManagementPage = () => {
                 <Button
                   type="default"
                   icon={<ThunderboltOutlined />}
-                  loading={batchParsingLoading && !isBatchPolling}
+                  loading={batchParsingStatus.isActive}
                   onClick={handleBatchParse}
                   disabled={
                     documentList.length === 0 ||
                     !canWrite ||
-                    isBatchPolling ||
-                    batchParsingLoading
+                    batchParsingStatus.isActive
                   }
                 >
-                  {isBatchPolling
-                    ? '正在批量解析...'
-                    : batchParsingLoading
-                      ? '正在启动...'
-                      : '批量解析'}
+                  {batchParsingStatus.isActive ? '正在批量解析...' : '批量解析'}
                 </Button>
               </Space>
 
@@ -1364,28 +1560,45 @@ const KnowledgeManagementPage = () => {
               </Space>
             </div>
 
-            {batchProgress && (
+            {(batchParsingStatus.isActive || batchParsingStatus.error) && (
               <Alert
-                message={batchProgress.message || '正在处理...'}
+                message={batchParsingStatus.message}
                 description={
-                  batchProgress.total > 0 &&
-                  !['starting', 'not_found'].includes(batchProgress.status) && (
-                    <div style={{ fontSize: '12px', color: '#606266' }}>
-                      处理进度: {batchProgress.current || 0} /{' '}
-                      {batchProgress.total}
+                  batchParsingStatus.totalDocuments > 0 && (
+                    <div>
+                      <div
+                        style={{
+                          fontSize: '12px',
+                          color: '#606266',
+                          marginBottom: '8px',
+                        }}
+                      >
+                        处理进度: {batchParsingStatus.completedDocuments} /{' '}
+                        {batchParsingStatus.totalDocuments}
+                      </div>
+                      {batchParsingStatus.currentDocumentName && (
+                        <div style={{ fontSize: '12px', color: '#1890ff' }}>
+                          当前处理: {batchParsingStatus.currentDocumentName}
+                        </div>
+                      )}
+                      {batchParsingStatus.startTime && (
+                        <div
+                          style={{
+                            fontSize: '12px',
+                            color: '#999',
+                            marginTop: '4px',
+                          }}
+                        >
+                          开始时间:{' '}
+                          {new Date(
+                            batchParsingStatus.startTime,
+                          ).toLocaleString()}
+                        </div>
+                      )}
                     </div>
                   )
                 }
-                type={
-                  batchProgress.status === 'failed' ||
-                  batchProgress.status === 'not_found'
-                    ? 'error'
-                    : batchProgress.status === 'completed'
-                      ? 'success'
-                      : batchProgress.status === 'cancelled'
-                        ? 'warning'
-                        : 'info'
-                }
+                type={batchParsingStatus.error ? 'error' : 'info'}
                 showIcon
                 className={styles.batchAlert}
               />
@@ -1399,6 +1612,15 @@ const KnowledgeManagementPage = () => {
                 loading={documentLoading}
                 pagination={false}
                 size="small"
+                rowClassName={(record) => {
+                  // 为正在批量解析的文档添加特殊样式
+                  const isCurrentBatchDocument =
+                    batchParsingStatus.isActive &&
+                    batchParsingStatus.currentDocumentName &&
+                    record.name === batchParsingStatus.currentDocumentName;
+
+                  return isCurrentBatchDocument ? 'batch-parsing-row' : '';
+                }}
                 locale={{
                   emptyText: <Empty description="暂无文档数据" />,
                 }}
