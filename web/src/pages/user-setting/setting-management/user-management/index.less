@@ -4,6 +4,25 @@
   flex-direction: column;
   width: 100%;
   max-width: none !important;
+
+  // 统一操作列样式 - 添加分割线
+  .ant-table {
+    .ant-table-tbody > tr > td:last-child {
+      text-align: right;
+      position: relative;
+
+      &::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        height: 20px;
+        width: 1px;
+        background-color: #f0f0f0;
+      }
+    }
+  }
 }
 
 .searchCard {

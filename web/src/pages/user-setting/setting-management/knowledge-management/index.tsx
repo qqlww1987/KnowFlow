@@ -1058,22 +1058,12 @@ const KnowledgeManagementPage = () => {
       ),
     },
     {
-      title: '文档数量',
+      title: '文档',
       dataIndex: 'doc_num',
       key: 'doc_num',
       width: 80,
       align: 'left',
       render: (count: number) => <Tag color="blue">{count}</Tag>,
-    },
-    {
-      title: '语言',
-      dataIndex: 'language',
-      key: 'language',
-      width: 80,
-      align: 'left',
-      render: (lang: string) => (
-        <Tag color="geekblue">{lang === 'Chinese' ? '中文' : '英文'}</Tag>
-      ),
     },
     {
       title: '解析方法',
