@@ -5,22 +5,89 @@ DOTS OCR 文档处理入口
 
 提供与现有document_parser.py兼容的接口，支持:
 - PDF文档的DOTS OCR解析
-- 图片文件的OCR处理
+- 图片文件的OCR处理  
+- 非PDF文件的预处理转换（Office文档、图像、URL等）
 - 与RAGFlow系统的集成
 """
 
 import os
 import tempfile
 import logging
-from typing import Optional, Callable
+from typing import Optional, Callable, Tuple
 from pathlib import Path
 from io import BytesIO
 
 from .dots_fastapi_adapter import get_global_adapter
 from .dots_processor import process_dots_result
 from .ragflow_integration import create_ragflow_resources
+# 导入MinerU的文件转换器
+from ..mineru_parse.file_converter import ensure_pdf, OFFICE_EXTENSIONS
 
 logger = logging.getLogger(__name__)
+
+def _ensure_pdf_for_dots(file_input: str, job_temp_dir: str, update_progress: Optional[Callable] = None) -> Tuple[Optional[str], Optional[str]]:
+    """
+    为DOTS处理确保输入文件为PDF格式
+    
+    Args:
+        file_input: 输入文件路径或URL
+        job_temp_dir: 临时目录
+        update_progress: 进度回调函数
+        
+    Returns:
+        tuple: (pdf_file_path, temp_file_to_cleanup)
+            - pdf_file_path: 可用于处理的PDF文件路径，失败时为None
+            - temp_file_to_cleanup: 需要清理的临时文件路径，无需清理时为None
+    """
+    logger.info(f"DOTS预处理: 确保文件为PDF格式 - {file_input}")
+    
+    if update_progress:
+        update_progress(0.05, "检查文件格式...")
+    
+    # 获取文件扩展名
+    file_ext = os.path.splitext(file_input)[1].lower()
+    
+    # 检查是否为支持的非PDF格式
+    if file_ext not in ['.pdf'] and (file_input.startswith('http') or file_ext in OFFICE_EXTENSIONS or file_ext in {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'}):
+        logger.info(f"检测到非PDF文件，开始转换: {file_input} (扩展名: {file_ext})")
+        
+        if update_progress:
+            update_progress(0.1, f"转换{file_ext}文件为PDF...")
+        
+        try:
+            # 使用MinerU的转换器
+            pdf_path, temp_path = ensure_pdf(file_input, job_temp_dir)
+            
+            if pdf_path:
+                logger.info(f"文件转换成功: {file_input} -> {pdf_path}")
+                if update_progress:
+                    update_progress(0.2, "文件转换完成")
+                return pdf_path, temp_path
+            else:
+                logger.error(f"文件转换失败: {file_input}")
+                return None, None
+                
+        except Exception as e:
+            logger.error(f"文件转换异常: {file_input}, 错误: {e}")
+            return None, None
+    
+    elif file_ext == '.pdf':
+        # 已经是PDF文件
+        logger.info(f"输入文件已是PDF格式: {file_input}")
+        if update_progress:
+            update_progress(0.2, "PDF文件验证完成")
+        
+        if os.path.exists(file_input):
+            return file_input, None
+        else:
+            logger.error(f"PDF文件不存在: {file_input}")
+            return None, None
+    
+    else:
+        # 不支持的文件类型
+        logger.warning(f"不支持的文件类型: {file_input} (扩展名: {file_ext})")
+        logger.info(f"DOTS支持的文件类型: PDF, 以及可转换的格式: {list(OFFICE_EXTENSIONS)} + 图像文件")
+        return None, None
 
 def _process_pdf_to_images(file_path: str, adapter, update_progress: Optional[Callable] = None) -> list:
     """
@@ -103,9 +170,15 @@ def process_document_with_dots(doc_id: str, file_path: str, kb_id: str,
                               parser_config: Optional[dict] = None) -> int:
     """使用DOTS OCR处理文档的主入口函数
     
+    支持的文件类型:
+    - PDF文件 (直接处理)
+    - Office文档 (.docx, .pptx, .xlsx等，通过Gotenberg转换为PDF)
+    - 图像文件 (.jpg, .png等，通过Gotenberg转换为PDF)
+    - URL网页 (通过Gotenberg转换为PDF)
+    
     Args:
         doc_id: 文档ID
-        file_path: 文件路径
+        file_path: 文件路径或URL
         kb_id: 知识库ID  
         update_progress: 进度更新回调函数
         embedding_config: 嵌入模型配置
@@ -114,11 +187,30 @@ def process_document_with_dots(doc_id: str, file_path: str, kb_id: str,
     Returns:
         int: 生成的文档块数量
     """
+    temp_file_to_cleanup = None
+    
     try:
+        # 创建任务临时目录
+        job_temp_dir = tempfile.mkdtemp(prefix=f"dots_job_{doc_id}_")
+        logger.info(f"DOTS处理任务临时目录: {job_temp_dir}")
+        
+        if update_progress:
+            update_progress(0.05, "准备处理文件...")
+        
+        # 1. 预处理: 确保输入文件为PDF格式
+        processed_file_path, temp_file_to_cleanup = _ensure_pdf_for_dots(
+            file_path, job_temp_dir, update_progress
+        )
+        
+        if not processed_file_path:
+            raise Exception(f"文件预处理失败，无法转换为PDF格式: {file_path}")
+        
+        logger.info(f"DOTS将处理文件: {processed_file_path} (原文件: {file_path})")
+        
         if update_progress:
             update_progress(0.1, "初始化DOTS OCR服务")
         
-        # 1. 初始化DOTS适配器
+        # 2. 初始化DOTS适配器
         adapter = get_global_adapter()
         
         # 2. 测试连接
@@ -156,28 +248,10 @@ def process_document_with_dots(doc_id: str, file_path: str, kb_id: str,
         if update_progress:
             update_progress(0.2, "开始DOTS OCR解析")
         
-        # 3. 根据文件类型选择处理方式
-        file_ext = Path(file_path).suffix.lower()
-        
-        if file_ext == '.pdf':
-            # PDF文档处理 - 转换为图像后处理（符合DOTS VLLM要求）
-            logger.info(f"使用DOTS解析PDF文档: {file_path}")
-            document_results = _process_pdf_to_images(file_path, adapter, update_progress)
-        elif file_ext in ['.png', '.jpg', '.jpeg', '.bmp', '.tiff']:
-            # 单个图片处理
-            logger.info(f"使用DOTS解析图片文件: {file_path}")
-            with open(file_path, 'rb') as f:
-                image_bytes = f.read()
-            
-            # 加载PIL图像用于后续图片裁剪
-            from PIL import Image
-            page_image = Image.open(file_path)
-            
-            image_result = adapter.parse_image(image_bytes)
-            image_result['page_image'] = page_image
-            document_results = [image_result]  # 包装为列表
-        else:
-            raise ValueError(f"不支持的文件类型: {file_ext}")
+        # 3. 处理转换后的PDF文件（所有输入都已转换为PDF）
+        # 注意：此时 processed_file_path 总是指向一个PDF文件
+        logger.info(f"使用DOTS解析PDF文档: {processed_file_path}")
+        document_results = _process_pdf_to_images(processed_file_path, adapter, update_progress)
         
         if update_progress:
             update_progress(0.4, "处理OCR解析结果")
@@ -200,7 +274,6 @@ def process_document_with_dots(doc_id: str, file_path: str, kb_id: str,
                 logger.info(f"使用兼容配置: {chunking_config}")
         
         # 创建临时目录用于图片处理
-        import tempfile
         with tempfile.TemporaryDirectory() as temp_dir:
             processor_result = process_dots_result(
                 document_results,
@@ -253,19 +326,61 @@ def process_document_with_dots(doc_id: str, file_path: str, kb_id: str,
         if update_progress:
             update_progress(None, f"DOTS统一解析失败: {str(e)}")
         raise
+    
+    finally:
+        # 清理临时文件
+        if temp_file_to_cleanup and os.path.exists(temp_file_to_cleanup):
+            try:
+                os.remove(temp_file_to_cleanup)
+                logger.info(f"已清理临时转换文件: {temp_file_to_cleanup}")
+            except Exception as cleanup_error:
+                logger.warning(f"清理临时文件失败: {temp_file_to_cleanup}, 错误: {cleanup_error}")
+        
+        # 清理任务临时目录
+        try:
+            if 'job_temp_dir' in locals() and os.path.exists(job_temp_dir):
+                import shutil
+                shutil.rmtree(job_temp_dir)
+                logger.info(f"已清理任务临时目录: {job_temp_dir}")
+        except Exception as cleanup_error:
+            logger.warning(f"清理任务临时目录失败: {job_temp_dir}, 错误: {cleanup_error}")
 
 def is_dots_supported_file(file_path: str) -> bool:
     """检查文件是否支持DOTS OCR处理
     
+    支持的文件类型:
+    - PDF文件 (直接处理)
+    - Office文档 (.docx, .pptx, .xlsx等，通过Gotenberg转换)
+    - 图像文件 (.jpg, .png等，通过Gotenberg转换)  
+    - URL网页 (通过Gotenberg转换)
+    
     Args:
-        file_path: 文件路径
+        file_path: 文件路径或URL
         
     Returns:
         bool: 是否支持
     """
+    # 检查URL
+    if file_path.startswith('http://') or file_path.startswith('https://'):
+        return True
+    
+    # 检查文件扩展名
     file_ext = Path(file_path).suffix.lower()
-    supported_extensions = ['.pdf', '.png', '.jpg', '.jpeg', '.bmp', '.tiff']
-    return file_ext in supported_extensions
+    
+    # PDF文件直接支持
+    if file_ext == '.pdf':
+        return True
+    
+    # Office文档通过转换支持
+    if file_ext in OFFICE_EXTENSIONS:
+        return True
+    
+    # 图像文件通过转换支持
+    image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp'}
+    if file_ext in image_extensions:
+        return True
+    
+    return False
 
 def test_dots_service() -> dict:
     """测试DOTS服务状态
