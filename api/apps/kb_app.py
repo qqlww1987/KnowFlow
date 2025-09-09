@@ -14,6 +14,7 @@
 #  limitations under the License.
 #
 import json
+import logging
 
 from flask import request
 try:
@@ -223,12 +224,32 @@ def rm():
             code=settings.RetCode.AUTHENTICATION_ERROR
         )
     try:
+        # 首先尝试查询用户创建的知识库
         kbs = KnowledgebaseService.query(
             created_by=current_user.id, id=req["kb_id"])
+        
+        # 如果不是创建者，检查是否有RBAC权限
         if not kbs:
-            return get_json_result(
-                data=False, message='Only owner of knowledgebase authorized for this operation.',
-                code=settings.RetCode.OPERATING_ERROR)
+            # 检查用户是否通过RBAC系统有管理权限（如超级管理员）
+            has_rbac_permission = False
+            try:
+                has_rbac_permission = check_rbac_permission(
+                    current_user.id, 
+                    RBACResourceType.KNOWLEDGEBASE, 
+                    req["kb_id"], 
+                    RBACPermissionType.KB_ADMIN
+                )
+            except Exception as e:
+                logging.warning(f"RBAC permission check failed: {e}")
+            
+            if has_rbac_permission:
+                # 如果有RBAC权限，查询知识库（不限制创建者）
+                kbs = KnowledgebaseService.query(id=req["kb_id"])
+            
+            if not kbs:
+                return get_json_result(
+                    data=False, message='Only owner of knowledgebase authorized for this operation.',
+                    code=settings.RetCode.OPERATING_ERROR)
 
         for doc in DocumentService.query(kb_id=req["kb_id"]):
             if not DocumentService.remove_document(doc, kbs[0].tenant_id):

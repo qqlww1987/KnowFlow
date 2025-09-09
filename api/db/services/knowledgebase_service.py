@@ -48,7 +48,8 @@ class KnowledgebaseService(CommonService):
         """Check if a knowledge base can be deleted by a specific user.
 
         This method verifies whether a user has permission to delete a knowledge base
-        by checking if they are the creator of that knowledge base.
+        by first checking RBAC permissions, and if no RBAC permission exists,
+        falls back to checking if they are the creator of that knowledge base.
 
         Args:
             kb_id (str): The unique identifier of the knowledge base to check.
@@ -63,12 +64,29 @@ class KnowledgebaseService(CommonService):
             True
 
         Note:
-            - This method only checks creator permissions
-            - A return value of False can mean either:
-                1. The knowledge base doesn't exist
-                2. The user is not the creator of the knowledge base
+            - Priority 1: Check RBAC admin permissions (including super admin)
+            - Priority 2: Fallback to original creator permission check
+            - A return value of False means the user has neither RBAC permission nor creator permission
         """
-        # Check if a knowledge base can be deleted by a user
+        # Priority 1: Check RBAC permissions first
+        try:
+            from api.utils.rbac_utils import check_rbac_permission, RBACResourceType, RBACPermissionType
+            # Check for admin permission through RBAC system (includes super admin)
+            has_rbac_permission = check_rbac_permission(
+                user_id=user_id,
+                resource_type=RBACResourceType.KNOWLEDGEBASE,
+                resource_id=kb_id,
+                permission_type=RBACPermissionType.KB_ADMIN,
+                tenant_id='default'
+            )
+            if has_rbac_permission:
+                return True
+        except Exception as e:
+            # If RBAC check fails, log the error but continue to original logic
+            import logging
+            logging.warning(f"RBAC permission check failed for user {user_id} on KB {kb_id}: {e}")
+        
+        # Priority 2: Fallback to original creator permission check
         docs = cls.model.select(
             cls.model.id).where(cls.model.id == kb_id, cls.model.created_by == user_id).paginate(0, 1)
         docs = docs.dicts()
