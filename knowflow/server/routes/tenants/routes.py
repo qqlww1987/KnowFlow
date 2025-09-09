@@ -1,5 +1,5 @@
 from flask import jsonify, request
-from services.tenants.service import get_tenants_with_pagination, update_tenant
+from services.tenants.service import get_tenants_with_pagination, update_tenant, get_all_configured_models, get_admin_tenant_config
 from .. import tenants_bp
 
 @tenants_bp.route('', methods=['GET'])
@@ -50,4 +50,36 @@ def update_tenant_route(tenant_id):
         return jsonify({
             "code": 500,
             "message": f"更新租户失败: {str(e)}"
+        }), 500
+
+@tenants_bp.route('/models', methods=['GET'])
+def get_configured_models():
+    """获取所有租户已配置的模型列表，去重后返回"""
+    try:
+        models = get_all_configured_models()
+        return jsonify({
+            "code": 0,
+            "data": models,
+            "message": "获取已配置模型列表成功"
+        })
+    except Exception as e:
+        return jsonify({
+            "code": 500,
+            "message": f"获取已配置模型列表失败: {str(e)}"
+        }), 500
+
+@tenants_bp.route('/admin-defaults', methods=['GET'])
+def get_admin_defaults():
+    """获取超级管理员的默认模型配置"""
+    try:
+        defaults = get_admin_tenant_config()
+        return jsonify({
+            "code": 0,
+            "data": defaults,
+            "message": "获取管理员默认配置成功"
+        })
+    except Exception as e:
+        return jsonify({
+            "code": 500,
+            "message": f"获取管理员默认配置失败: {str(e)}"
         }), 500

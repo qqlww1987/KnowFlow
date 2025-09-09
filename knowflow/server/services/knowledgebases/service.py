@@ -251,32 +251,45 @@ class KnowledgebaseService:
             else:
                 print(f"使用传入的 creator_id 作为 tenant_id 和 created_by: {tenant_id}")
 
-            # --- 获取动态 embd_id ---
+            # --- 获取用户配置的向量模型 ---
             dynamic_embd_id = None
             default_embd_id = "bge-m3"  # Fallback default
             try:
-                query_embedding_model = """
-                    SELECT llm_name
-                    FROM tenant_llm
-                    WHERE model_type = 'embedding' AND update_time IS NOT NULL AND tenant_id = %s
-                    ORDER BY update_time DESC
-                    LIMIT 1
+                # 直接从tenant表获取用户配置的向量模型
+                query_tenant_embedding = """
+                    SELECT embd_id
+                    FROM tenant
+                    WHERE id = %s AND embd_id IS NOT NULL AND embd_id != ''
                 """
-                cursor.execute(query_embedding_model, (tenant_id,))
-                embedding_model = cursor.fetchone()
+                cursor.execute(query_tenant_embedding, (tenant_id,))
+                tenant_config = cursor.fetchone()
 
-                if embedding_model and embedding_model.get("llm_name"):
-                    dynamic_embd_id = embedding_model["llm_name"]
-                    # 对硅基流动平台进行特异性处理
-                    if dynamic_embd_id == "netease-youdao/bce-embedding-base_v1":
-                        dynamic_embd_id = "BAAI/bge-m3"
-                    print(f"动态获取到的 embedding 模型 ID: {dynamic_embd_id}")
+                if tenant_config and tenant_config.get("embd_id"):
+                    dynamic_embd_id = tenant_config["embd_id"]
+                    print(f"从租户配置获取到的向量模型 ID: {dynamic_embd_id}")
                 else:
-                    dynamic_embd_id = default_embd_id
-                    print(f"未在 tenant_llm 表中找到 embedding 模型, 使用默认值: {dynamic_embd_id}")
+                    # 如果用户未配置向量模型，尝试获取超级管理员的默认配置
+                    query_admin_tenant = """
+                        SELECT t.embd_id
+                        FROM tenant t
+                        JOIN user u ON t.id = u.id
+                        WHERE u.email = 'admin@gmail.com' 
+                        AND t.embd_id IS NOT NULL AND t.embd_id != ''
+                        ORDER BY u.create_time ASC
+                        LIMIT 1
+                    """
+                    cursor.execute(query_admin_tenant)
+                    admin_config = cursor.fetchone()
+                    
+                    if admin_config and admin_config.get("embd_id"):
+                        dynamic_embd_id = admin_config["embd_id"]
+                        print(f"从超级管理员配置获取到的向量模型 ID: {dynamic_embd_id}")
+                    else:
+                        dynamic_embd_id = default_embd_id
+                        print(f"未找到用户和管理员配置的向量模型，使用默认值: {dynamic_embd_id}")
             except Exception as e:
                 dynamic_embd_id = default_embd_id
-                print(f"查询 embedding 模型失败: {str(e)}，使用默认值: {dynamic_embd_id}")
+                print(f"查询向量模型配置失败: {str(e)}，使用默认值: {dynamic_embd_id}")
                 traceback.print_exc()  # Log the full traceback for debugging
 
             current_time = datetime.now()

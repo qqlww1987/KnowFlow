@@ -22,11 +22,10 @@ import {
   Tag,
   message,
 } from 'antd';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import styles from './index.less';
 
 import { getLlmNameAndFIdByLlmId, getRealModelName } from '@/utils/llm-util';
-import llmFactories from '@parent/conf/llm_factories.json';
 
 const { Option } = Select;
 
@@ -48,6 +47,17 @@ const UserConfigPage = () => {
   );
   const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
   const [searchValue, setSearchValue] = useState('');
+  const [chatModelOptions, setChatModelOptions] = useState<string[]>([]);
+  const [embeddingModelOptions, setEmbeddingModelOptions] = useState<string[]>(
+    [],
+  );
+  const [adminDefaults, setAdminDefaults] = useState<{
+    chat_model: string;
+    embedding_model: string;
+  }>({
+    chat_model: '',
+    embedding_model: '',
+  });
 
   const [editForm] = Form.useForm();
   const [pagination, setPagination] = useState({
@@ -56,49 +66,51 @@ const UserConfigPage = () => {
     total: 0,
   });
 
-  // 从 llm_factories.json 动态生成可用的模型选项
-  const chatModelOptions = useMemo(() => {
-    const set = new Set<string>();
+  // 加载已配置的模型选项
+  const loadConfiguredModels = async () => {
     try {
-      const factories = (llmFactories as any)?.factory_llm_infos ?? [];
-      factories.forEach((f: any) => {
-        // 仅选用启用的厂商（status === '1'）
-        if (String(f?.status ?? '') !== '1') return;
-        (f?.llm ?? []).forEach((m: any) => {
-          if (
-            String(m?.model_type ?? '').toLowerCase() === 'chat' &&
-            m?.llm_name
-          ) {
-            set.add(m.llm_name);
-          }
-        });
+      const res = await request.get('/api/knowflow/v1/tenants/models', {
+        skipSnakeCase: true,
       });
-    } catch {}
-    return Array.from(set).sort();
-  }, []);
+      if (res?.data?.code === 0) {
+        const { chat_models, embedding_models } = res.data.data;
+        setChatModelOptions(chat_models || []);
+        setEmbeddingModelOptions(embedding_models || []);
+      } else {
+        console.error('获取已配置模型失败:', res?.data?.message);
+        setChatModelOptions([]);
+        setEmbeddingModelOptions([]);
+      }
+    } catch (error) {
+      console.error('加载已配置模型失败:', error);
+      message.error('加载模型选项失败，请稍后重试');
+      setChatModelOptions([]);
+      setEmbeddingModelOptions([]);
+    }
+  };
 
-  const embeddingModelOptions = useMemo(() => {
-    const set = new Set<string>();
+  // 加载管理员默认配置
+  const loadAdminDefaults = async () => {
     try {
-      const factories = (llmFactories as any)?.factory_llm_infos ?? [];
-      factories.forEach((f: any) => {
-        if (String(f?.status ?? '') !== '1') return;
-        (f?.llm ?? []).forEach((m: any) => {
-          if (
-            String(m?.model_type ?? '').toLowerCase() === 'embedding' &&
-            m?.llm_name
-          ) {
-            set.add(m.llm_name);
-          }
-        });
+      const res = await request.get('/api/knowflow/v1/tenants/admin-defaults', {
+        skipSnakeCase: true,
       });
-    } catch {}
-    return Array.from(set).sort();
-  }, []);
+      if (res?.data?.code === 0) {
+        setAdminDefaults(res.data.data);
+      }
+    } catch (error) {
+      console.error('加载管理员默认配置失败:', error);
+    }
+  };
 
   useEffect(() => {
     loadConfigData();
   }, [pagination.current, pagination.pageSize, searchValue]);
+
+  useEffect(() => {
+    loadConfiguredModels();
+    loadAdminDefaults();
+  }, []);
 
   const loadConfigData = async () => {
     setLoading(true);
@@ -137,8 +149,8 @@ const UserConfigPage = () => {
     setCurrentConfig(record);
     editForm.setFieldsValue({
       username: record.username,
-      chatModel: record.chatModel,
-      embeddingModel: record.embeddingModel,
+      chatModel: record.chatModel || adminDefaults.chat_model,
+      embeddingModel: record.embeddingModel || adminDefaults.embedding_model,
     });
     setEditModalVisible(true);
   };
@@ -386,7 +398,7 @@ const UserConfigPage = () => {
             rules={[{ required: true, message: '请选择聊天模型' }]}
           >
             <Select
-              placeholder="请选择聊天模型"
+              placeholder={`请选择聊天模型${adminDefaults.chat_model ? ` (默认: ${getModelDisplayName(adminDefaults.chat_model)})` : ''}`}
               showSearch
               optionFilterProp="value"
             >
@@ -395,6 +407,11 @@ const UserConfigPage = () => {
                   <Space>
                     <RobotOutlined />
                     {getModelDisplayName(model)}
+                    {model === adminDefaults.chat_model && (
+                      <Tag size="small" color="blue">
+                        默认
+                      </Tag>
+                    )}
                   </Space>
                 </Option>
               ))}
@@ -406,7 +423,7 @@ const UserConfigPage = () => {
             rules={[{ required: true, message: '请选择嵌入模型' }]}
           >
             <Select
-              placeholder="请选择嵌入模型"
+              placeholder={`请选择嵌入模型${adminDefaults.embedding_model ? ` (默认: ${getModelDisplayName(adminDefaults.embedding_model)})` : ''}`}
               showSearch
               optionFilterProp="value"
             >
@@ -415,6 +432,11 @@ const UserConfigPage = () => {
                   <Space>
                     <ApiOutlined />
                     {getModelDisplayName(model)}
+                    {model === adminDefaults.embedding_model && (
+                      <Tag size="small" color="blue">
+                        默认
+                      </Tag>
+                    )}
                   </Space>
                 </Option>
               ))}
@@ -425,6 +447,8 @@ const UserConfigPage = () => {
         <div className={styles.formTip}>
           <p>• 聊天模型用于处理对话和文本生成任务</p>
           <p>• 嵌入模型用于文档向量化和语义搜索</p>
+          <p>• 模型选项来源于所有租户的已配置模型</p>
+          <p>• 用户模型默认值与超级管理员保持一致</p>
           <p>• 修改后将立即生效，影响该用户的所有操作</p>
         </div>
       </Modal>

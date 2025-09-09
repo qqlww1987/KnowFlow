@@ -119,3 +119,92 @@ def update_tenant(tenant_id, tenant_data):
     except mysql.connector.Error as err:
         print(f"更新租户错误: {err}")
         return False
+
+def get_all_configured_models():
+    """获取所有租户已配置的模型列表，去重后返回"""
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG)
+        cursor = conn.cursor(dictionary=True)
+        
+        # 获取所有租户的模型配置
+        query = """
+        SELECT DISTINCT 
+            llm_id as chat_model,
+            embd_id as embedding_model
+        FROM tenant 
+        WHERE (llm_id IS NOT NULL AND llm_id != '') 
+           OR (embd_id IS NOT NULL AND embd_id != '')
+        """
+        cursor.execute(query)
+        results = cursor.fetchall()
+        
+        # 关闭连接
+        cursor.close()
+        conn.close()
+        
+        # 提取去重的模型列表
+        chat_models = set()
+        embedding_models = set()
+        
+        for row in results:
+            if row['chat_model']:
+                chat_models.add(row['chat_model'])
+            if row['embedding_model']:
+                embedding_models.add(row['embedding_model'])
+        
+        return {
+            'chat_models': sorted(list(chat_models)),
+            'embedding_models': sorted(list(embedding_models))
+        }
+        
+    except mysql.connector.Error as err:
+        print(f"获取已配置模型错误: {err}")
+        return {
+            'chat_models': [],
+            'embedding_models': []
+        }
+
+def get_admin_tenant_config():
+    """获取超级管理员租户的配置作为默认值"""
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG)
+        cursor = conn.cursor(dictionary=True)
+        
+        # 查询超级管理员用户
+        admin_query = """
+        SELECT id FROM user 
+        WHERE email = 'admin@gmail.com' 
+        ORDER BY create_time ASC 
+        LIMIT 1
+        """
+        cursor.execute(admin_query)
+        admin_user = cursor.fetchone()
+        
+        if not admin_user:
+            cursor.close()
+            conn.close()
+            return {'chat_model': '', 'embedding_model': ''}
+        
+        # 查询管理员租户配置
+        tenant_query = """
+        SELECT llm_id as chat_model, embd_id as embedding_model
+        FROM tenant 
+        WHERE id = %s
+        """
+        cursor.execute(tenant_query, (admin_user['id'],))
+        tenant_config = cursor.fetchone()
+        
+        cursor.close()
+        conn.close()
+        
+        if tenant_config:
+            return {
+                'chat_model': tenant_config['chat_model'] or '',
+                'embedding_model': tenant_config['embedding_model'] or ''
+            }
+        else:
+            return {'chat_model': '', 'embedding_model': ''}
+            
+    except mysql.connector.Error as err:
+        print(f"获取管理员租户配置错误: {err}")
+        return {'chat_model': '', 'embedding_model': ''}
