@@ -1,4 +1,4 @@
-from flask import jsonify, request
+from flask import jsonify, request, g
 from services.users.service import get_users_with_pagination, delete_user, create_user, update_user, reset_user_password, get_assignable_users_with_pagination
 from services.rbac.permission_service import permission_service
 from models.rbac_models import ResourceType, PermissionType, RoleType
@@ -15,7 +15,9 @@ def get_users():
         email = request.args.get('email', '')
         
         # 调用服务函数获取分页和筛选后的用户数据
-        users, total = get_users_with_pagination(current_page, page_size, username, email)
+        current_user_id = getattr(g, 'current_user_id', None)
+        user_role = getattr(g, 'current_user_role', None)
+        users, total = get_users_with_pagination(current_page, page_size, username, email, current_user_id, user_role)
         
         # 返回符合前端期望格式的数据
         return jsonify({
@@ -44,7 +46,9 @@ def get_assignable_users():
         email = request.args.get('email', '')
         
         # 调用服务函数获取可分配权限的用户数据
-        users, total = get_assignable_users_with_pagination(current_page, page_size, username, email)
+        current_user_id = getattr(g, 'current_user_id', None)
+        user_role = getattr(g, 'current_user_role', None)
+        users, total = get_assignable_users_with_pagination(current_page, page_size, username, email, current_user_id, user_role)
         
         # 返回符合前端期望格式的数据
         return jsonify({
@@ -107,14 +111,41 @@ def update_user_route(user_id):
 
 @users_bp.route('/me', methods=['GET'])
 def get_current_user():
-    return jsonify({
-        "code": 0,
-        "data": {
-            "username": "admin",
-            "roles": ["admin"]
-        },
-        "message": "获取用户信息成功"
-    })
+    """获取当前登录用户信息"""
+    try:
+        # 从Flask g对象中获取用户信息
+        if not hasattr(g, 'current_user_id') or not g.current_user_id:
+            return jsonify({
+                "code": 401,
+                "message": "用户未登录"
+            }), 401
+        
+        # 根据角色返回相应的roles数组    
+        roles = []
+        if g.current_user_role == 'super_admin':
+            roles = ["admin", "super_admin"]  # 超级管理员包含admin权限
+        elif g.current_user_role == 'admin':
+            roles = ["admin"]
+        else:
+            roles = ["user"]
+        
+        return jsonify({
+            "code": 0,
+            "data": {
+                "id": g.current_user_id,
+                "username": g.current_user_name or "用户",
+                "email": g.current_user_email or "",
+                "roles": roles,
+                "role": g.current_user_role
+            },
+            "message": "获取用户信息成功"
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "code": 500,
+            "message": f"获取用户信息失败: {str(e)}"
+        }), 500
 
 @users_bp.route('/<string:user_id>/reset-password', methods=['PUT'])
 def reset_password_route(user_id):

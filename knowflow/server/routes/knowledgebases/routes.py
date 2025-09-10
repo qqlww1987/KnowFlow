@@ -1,5 +1,5 @@
 import traceback
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 from services.knowledgebases.service import KnowledgebaseService
 from services.rbac.permission_service import permission_service
 from services.rbac.permission_decorator import require_permission
@@ -14,7 +14,9 @@ def get_knowledgebase_list():
         params = {
             'page': int(request.args.get('current_page', 1)),
             'size': int(request.args.get('size', 10)),
-            'name': request.args.get('name', '')
+            'name': request.args.get('name', ''),
+            'current_user_id': getattr(g, 'current_user_id', None),
+            'user_role': getattr(g, 'current_user_role', None)
         }
         result = KnowledgebaseService.get_knowledgebase_list(**params)
         return success_response(result)

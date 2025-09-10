@@ -24,7 +24,7 @@ class KnowledgebaseService:
         return mysql.connector.connect(**DB_CONFIG)
 
     @classmethod
-    def get_knowledgebase_list(cls, page=1, size=10, name="", sort_by="create_time", sort_order="desc"):
+    def get_knowledgebase_list(cls, page=1, size=10, name="", sort_by="create_time", sort_order="desc", current_user_id=None, user_role=None):
         """获取知识库列表"""
         conn = cls._get_db_connection()
         cursor = conn.cursor(dictionary=True)
@@ -51,11 +51,30 @@ class KnowledgebaseService:
                 k.created_by
             FROM knowledgebase k
         """
+        
+        # 构建WHERE子句和参数
+        where_clauses = []
         params = []
 
         if name:
-            query += " WHERE k.name LIKE %s"
+            where_clauses.append("k.name LIKE %s")
             params.append(f"%{name}%")
+        
+        # 添加基于角色的权限过滤
+        if current_user_id and user_role:
+            if user_role == 'admin':
+                # 管理员只能看到自己创建的知识库
+                where_clauses.append("k.created_by = %s")
+                params.append(current_user_id)
+            elif user_role == 'user':
+                # 普通用户只能看到自己创建的或有权限访问的知识库
+                where_clauses.append("k.created_by = %s")
+                params.append(current_user_id)
+            # super_admin 不添加过滤条件，可以看到所有知识库
+        
+        # 组合WHERE子句
+        if where_clauses:
+            query += " WHERE " + " AND ".join(where_clauses)
 
         # 添加查询排序条件
         query += f" {sort_clause}"
@@ -83,10 +102,10 @@ class KnowledgebaseService:
                         result["create_date"] = ""
 
         # 获取总数
-        count_query = "SELECT COUNT(*) as total FROM knowledgebase"
-        if name:
-            count_query += " WHERE name LIKE %s"
-        cursor.execute(count_query, params[:1] if name else [])
+        count_query = "SELECT COUNT(*) as total FROM knowledgebase k"
+        if where_clauses:
+            count_query += " WHERE " + " AND ".join(where_clauses)
+        cursor.execute(count_query, params)
         total = cursor.fetchone()["total"]
 
         cursor.close()

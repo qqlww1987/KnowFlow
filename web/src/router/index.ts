@@ -1,10 +1,10 @@
-import type { RouteRecordRaw } from "vue-router"
-import { routerConfig } from "@/router/config"
-import { registerNavigationGuard } from "@/router/guard"
-import { createRouter } from "vue-router"
-import { flatMultiLevelRoutes } from "./helper"
+import { routerConfig } from '@/router/config';
+import { registerNavigationGuard } from '@/router/guard';
+import type { RouteRecordRaw } from 'vue-router';
+import { createRouter } from 'vue-router';
+import { flatMultiLevelRoutes } from './helper';
 
-const Layouts = () => import("@/layouts/index.vue")
+const Layouts = () => import('@/layouts/index.vue');
 
 /**
  * @name 常驻路由
@@ -12,39 +12,39 @@ const Layouts = () => import("@/layouts/index.vue")
  */
 export const constantRoutes: RouteRecordRaw[] = [
   {
-    path: "/redirect",
+    path: '/redirect',
     component: Layouts,
     meta: {
-      hidden: true
+      hidden: true,
     },
     children: [
       {
-        path: ":path(.*)",
-        component: () => import("@/pages/redirect/index.vue")
-      }
-    ]
+        path: ':path(.*)',
+        component: () => import('@/pages/redirect/index.vue'),
+      },
+    ],
   },
   {
-    path: "/403",
-    component: () => import("@/pages/error/403.vue"),
+    path: '/403',
+    component: () => import('@/pages/error/403.vue'),
     meta: {
-      hidden: true
-    }
-  },
-  {
-    path: "/404",
-    component: () => import("@/pages/error/404.vue"),
-    meta: {
-      hidden: true
+      hidden: true,
     },
-    alias: "/:pathMatch(.*)*"
   },
   {
-    path: "/login",
-    component: () => import("@/pages/login/index.vue"),
+    path: '/404',
+    component: () => import('@/pages/error/404.vue'),
     meta: {
-      hidden: true
-    }
+      hidden: true,
+    },
+    alias: '/:pathMatch(.*)*',
+  },
+  {
+    path: '/login',
+    component: () => import('@/pages/login/index.vue'),
+    meta: {
+      hidden: true,
+    },
   },
   // {
   //   path: "/",
@@ -83,94 +83,22 @@ export const constantRoutes: RouteRecordRaw[] = [
   // },
 
   {
-    path: "/",
+    path: '/',
     component: Layouts,
-    redirect: "/dashboard",
+    redirect: '/dashboard',
     children: [
       {
-        path: "dashboard",
-        component: () => import("@/pages/user-management/index.vue"),
-        name: "UserManagement",
+        path: 'dashboard',
+        component: () => import('@/pages/dashboard/index.vue'),
+        name: 'Dashboard',
         meta: {
-          title: "用户管理",
-          svgIcon: "user-management",
-          affix: true
-        }
-      }
-    ]
+          title: '首页',
+          svgIcon: 'dashboard',
+          affix: true,
+        },
+      },
+    ],
   },
-  {
-    path: "/team",
-    component: Layouts,
-    redirect: "/team/index",
-    children: [
-      {
-        path: "index",
-        component: () => import("@/pages/team-management/index.vue"),
-        name: "Team",
-        meta: {
-          title: "团队管理",
-          svgIcon: "team-management",
-          affix: false,
-          keepAlive: true
-        }
-      }
-    ]
-  },
-  {
-    path: "/file",
-    component: Layouts,
-    redirect: "/file/index",
-    children: [
-      {
-        path: "index",
-        component: () => import("@/pages/file/index.vue"),
-        name: "File",
-        meta: {
-          title: "文件管理",
-          svgIcon: "file",
-          affix: false,
-          keepAlive: true
-        }
-      }
-    ]
-  },
-  {
-    path: "/knowledgebase",
-    component: Layouts,
-    redirect: "/knowledgebase/index",
-    children: [
-      {
-        path: "index",
-        component: () => import("@/pages/knowledgebase/index.vue"),
-        name: "KnowledgeBase",
-        meta: {
-          title: "知识库管理",
-          svgIcon: "kb",
-          affix: false,
-          keepAlive: true
-        }
-      }
-    ]
-  },
-  {
-    path: "/config",
-    component: Layouts,
-    redirect: "/config/index",
-    children: [
-      {
-        path: "index",
-        component: () => import("@/pages/user-config/index.vue"),
-        name: "UserConfig",
-        meta: {
-          title: "用户配置",
-          svgIcon: "user-config",
-          affix: false,
-          keepAlive: true
-        }
-      }
-    ]
-  }
   // {
   //   path: "/",
   //   component: () => import("@/pages/demo/element-plus/index.vue"),
@@ -291,7 +219,7 @@ export const constantRoutes: RouteRecordRaw[] = [
   //     }
   //   ]
   // }
-]
+];
 
 /**
  * @name 动态路由
@@ -299,64 +227,96 @@ export const constantRoutes: RouteRecordRaw[] = [
  * @description 必须带有唯一的 Name 属性
  */
 export const dynamicRoutes: RouteRecordRaw[] = [
-  // {
-  //   path: "/permission",
-  //   component: Layouts,
-  //   redirect: "/permission/page-level",
-  //   name: "Permission",
-  //   meta: {
-  //     title: "权限演示",
-  //     elIcon: "Lock",
-  //     // 可以在根路由中设置角色
-  //     roles: ["admin", "editor"],
-  //     alwaysShow: true
-  //   },
-  //   children: [
-  //     {
-  //       path: "page-level",
-  //       component: () => import("@/pages/demo/permission/page-level.vue"),
-  //       name: "PermissionPageLevel",
-  //       meta: {
-  //         title: "页面级",
-  //         // 或者在子路由中设置角色
-  //         roles: ["admin"]
-  //       }
-  //     },
-  //     {
-  //       path: "button-level",
-  //       component: () => import("@/pages/demo/permission/button-level.vue"),
-  //       name: "PermissionButtonLevel",
-  //       meta: {
-  //         title: "按钮级",
-  //         // 如果未设置角色，则表示：该页面不需要权限，但会继承根路由的角色
-  //         roles: undefined
-  //       }
-  //     }
-  //   ]
-  // }
-]
+  {
+    path: '/management',
+    component: Layouts,
+    redirect: '/management/users',
+    name: 'Management',
+    meta: {
+      title: '系统管理',
+      svgIcon: 'management',
+      // 管理员和超级管理员都可以访问
+      roles: ['admin', 'super_admin'],
+      alwaysShow: true,
+    },
+    children: [
+      {
+        path: 'users',
+        component: () => import('@/pages/user-management/index.vue'),
+        name: 'UserManagement',
+        meta: {
+          title: '用户管理',
+          svgIcon: 'user-management',
+          roles: ['admin', 'super_admin'],
+        },
+      },
+      {
+        path: 'teams',
+        component: () => import('@/pages/team-management/index.vue'),
+        name: 'TeamManagement',
+        meta: {
+          title: '团队管理',
+          svgIcon: 'team-management',
+          roles: ['admin', 'super_admin'],
+        },
+      },
+      {
+        path: 'files',
+        component: () => import('@/pages/file/index.vue'),
+        name: 'FileManagement',
+        meta: {
+          title: '文件管理',
+          svgIcon: 'file',
+          roles: ['admin', 'super_admin'],
+        },
+      },
+      {
+        path: 'knowledgebases',
+        component: () => import('@/pages/knowledgebase/index.vue'),
+        name: 'KnowledgeBaseManagement',
+        meta: {
+          title: '知识库管理',
+          svgIcon: 'kb',
+          roles: ['admin', 'super_admin'],
+        },
+      },
+      {
+        path: 'configs',
+        component: () => import('@/pages/user-config/index.vue'),
+        name: 'UserConfigManagement',
+        meta: {
+          title: '用户配置',
+          svgIcon: 'user-config',
+          roles: ['admin', 'super_admin'],
+        },
+      },
+    ],
+  },
+];
 
 /** 路由实例 */
 export const router = createRouter({
   history: routerConfig.history,
-  routes: routerConfig.thirdLevelRouteCache ? flatMultiLevelRoutes(constantRoutes) : constantRoutes
-})
+  routes: routerConfig.thirdLevelRouteCache
+    ? flatMultiLevelRoutes(constantRoutes)
+    : constantRoutes,
+});
 
 /** 重置路由 */
 export function resetRouter() {
   try {
     // 注意：所有动态路由路由必须带有 Name 属性，否则可能会不能完全重置干净
     router.getRoutes().forEach((route) => {
-      const { name, meta } = route
+      const { name, meta } = route;
       if (name && meta.roles?.length) {
-        router.hasRoute(name) && router.removeRoute(name)
+        router.hasRoute(name) && router.removeRoute(name);
       }
-    })
+    });
   } catch {
     // 强制刷新浏览器也行，只是交互体验不是很好
-    location.reload()
+    location.reload();
   }
 }
 
 // 注册路由导航守卫
-registerNavigationGuard(router)
+registerNavigationGuard(router);

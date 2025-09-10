@@ -4,7 +4,7 @@ from utils import generate_uuid
 from database import DB_CONFIG
 
 
-def get_teams_with_pagination(current_page, page_size, name=''):
+def get_teams_with_pagination(current_page, page_size, name='', current_user_id=None, user_role=None):
     """查询团队信息，支持分页和条件筛选"""
     try:
         conn = mysql.connector.connect(**DB_CONFIG)
@@ -17,6 +17,23 @@ def get_teams_with_pagination(current_page, page_size, name=''):
         if name:
             where_clauses.append("t.name LIKE %s")
             params.append(f"%{name}%")
+        
+        # 添加基于角色的权限过滤
+        if current_user_id and user_role:
+            if user_role == 'admin':
+                # 管理员只能看到自己创建的团队
+                where_clauses.append("t.created_by = %s")
+                params.append(current_user_id)
+            elif user_role == 'user':
+                # 普通用户只能看到自己参与的团队
+                where_clauses.append("""
+                    EXISTS (
+                        SELECT 1 FROM user_tenant ut 
+                        WHERE ut.tenant_id = t.id AND ut.user_id = %s AND ut.status = 1
+                    )
+                """)
+                params.append(current_user_id)
+            # super_admin 不添加过滤条件，可以看到所有团队
         
         # 组合WHERE子句
         where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"

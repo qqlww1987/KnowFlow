@@ -1,4 +1,4 @@
-from flask import jsonify, request
+from flask import jsonify, request, g
 from services.teams.service import (
     get_teams_with_pagination, get_team_by_id, create_team, update_team, delete_team,
     get_team_members, add_team_member, remove_team_member
@@ -17,7 +17,9 @@ def get_teams():
         team_name = request.args.get('name', '')
         
         # 调用服务函数获取分页和筛选后的团队数据
-        teams, total = get_teams_with_pagination(current_page, page_size, team_name)
+        current_user_id = getattr(g, 'current_user_id', None)
+        user_role = getattr(g, 'current_user_role', None)
+        teams, total = get_teams_with_pagination(current_page, page_size, team_name, current_user_id, user_role)
         
         # 返回符合前端期望格式的数据
         return jsonify({

@@ -4,12 +4,14 @@ import os
 import logging
 import time
 import threading
-from flask import Flask, jsonify, request
+import mysql.connector
+from flask import Flask, jsonify, request, g
 from flask_cors import CORS
 from datetime import datetime, timedelta
 from routes import register_routes
 from dotenv import load_dotenv
 from rbac_init import initialize_rbac_system, RBACInitializer
+from database import DB_CONFIG
 
 # 配置日志
 logging.basicConfig(
@@ -24,6 +26,164 @@ load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file_
 app = Flask(__name__)
 # 启用CORS，允许前端访问
 CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
+
+# ==================== 用户身份识别机制 ====================
+
+def get_current_user():
+    """
+    获取当前请求的用户信息
+    返回: (user_id, role) 或 None
+    """
+    try:
+        # 1. 从 Authorization header 获取
+        auth_header = request.headers.get('Authorization')
+        user_id = None
+        
+        if auth_header and auth_header.startswith('Bearer '):
+            token = auth_header.split(' ')[1]
+            # 这里可以解析JWT或从数据库查询用户
+            user_id = get_user_id_from_token(token)
+        
+        # 2. 从 X-User-ID header 获取（临时方案）
+        if not user_id:
+            user_id = request.headers.get('X-User-ID')
+        
+        # 3. 从 cookie 获取（fallback）
+        if not user_id:
+            user_id = request.cookies.get('user_id')
+        
+        # 4. 默认使用admin用户（向后兼容）
+        if not user_id:
+            user_id = get_default_admin_user_id()
+        
+        if not user_id:
+            return None
+            
+        # 从数据库获取用户角色信息
+        return get_user_info_from_db(user_id)
+        
+    except Exception as e:
+        logger.warning(f"获取用户信息失败: {e}")
+        return None
+
+def get_user_id_from_token(token):
+    """从token获取用户ID（简化实现）"""
+    # TODO: 实现JWT解析或token验证
+    return None
+
+
+def get_default_admin_user_id():
+    """获取默认管理员用户ID"""
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG)
+        cursor = conn.cursor()
+        
+        # 获取最早创建的超级管理员
+        cursor.execute("""
+            SELECT id FROM user 
+            WHERE is_superuser = 1 OR email = 'admin@gmail.com'
+            ORDER BY create_time ASC
+            LIMIT 1
+        """)
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        return result[0] if result else None
+    except Exception as e:
+        logger.warning(f"获取默认admin用户失败: {e}")
+        return None
+
+def get_user_info_from_db(user_id):
+    """从数据库获取用户信息"""
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG)
+        cursor = conn.cursor(dictionary=True)
+        
+        # 检查是否为超级管理员
+        cursor.execute("""
+            SELECT 
+                u.id, u.nickname, u.email, u.is_superuser,
+                COUNT(CASE WHEN r.code = 'super_admin' THEN 1 END) as is_super_admin_role,
+                COUNT(CASE WHEN r.code = 'admin' THEN 1 END) as is_admin_role
+            FROM user u
+            LEFT JOIN rbac_user_roles ur ON u.id = ur.user_id AND ur.is_active = 1
+            LEFT JOIN rbac_roles r ON ur.role_id = r.id
+            WHERE u.id = %s
+            GROUP BY u.id, u.nickname, u.email, u.is_superuser
+        """, (user_id,))
+        
+        user = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if not user:
+            return None
+            
+        # 确定用户角色
+        if user['is_superuser'] == 1 or user['is_super_admin_role'] > 0:
+            role = 'super_admin'
+        elif user['is_admin_role'] > 0:
+            role = 'admin'
+        else:
+            role = 'user'
+            
+        return user_id, role, user['nickname'], user['email']
+        
+    except Exception as e:
+        logger.warning(f"从数据库获取用户信息失败: {e}")
+        return None
+
+def get_manageable_user_ids(current_user_id, role):
+    """
+    获取当前用户可管理的用户ID列表
+    返回: list of user_ids 或 None（表示所有用户）
+    """
+    if role == 'super_admin':
+        return None  # 超级管理员可以看所有用户
+    
+    if role == 'admin':
+        try:
+            conn = mysql.connector.connect(**DB_CONFIG)
+            cursor = conn.cursor()
+            
+            # 获取当前用户创建的所有用户 + 用户自己
+            cursor.execute("""
+                SELECT id FROM user 
+                WHERE created_by = %s OR id = %s
+            """, (current_user_id, current_user_id))
+            
+            results = cursor.fetchall()
+            cursor.close()
+            conn.close()
+            
+            return [row[0] for row in results]
+            
+        except Exception as e:
+            logger.warning(f"获取可管理用户列表失败: {e}")
+            return [current_user_id]  # 至少返回自己
+    
+    return [current_user_id]  # 普通用户只能看自己
+
+# 在Flask的g对象中存储用户信息
+@app.before_request
+def load_user_info():
+    """在每个请求前加载用户信息"""
+    # 跳过不需要用户信息的路径
+    excluded_paths = ['/health', '/api/v1/auth/login', '/']
+    if request.path in excluded_paths or not request.path.startswith('/api/'):
+        return
+        
+    user_info = get_current_user()
+    if user_info:
+        g.current_user_id, g.current_user_role, g.current_user_name, g.current_user_email = user_info
+        g.manageable_user_ids = get_manageable_user_ids(g.current_user_id, g.current_user_role)
+    else:
+        g.current_user_id = None
+        g.current_user_role = None
+        g.current_user_name = None
+        g.current_user_email = None
+        g.manageable_user_ids = None
 
 # 请求前钩子：确保RBAC已初始化
 @app.before_request

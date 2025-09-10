@@ -57,7 +57,7 @@ def get_db_connection():
     """创建数据库连接"""
     return mysql.connector.connect(**DB_CONFIG)
 
-def get_files_list(current_page, page_size, parent_id=None, name_filter=""):
+def get_files_list(current_page, page_size, parent_id=None, name_filter="", manageable_user_ids=None, user_role=None):
     """
     获取文件列表
     
@@ -89,6 +89,19 @@ def get_files_list(current_page, page_size, parent_id=None, name_filter=""):
         if name_filter:
             where_clause += " AND f.name LIKE %s"
             params.append(f"%{name_filter}%")
+        
+        # 添加基于角色的权限过滤
+        if manageable_user_ids is not None and user_role:
+            if user_role in ['admin', 'user']:
+                # 管理员和普通用户只能看到可管理用户创建的文件
+                if manageable_user_ids:
+                    placeholders = ','.join(['%s'] * len(manageable_user_ids))
+                    where_clause += f" AND f.created_by IN ({placeholders})"
+                    params.extend(manageable_user_ids)
+                else:
+                    # 如果没有可管理的用户，则不显示任何文件
+                    where_clause += " AND 1=0"
+            # super_admin 不添加过滤条件，可以看到所有文件
         
         # 查询总数
         count_query = f"""
