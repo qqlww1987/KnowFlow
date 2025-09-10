@@ -10,6 +10,7 @@ export interface IUserInfo {
   is_anonymous: string;
   is_authenticated: string;
   is_superuser: boolean;
+  is_admin: boolean; // 新增：检查包含 RBAC 权限的管理员状态
   language: string;
   last_login_time: string;
   login_channel: string;

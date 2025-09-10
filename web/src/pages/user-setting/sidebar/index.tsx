@@ -68,12 +68,13 @@ const SideBar = () => {
           return false;
         }
         if (x === UserSettingRouteKey.Management) {
-          return userInfo?.is_superuser;
+          // 检查用户是否为超级管理员或全局管理员（包含 RBAC 权限）
+          return userInfo?.is_superuser || userInfo?.is_admin;
         }
         return true;
       })
       .map((value) => getItem(value, value, UserSettingIconMap[value]));
-  }, [userInfo?.is_superuser]);
+  }, [userInfo?.is_superuser, userInfo?.is_admin]);
 
   const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
     if (key === UserSettingRouteKey.Logout) {

@@ -566,7 +566,40 @@ def user_profile():
               type: string
               description: User email.
     """
-    return get_json_result(data=current_user.to_dict())
+    user_data = current_user.to_dict()
+    
+    # 检查是否为管理员 - 包括数据库 is_superuser 字段和 RBAC 权限
+    user_data['is_admin'] = False
+    
+    # 1. 检查数据库中的 is_superuser 字段
+    if current_user.is_superuser:
+        user_data['is_admin'] = True
+    else:
+        # 2. 通过 HTTP API 检查 RBAC 系统中的管理员权限
+        try:
+            import requests
+            
+            # 调用 KnowFlow 后端的 RBAC API 检查全局管理员权限
+            response = requests.post(
+                'http://localhost:5000/api/v1/rbac/permissions/check-global',
+                json={
+                    'user_id': current_user.id,
+                    'permission_type': 'admin'
+                },
+                timeout=3  # 3秒超时
+            )
+            
+            if response.ok:
+                rbac_result = response.json()
+                if rbac_result.get('has_permission', False):
+                    user_data['is_admin'] = True
+                    
+        except Exception as e:
+            logging.warning(f"Failed to check RBAC permissions for user {current_user.id}: {e}")
+            # 如果 RBAC 检查失败，只依赖 is_superuser 字段
+            pass
+    
+    return get_json_result(data=user_data)
 
 
 def rollback_user_registration(user_id):

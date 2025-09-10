@@ -40,6 +40,43 @@ export const useFetchUserInfo = (): ResponseGetType<IUserInfo> => {
           // 默认定死中文
           LanguageTranslationMap['Chinese'],
         );
+
+        // 检查用户是否具有管理员权限（包含 RBAC 权限）
+        const userInfo = data.data;
+        userInfo.is_admin = false;
+
+        // 1. 检查 is_superuser 字段
+        if (userInfo.is_superuser) {
+          userInfo.is_admin = true;
+        } else {
+          // 2. 检查 RBAC 系统中的全局管理员权限
+          try {
+            const response = await fetch(
+              'http://localhost:5000/api/v1/rbac/permissions/check-global',
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  user_id: userInfo.id,
+                  permission_type: 'admin',
+                }),
+              },
+            );
+
+            if (response.ok) {
+              const rbacResult = await response.json();
+              if (rbacResult.has_permission) {
+                userInfo.is_admin = true;
+              }
+            }
+          } catch (error) {
+            console.warn('Failed to check RBAC admin permission:', error);
+          }
+        }
+
+        return userInfo;
       }
       return data?.data ?? {};
     },
