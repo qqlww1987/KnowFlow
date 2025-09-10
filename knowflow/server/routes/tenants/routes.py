@@ -1,4 +1,4 @@
-from flask import jsonify, request
+from flask import jsonify, request, g
 from services.tenants.service import get_tenants_with_pagination, update_tenant, get_all_configured_models, get_admin_tenant_config
 from .. import tenants_bp
 
@@ -11,8 +11,12 @@ def get_tenants():
         page_size = int(request.args.get('size', 10))
         username = request.args.get('username', '')
         
+        # 获取当前用户信息
+        current_user_id = getattr(g, 'current_user_id', None)
+        user_role = getattr(g, 'current_user_role', None)
+        
         # 调用服务函数获取分页和筛选后的租户数据
-        tenants, total = get_tenants_with_pagination(current_page, page_size, username)
+        tenants, total = get_tenants_with_pagination(current_page, page_size, username, current_user_id, user_role)
         
         # 返回符合前端期望格式的数据
         return jsonify({

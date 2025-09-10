@@ -2,7 +2,7 @@ import mysql.connector
 from datetime import datetime
 from database import DB_CONFIG
 
-def get_tenants_with_pagination(current_page, page_size, username=''):
+def get_tenants_with_pagination(current_page, page_size, username='', current_user_id=None, user_role=None):
     """查询租户信息，支持分页和条件筛选"""
     try:
         conn = mysql.connector.connect(**DB_CONFIG)
@@ -21,6 +21,30 @@ def get_tenants_with_pagination(current_page, page_size, username=''):
             )
             """)
             params.append(f"%{username}%")
+        
+        # 添加基于角色的权限过滤
+        if current_user_id and user_role:
+            if user_role == 'admin':
+                # 管理员只能看到自己创建的租户（其实就是自己的租户+自己创建的用户的租户）
+                where_clauses.append("""
+                EXISTS (
+                    SELECT 1 FROM user_tenant ut 
+                    JOIN user u ON ut.user_id = u.id 
+                    WHERE ut.tenant_id = t.id AND ut.role = 'owner'
+                    AND (u.id = %s OR u.created_by = %s)
+                )
+                """)
+                params.extend([current_user_id, current_user_id])
+            elif user_role == 'user':
+                # 普通用户只能看到自己的租户
+                where_clauses.append("""
+                EXISTS (
+                    SELECT 1 FROM user_tenant ut 
+                    WHERE ut.tenant_id = t.id AND ut.user_id = %s AND ut.role = 'owner'
+                )
+                """)
+                params.append(current_user_id)
+            # super_admin 不添加过滤条件，可以看到所有租户
         
         # 组合WHERE子句
         where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
