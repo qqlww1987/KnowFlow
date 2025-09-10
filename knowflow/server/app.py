@@ -35,26 +35,30 @@ def get_current_user():
     返回: (user_id, role) 或 None
     """
     try:
-        # 1. 从 Authorization header 获取
-        auth_header = request.headers.get('Authorization')
         user_id = None
         
-        if auth_header and auth_header.startswith('Bearer '):
-            token = auth_header.split(' ')[1]
-            # 这里可以解析JWT或从数据库查询用户
-            user_id = get_user_id_from_token(token)
-        
-        # 2. 从 X-User-ID header 获取（临时方案）
-        if not user_id:
+        # 1. 从 X-User-ID header 获取（管理页面专用）
+        if request.headers.get('X-User-ID'):
             user_id = request.headers.get('X-User-ID')
         
-        # 3. 从 cookie 获取（fallback）
-        if not user_id:
+        # 2. 从 RAGFlow session cookie 获取当前用户
+        elif request.cookies.get('user_id'):
             user_id = request.cookies.get('user_id')
+            
+        # 3. 从 RAGFlow session 获取 (_ragflow_user_session_)
+        elif request.cookies.get('_ragflow_user_session_'):
+            user_id = get_user_id_from_ragflow_session()
         
-        # 4. 默认使用admin用户（向后兼容）
+        # 4. 从 Authorization header 获取
+        elif request.headers.get('Authorization'):
+            auth_header = request.headers.get('Authorization')
+            if auth_header.startswith('Bearer '):
+                token = auth_header.split(' ')[1]
+                user_id = get_user_id_from_token(token)
+        
+        # 5. 默认使用3@qq.com用户（管理员测试用户）
         if not user_id:
-            user_id = get_default_admin_user_id()
+            user_id = get_user_id_by_email('3@qq.com')
         
         if not user_id:
             return None
@@ -71,6 +75,26 @@ def get_user_id_from_token(token):
     # TODO: 实现JWT解析或token验证
     return None
 
+def get_user_id_from_ragflow_session():
+    """从RAGFlow session获取用户ID"""
+    # TODO: 解析RAGFlow session cookie获取用户信息
+    return None
+
+def get_user_id_by_email(email):
+    """根据邮箱获取用户ID"""
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG)
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT id FROM user WHERE email = %s LIMIT 1", (email,))
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        return result[0] if result else None
+    except Exception as e:
+        logger.warning(f"根据邮箱获取用户ID失败: {e}")
+        return None
 
 def get_default_admin_user_id():
     """获取默认管理员用户ID"""

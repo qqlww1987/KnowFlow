@@ -101,11 +101,18 @@ class KnowledgebaseService:
                     except ValueError:
                         result["create_date"] = ""
 
-        # 获取总数
+        # 获取总数（重新构建不包含分页参数的params）
+        count_params = []
+        if name:
+            count_params.append(f"%{name}%")
+        if current_user_id and user_role:
+            if user_role in ['admin', 'user']:
+                count_params.append(current_user_id)
+        
         count_query = "SELECT COUNT(*) as total FROM knowledgebase k"
         if where_clauses:
             count_query += " WHERE " + " AND ".join(where_clauses)
-        cursor.execute(count_query, params)
+        cursor.execute(count_query, count_params)
         total = cursor.fetchone()["total"]
 
         cursor.close()
