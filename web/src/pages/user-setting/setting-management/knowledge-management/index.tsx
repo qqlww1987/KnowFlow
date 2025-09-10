@@ -113,6 +113,10 @@ const KnowledgeManagementPage = () => {
     useState<KnowledgeBaseData | null>(null);
 
   const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
+  const [selectedDocumentKeys, setSelectedDocumentKeys] = useState<string[]>(
+    [],
+  );
+  const [batchParseSelectionMode, setBatchParseSelectionMode] = useState(false);
   const [searchValue, setSearchValue] = useState('');
 
   // 批量解析状态和监控器
@@ -433,6 +437,9 @@ const KnowledgeManagementPage = () => {
     // 重置文档搜索和分页
     setDocSearchValue('');
     setDocPagination({ current: 1, pageSize: 10, total: 0 });
+    // 重置批量解析选择状态
+    setBatchParseSelectionMode(false);
+    setSelectedDocumentKeys([]);
     loadDocumentList(record.id);
   };
 
@@ -517,20 +524,43 @@ const KnowledgeManagementPage = () => {
     }
   };
 
-  // 新的批量解析处理函数
+  // 批量解析处理函数
   const handleBatchParse = async () => {
+    if (!currentKnowledgeBase) return;
+
+    if (!batchParseSelectionMode) {
+      // 首次点击：进入选择模式，默认全选
+      setBatchParseSelectionMode(true);
+      const allDocumentIds = documentList.map((doc) => doc.id);
+      setSelectedDocumentKeys(allDocumentIds);
+      message.info('请勾选要解析的文档，然后点击"开始解析"');
+    } else {
+      // 二次点击：确认开始解析
+      if (selectedDocumentKeys.length === 0) {
+        message.warning('请至少选择一个文档进行解析');
+        return;
+      }
+      await startSelectedDocumentsParsing();
+    }
+  };
+
+  // 开始解析选中的文档
+  const startSelectedDocumentsParsing = async () => {
     if (!currentKnowledgeBase) return;
 
     const kbId = currentKnowledgeBase.id;
     const kbName = currentKnowledgeBase.name;
+    const selectedCount = selectedDocumentKeys.length;
 
     Modal.confirm({
       title: '启动批量解析确认',
       content: (
         <div>
-          <p>确定要为知识库 "{kbName}" 启动批量解析吗？</p>
+          <p>
+            确定要为知识库 "{kbName}" 的 {selectedCount} 个文档启动批量解析吗？
+          </p>
           <p style={{ color: '#E6A23C', fontWeight: 'bold' }}>
-            批量解析将按顺序处理所有文档，请耐心等待完成。
+            批量解析将按顺序处理选中的文档，请耐心等待完成。
           </p>
         </div>
       ),
@@ -544,6 +574,9 @@ const KnowledgeManagementPage = () => {
             message.success('批量解析任务已启动');
             // 开始监控进度
             startBatchProgressMonitoring(kbId);
+            // 退出选择模式
+            setBatchParseSelectionMode(false);
+            setSelectedDocumentKeys([]);
           } else {
             message.error('启动批量解析失败');
           }
@@ -553,6 +586,13 @@ const KnowledgeManagementPage = () => {
         }
       },
     });
+  };
+
+  // 取消批量解析选择模式
+  const handleCancelBatchParse = () => {
+    setBatchParseSelectionMode(false);
+    setSelectedDocumentKeys([]);
+    message.info('已取消批量解析选择');
   };
 
   // 开始批量解析进度监控
@@ -1484,6 +1524,9 @@ const KnowledgeManagementPage = () => {
         onCancel={() => {
           // 批量解析可以在后台继续运行
           setViewModalVisible(false);
+          // 清除批量解析选择状态
+          setBatchParseSelectionMode(false);
+          setSelectedDocumentKeys([]);
           // 只有在批量解析完成时才清空 currentKnowledgeBase
           if (!batchParsingStatus.isActive) {
             setCurrentKnowledgeBase(null);
@@ -1496,6 +1539,9 @@ const KnowledgeManagementPage = () => {
             onClick={() => {
               // 批量解析可以在后台继续运行
               setViewModalVisible(false);
+              // 清除批量解析选择状态
+              setBatchParseSelectionMode(false);
+              setSelectedDocumentKeys([]);
               // 只有在批量解析完成时才清空 currentKnowledgeBase
               if (!batchParsingStatus.isActive) {
                 setCurrentKnowledgeBase(null);
@@ -1550,19 +1596,35 @@ const KnowledgeManagementPage = () => {
                 >
                   添加文档
                 </Button>
-                <Button
-                  type="default"
-                  icon={<ThunderboltOutlined />}
-                  loading={batchParsingStatus.isActive}
-                  onClick={handleBatchParse}
-                  disabled={
-                    documentList.length === 0 ||
-                    !canWrite ||
-                    batchParsingStatus.isActive
-                  }
-                >
-                  {batchParsingStatus.isActive ? '正在批量解析...' : '批量解析'}
-                </Button>
+                {!batchParseSelectionMode ? (
+                  <Button
+                    type="default"
+                    icon={<ThunderboltOutlined />}
+                    loading={batchParsingStatus.isActive}
+                    onClick={handleBatchParse}
+                    disabled={
+                      documentList.length === 0 ||
+                      !canWrite ||
+                      batchParsingStatus.isActive
+                    }
+                  >
+                    {batchParsingStatus.isActive
+                      ? '正在批量解析...'
+                      : '批量解析'}
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      type="primary"
+                      icon={<ThunderboltOutlined />}
+                      onClick={handleBatchParse}
+                      disabled={selectedDocumentKeys.length === 0}
+                    >
+                      开始解析 ({selectedDocumentKeys.length})
+                    </Button>
+                    <Button onClick={handleCancelBatchParse}>取消选择</Button>
+                  </>
+                )}
               </Space>
 
               {/* 文档搜索区域 */}
@@ -1646,6 +1708,25 @@ const KnowledgeManagementPage = () => {
                 loading={documentLoading}
                 pagination={false}
                 size="small"
+                rowSelection={
+                  batchParseSelectionMode
+                    ? {
+                        selectedRowKeys: selectedDocumentKeys,
+                        onChange: (selectedRowKeys: React.Key[]) =>
+                          setSelectedDocumentKeys(selectedRowKeys as string[]),
+                        onSelectAll: (selected, selectedRows, changeRows) => {
+                          if (selected) {
+                            // 全选
+                            const allIds = documentList.map((doc) => doc.id);
+                            setSelectedDocumentKeys(allIds);
+                          } else {
+                            // 取消全选
+                            setSelectedDocumentKeys([]);
+                          }
+                        },
+                      }
+                    : undefined
+                }
                 rowClassName={(record) => {
                   // 为正在批量解析的文档添加特殊样式
                   const isCurrentBatchDocument =
