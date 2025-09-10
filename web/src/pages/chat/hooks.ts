@@ -282,6 +282,7 @@ export const useSetConversation = () => {
 export const useSelectNextMessages = () => {
   const {
     ref,
+    messageContainerRef,
     setDerivedMessages,
     derivedMessages,
     addNewestAnswer,
@@ -328,6 +329,7 @@ export const useSelectNextMessages = () => {
 
   return {
     ref,
+    messageContainerRef,
     derivedMessages,
     loading,
     addNewestAnswer,
@@ -367,6 +369,7 @@ export const useSendNextMessage = (
   );
   const {
     ref,
+    messageContainerRef,
     derivedMessages,
     loading,
     addNewestAnswer,
@@ -518,6 +521,7 @@ export const useSendNextMessage = (
     sendLoading: !done,
     loading,
     ref,
+    messageContainerRef,
     derivedMessages,
     removeMessageById,
     stopOutputMessage,

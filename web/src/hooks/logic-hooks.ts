@@ -298,7 +298,7 @@ export const useScrollToBottom = (
   const checkIfUserAtBottom = useCallback(() => {
     if (!containerRef?.current) return true;
     const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-    return Math.abs(scrollTop + clientHeight - scrollHeight) < 25;
+    return Math.abs(scrollTop + clientHeight - scrollHeight) < 50;
   }, [containerRef]);
 
   useEffect(() => {
@@ -320,16 +320,31 @@ export const useScrollToBottom = (
     requestAnimationFrame(() => {
       setTimeout(() => {
         if (isAtBottomRef.current) {
+          // Try both scrollIntoView and direct scrollTo
           ref.current?.scrollIntoView({ behavior: 'smooth' });
+          // Alternative: directly scroll container to bottom
+          if (containerRef.current) {
+            containerRef.current.scrollTo({
+              top: containerRef.current.scrollHeight,
+              behavior: 'smooth',
+            });
+          }
         }
-      }, 30);
+      }, 100);
     });
   }, [messages, containerRef]);
 
   // Imperative scroll function
   const scrollToBottom = useCallback(() => {
     ref.current?.scrollIntoView({ behavior: 'smooth' });
-  }, []);
+    // Fallback: directly scroll container to bottom
+    if (containerRef?.current) {
+      containerRef.current.scrollTo({
+        top: containerRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
+    }
+  }, [containerRef]);
 
   return { scrollRef: ref, isAtBottom, scrollToBottom };
 };

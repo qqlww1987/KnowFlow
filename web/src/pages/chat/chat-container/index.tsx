@@ -34,6 +34,7 @@ const ChatContainer = ({ controller, setController }: IProps) => {
   const {
     value,
     ref,
+    messageContainerRef,
     loading,
     sendLoading,
     derivedMessages,
@@ -55,7 +56,12 @@ const ChatContainer = ({ controller, setController }: IProps) => {
 
   return (
     <>
-      <Flex flex={1} className={styles.chatContainer} vertical>
+      <Flex
+        flex={1}
+        className={styles.chatContainer}
+        vertical
+        ref={messageContainerRef}
+      >
         <Flex flex={1} vertical className={styles.messageContainer}>
           <div>
             <Spin spinning={loading}>
