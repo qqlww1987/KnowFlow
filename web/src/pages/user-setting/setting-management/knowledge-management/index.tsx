@@ -1420,7 +1420,7 @@ const KnowledgeManagementPage = () => {
             label="创建人"
             rules={[{ required: true, message: '请选择创建人' }]}
           >
-            {userInfo?.roles?.includes('super_admin') ? (
+            {userInfo?.is_superuser ? (
               <Select
                 placeholder="请选择创建人"
                 showSearch

@@ -1,4 +1,5 @@
 import { useTranslate } from '@/hooks/common-hooks';
+import { useFetchUserInfo } from '@/hooks/user-setting-hooks';
 import request from '@/utils/request';
 import {
   DeleteOutlined,
@@ -62,6 +63,10 @@ interface Role {
 
 const TeamManagementPage = () => {
   const { t } = useTranslate('setting');
+
+  // 登录用户信息
+  const { data: userInfo } = useFetchUserInfo();
+  const userId = userInfo?.id;
   const [loading, setLoading] = useState(false);
   const [memberLoading, setMemberLoading] = useState(false);
   const [userLoading, setUserLoading] = useState(false);
@@ -229,10 +234,11 @@ const TeamManagementPage = () => {
   };
 
   const handleCreateTeam = () => {
-    // 默认将当前登录用户设为团队负责人（若存在）
-    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
     teamForm.resetFields();
-    teamForm.setFieldsValue({ owner_id: userInfo?.id });
+    // 默认设置当前用户为负责人
+    if (userId) {
+      teamForm.setFieldsValue({ owner_id: userId });
+    }
     setTeamModalVisible(true);
   };
 
@@ -831,17 +837,30 @@ const TeamManagementPage = () => {
             label="负责人"
             rules={[{ required: true, message: '请选择负责人' }]}
           >
-            <Select
-              placeholder="请选择负责人"
-              showSearch
-              optionFilterProp="children"
-            >
-              {userList.map((u) => (
-                <Option key={u.id} value={u.id}>
-                  {u.username} ({u.email || '无邮箱'})
+            {userInfo?.is_superuser ? (
+              <Select
+                placeholder="请选择负责人"
+                showSearch
+                optionFilterProp="children"
+                loading={userList.length === 0}
+              >
+                {userList.map((u) => (
+                  <Option key={u.id} value={u.id}>
+                    {u.username} ({u.email || '无邮箱'})
+                  </Option>
+                ))}
+              </Select>
+            ) : (
+              <Select
+                value={userId}
+                disabled
+                style={{ backgroundColor: '#f5f5f5' }}
+              >
+                <Option value={userId}>
+                  {userInfo?.nickname || '当前管理员'}
                 </Option>
-              ))}
-            </Select>
+              </Select>
+            )}
           </Form.Item>
           <Form.Item name="description" label="团队描述">
             <Input.TextArea placeholder="请输入团队描述（可选）" rows={3} />
