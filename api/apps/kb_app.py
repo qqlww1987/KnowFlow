@@ -122,7 +122,7 @@ def update():
                 current_user.id, 
                 RBACResourceType.KNOWLEDGEBASE, 
                 req["kb_id"], 
-                RBACPermissionType.KB_ADMIN
+                RBACPermissionType.KB_WRITE
                 # 不传tenant_id，让RBAC底层使用default
             )
         except Exception as e:

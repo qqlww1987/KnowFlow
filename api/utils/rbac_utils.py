@@ -117,8 +117,8 @@ def check_rbac_permission(user_id, resource_type, resource_id, permission_type, 
                 "user_id": check_user_id,
                 "resource_type": resource_type,
                 "resource_id": resource_id,
-                "permission_type": permission_type,
-                "tenant_id": tenant_id or "default"
+                "permission_type": permission_type
+                # 不传tenant_id，让RBAC服务使用默认值'default'
             }
             
             response = requests.post(
@@ -229,8 +229,8 @@ def rbac_permission_required(
                     user_id=user_id,
                     resource_type=resource_type,
                     resource_id=resource_id,
-                    permission_type=permission_type,
-                    tenant_id=tenant_id
+                    permission_type=permission_type
+                    # 不传tenant_id，让RBAC底层使用default
                 )
                 
                 # 4. 如果RBAC检查失败且有回退检查，执行回退逻辑
