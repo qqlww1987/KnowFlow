@@ -34,7 +34,6 @@ class RoleType(Enum):
     EDITOR = "editor"
     VIEWER = "viewer"
     USER = "user"
-    GUEST = "guest"
 
 @dataclass
 class Role:
@@ -139,11 +138,6 @@ SYSTEM_ROLES = {
     RoleType.USER: {
         "name": "用户",
         "description": "基础用户权限",
-        "permissions": [PermissionType.READ]
-    },
-    RoleType.GUEST: {
-        "name": "访客",
-        "description": "访客权限，只能查看公开资源",
         "permissions": [PermissionType.READ]
     }
 }

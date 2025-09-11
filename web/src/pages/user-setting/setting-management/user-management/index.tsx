@@ -545,11 +545,13 @@ const UserManagementPage = () => {
             rules={[{ required: true, message: '请选择一个角色' }]}
           >
             <Select placeholder="请选择角色" style={{ width: '100%' }}>
-              {roles.map((role: any) => (
-                <Select.Option key={role.id} value={role.id}>
-                  {role.name} - {role.description}
-                </Select.Option>
-              ))}
+              {roles
+                .filter((role: any) => role.code !== 'super_admin')
+                .map((role: any) => (
+                  <Select.Option key={role.id} value={role.id}>
+                    {role.name} - {role.description}
+                  </Select.Option>
+                ))}
             </Select>
           </Form.Item>
         </Form>

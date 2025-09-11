@@ -49,11 +49,26 @@ def get_tenants_with_pagination(current_page, page_size, username='', current_us
         # 组合WHERE子句
         where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
         
-        # 查询总记录数
+        # 查询总记录数 - 每个用户只计算一次（最新租户记录）
         count_sql = f"""
         SELECT COUNT(*) as total 
-        FROM tenant t 
-        WHERE {where_sql}
+        FROM (
+            SELECT 
+                t.id
+            FROM 
+                tenant t
+            JOIN user_tenant ut ON t.id = ut.tenant_id AND ut.role = 'owner'
+            JOIN user u ON ut.user_id = u.id
+            JOIN (
+                SELECT ut2.user_id, MAX(t2.create_date) as max_create_date
+                FROM user_tenant ut2 
+                JOIN tenant t2 ON ut2.tenant_id = t2.id 
+                WHERE ut2.role = 'owner'
+                GROUP BY ut2.user_id
+            ) latest ON u.id = latest.user_id AND t.create_date = latest.max_create_date
+            WHERE 
+                {where_sql}
+        ) as unique_tenants
         """
         cursor.execute(count_sql, params)
         total = cursor.fetchone()['total']
@@ -61,18 +76,26 @@ def get_tenants_with_pagination(current_page, page_size, username='', current_us
         # 计算分页偏移量
         offset = (current_page - 1) * page_size
         
-        # 执行分页查询
+        # 执行分页查询 - 每个用户只取最新的租户记录
         query = f"""
         SELECT 
             t.id, 
-            (SELECT u.nickname FROM user_tenant ut JOIN user u ON ut.user_id = u.id 
-             WHERE ut.tenant_id = t.id AND ut.role = 'owner' LIMIT 1) as username,
+            u.nickname as username,
             t.llm_id as chat_model,
             t.embd_id as embedding_model,
             t.create_date, 
             t.update_date
         FROM 
             tenant t
+        JOIN user_tenant ut ON t.id = ut.tenant_id AND ut.role = 'owner'
+        JOIN user u ON ut.user_id = u.id
+        JOIN (
+            SELECT ut2.user_id, MAX(t2.create_date) as max_create_date
+            FROM user_tenant ut2 
+            JOIN tenant t2 ON ut2.tenant_id = t2.id 
+            WHERE ut2.role = 'owner'
+            GROUP BY ut2.user_id
+        ) latest ON u.id = latest.user_id AND t.create_date = latest.max_create_date
         WHERE 
             {where_sql}
         ORDER BY 

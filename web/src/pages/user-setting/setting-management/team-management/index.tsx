@@ -804,11 +804,13 @@ const TeamManagementPage = () => {
             rules={[{ required: true, message: '请选择角色' }]}
           >
             <Select placeholder="请选择角色" style={{ width: '100%' }}>
-              {teamRoles.map((role: any) => (
-                <Select.Option key={role.id} value={role.id}>
-                  {role.name} - {role.description}
-                </Select.Option>
-              ))}
+              {teamRoles
+                .filter((role: any) => role.code !== 'super_admin')
+                .map((role: any) => (
+                  <Select.Option key={role.id} value={role.id}>
+                    {role.name} - {role.description}
+                  </Select.Option>
+                ))}
             </Select>
           </Form.Item>
         </Form>

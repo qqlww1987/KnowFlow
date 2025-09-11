@@ -141,7 +141,7 @@ class RBACInitializer:
                 name VARCHAR(100) NOT NULL COMMENT '角色名称',
                 code VARCHAR(50) NOT NULL COMMENT '角色代码',
                 description TEXT COMMENT '角色描述',
-                role_type ENUM('super_admin', 'admin', 'editor', 'viewer', 'user', 'guest') NOT NULL COMMENT '角色类型',
+                role_type ENUM('super_admin', 'admin', 'editor', 'viewer', 'user') NOT NULL COMMENT '角色类型',
                 is_system BOOLEAN DEFAULT FALSE COMMENT '是否为系统角色',
                 tenant_id VARCHAR(50) NULL COMMENT '租户ID',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
