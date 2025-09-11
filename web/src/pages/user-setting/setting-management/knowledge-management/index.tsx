@@ -1,9 +1,4 @@
 import { useTranslate } from '@/hooks/common-hooks';
-import {
-  checkKbPermission,
-  useGlobalKbAdmin,
-  useKbPermission,
-} from '@/hooks/permission-hooks';
 import { useFetchUserInfo } from '@/hooks/user-setting-hooks';
 import request from '@/utils/request';
 import {
@@ -239,28 +234,9 @@ const KnowledgeManagementPage = () => {
   const { data: userInfo } = useFetchUserInfo();
   const userId = userInfo?.id;
 
-  // 权限：全局 kb_admin（创建、批量删除）
-  const { allowed: canCreateKb } = useGlobalKbAdmin();
-  // 权限：针对当前选中知识库
-  const {
-    canRead,
-    canWrite,
-    canAdmin,
-    can: canDo,
-  } = useKbPermission(currentKnowledgeBase?.id);
-
   // 角色管理相关函数
   const handleOpenPermissionModal = async (record: KnowledgeBaseData) => {
     if (!userId) return;
-    const allowed = await checkKbPermission({
-      userId,
-      kbId: record.id,
-      permission: 'admin',
-    });
-    if (!allowed) {
-      message.warning('您没有管理该知识库角色');
-      return;
-    }
     setCurrentKnowledgeBase(record);
     setPermissionModalVisible(true);
   };
@@ -397,15 +373,17 @@ const KnowledgeManagementPage = () => {
 
   const handleCreate = () => {
     createForm.resetFields();
+    // 普通管理员默认设置创建人为当前用户，超级管理员可以选择
+    if (!userInfo?.roles?.includes('super_admin')) {
+      createForm.setFieldsValue({
+        creator_id: userId,
+      });
+    }
     setCreateModalVisible(true);
   };
 
   const handleCreateSubmit = async () => {
     try {
-      if (!canCreateKb) {
-        message.warning('您没有创建知识库的角色');
-        return;
-      }
       const values = await createForm.validateFields();
       setLoading(true);
       await request.post('/api/knowflow/v1/knowledgebases', {
@@ -423,15 +401,6 @@ const KnowledgeManagementPage = () => {
 
   const handleView = async (record: KnowledgeBaseData) => {
     if (!userId) return;
-    const allowed = await checkKbPermission({
-      userId,
-      kbId: record.id,
-      permission: 'read',
-    });
-    if (!allowed) {
-      message.warning('您没有查看该知识库的角色');
-      return;
-    }
     setCurrentKnowledgeBase(record);
     setViewModalVisible(true);
     // 重置文档搜索和分页
@@ -461,15 +430,6 @@ const KnowledgeManagementPage = () => {
 
   const handleDelete = async (kbId: string) => {
     if (!userId) return;
-    const allowed = await checkKbPermission({
-      userId,
-      kbId,
-      permission: 'admin',
-    });
-    if (!allowed) {
-      message.warning('您没有删除该知识库的角色');
-      return;
-    }
 
     // 如果正在删除当前查看的知识库，停止批量解析监控
     if (currentKnowledgeBase?.id === kbId && batchParsingStatus.isActive) {
@@ -492,10 +452,6 @@ const KnowledgeManagementPage = () => {
   const handleBatchDelete = async () => {
     if (selectedRowKeys.length === 0) {
       message.warning('请选择要删除的知识库');
-      return;
-    }
-    if (!canCreateKb) {
-      message.warning('您没有批量删除知识库的角色');
       return;
     }
 
@@ -694,12 +650,6 @@ const KnowledgeManagementPage = () => {
 
   // 解析文档
   const handleParseDocument = async (doc: DocumentData) => {
-    const allowed = await canDo('write');
-    if (!allowed) {
-      message.warning('您没有解析文档的权限');
-      return;
-    }
-
     // 如果文档已完成解析，显示确认对话框
     if (doc.progress === 1) {
       Modal.confirm({
@@ -904,10 +854,6 @@ const KnowledgeManagementPage = () => {
 
   // 分块规则弹窗
   const openChunkModal = (doc: DocumentData) => {
-    if (!canWrite) {
-      message.warning('您没有编辑分块规则的角色');
-      return;
-    }
     setChunkDocId(doc.id);
     setChunkDocName(doc.name);
     setChunkModalVisible(true);
@@ -940,10 +886,6 @@ const KnowledgeManagementPage = () => {
   };
   const handleChunkConfigSave = async () => {
     if (!chunkDocId) return;
-    if (!canWrite) {
-      message.warning('您没有保存分块配置的角色');
-      return;
-    }
     // 校验
     if (!chunkConfig.strategy) {
       message.error('请选择分块策略');
@@ -1382,7 +1324,6 @@ const KnowledgeManagementPage = () => {
               type="primary"
               icon={<PlusOutlined />}
               onClick={handleCreate}
-              disabled={!canCreateKb}
             >
               新建知识库
             </Button>
@@ -1390,12 +1331,12 @@ const KnowledgeManagementPage = () => {
               title={`确定删除选中的 ${selectedRowKeys.length} 个知识库吗？`}
               description="此操作不可恢复，且其中的所有文档也将被删除"
               onConfirm={handleBatchDelete}
-              disabled={selectedRowKeys.length === 0 || !canCreateKb}
+              disabled={selectedRowKeys.length === 0}
             >
               <Button
                 danger
                 icon={<DeleteOutlined />}
-                disabled={selectedRowKeys.length === 0 || !canCreateKb}
+                disabled={selectedRowKeys.length === 0}
               >
                 批量删除
               </Button>
@@ -1479,18 +1420,30 @@ const KnowledgeManagementPage = () => {
             label="创建人"
             rules={[{ required: true, message: '请选择创建人' }]}
           >
-            <Select
-              placeholder="请选择创建人"
-              showSearch
-              optionFilterProp="children"
-              loading={userList.length === 0}
-            >
-              {userList.map((user) => (
-                <Option key={user.id} value={user.id}>
-                  {user.username}
+            {userInfo?.roles?.includes('super_admin') ? (
+              <Select
+                placeholder="请选择创建人"
+                showSearch
+                optionFilterProp="children"
+                loading={userList.length === 0}
+              >
+                {userList.map((user) => (
+                  <Option key={user.id} value={user.id}>
+                    {user.username}
+                  </Option>
+                ))}
+              </Select>
+            ) : (
+              <Select
+                value={userId}
+                disabled
+                style={{ backgroundColor: '#f5f5f5' }}
+              >
+                <Option value={userId}>
+                  {userInfo?.nickname || '当前管理员'}
                 </Option>
-              ))}
-            </Select>
+              </Select>
+            )}
           </Form.Item>
           <Form.Item
             name="permission"
@@ -1592,7 +1545,6 @@ const KnowledgeManagementPage = () => {
                   type="primary"
                   icon={<PlusOutlined />}
                   onClick={openAddDocModal}
-                  disabled={!canWrite}
                 >
                   添加文档
                 </Button>
@@ -1603,9 +1555,7 @@ const KnowledgeManagementPage = () => {
                     loading={batchParsingStatus.isActive}
                     onClick={handleBatchParse}
                     disabled={
-                      documentList.length === 0 ||
-                      !canWrite ||
-                      batchParsingStatus.isActive
+                      documentList.length === 0 || batchParsingStatus.isActive
                     }
                   >
                     {batchParsingStatus.isActive
