@@ -1,5 +1,5 @@
 import os
-from flask import jsonify, request, send_file, current_app
+from flask import jsonify, request, send_file, current_app, g
 from io import BytesIO
 from .. import files_bp
 from flask import request, jsonify
@@ -46,11 +46,32 @@ def get_files():
         return '', 200
         
     try:
+        # 获取当前用户信息（从Flask g对象中获取，与其他模块保持一致）
+        current_user_id = getattr(g, 'current_user_id', None)
+        user_role = getattr(g, 'current_user_role', None)
+        
+        if not current_user_id:
+            return jsonify({
+                "code": 401,
+                "message": "未授权访问"
+            }), 401
+        
+        # 获取可管理的用户ID列表
+        from app import get_manageable_user_ids
+        manageable_user_ids = get_manageable_user_ids(current_user_id, user_role)
+        
         current_page = int(request.args.get('current_page', request.args.get('currentPage', 1)))
         page_size = int(request.args.get('size', 10))
         name_filter = request.args.get('name', '')
         
-        result, total = get_files_list(current_page, page_size, name_filter)
+        result, total = get_files_list(
+            current_page, 
+            page_size, 
+            parent_id=None,
+            name_filter=name_filter,
+            manageable_user_ids=manageable_user_ids,
+            user_role=user_role
+        )
         
         return jsonify({
             "code": 0,

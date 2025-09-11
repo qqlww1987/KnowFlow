@@ -32,30 +32,17 @@ CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
 
 def get_current_user():
     """
-    获取当前请求的用户信息
+    获取当前请求的用户信息（使用JWT token认证）
     返回: (user_id, role) 或 None
     """
     try:
-        user_id = None
-        
-        # 1. 从 X-User-ID header 获取（管理页面专用）
-        if request.headers.get('X-User-ID'):
-            user_id = request.headers.get('X-User-ID')
-        
-        # 2. 从 RAGFlow session cookie 获取当前用户
-        elif request.cookies.get('user_id'):
-            user_id = request.cookies.get('user_id')
+        # 从 Authorization header 获取 JWT token
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return None
             
-        # 3. 从 RAGFlow session 获取 (_ragflow_user_session_)
-        elif request.cookies.get('_ragflow_user_session_'):
-            user_id = get_user_id_from_ragflow_session()
-        
-        # 4. 从 Authorization header 获取 JWT token
-        elif request.headers.get('Authorization'):
-            auth_header = request.headers.get('Authorization')
-            # 直接使用JWT token（前端发送的格式）
-            user_id = get_user_id_from_token(auth_header)
-        
+        # 使用JWT token获取用户ID
+        user_id = get_user_id_from_token(auth_header)
         if not user_id:
             return None
             
@@ -99,80 +86,6 @@ def get_user_id_from_token(token):
         logger.warning(f"解析RAGFlow token失败: {e}")
         return None
 
-def get_user_id_from_ragflow_session():
-    """从RAGFlow session获取用户ID"""
-    try:
-        ragflow_base_url = os.getenv('RAGFLOW_BASE_URL', 'http://localhost:9380')
-        
-        # 从请求中获取session cookie
-        session_cookie = request.cookies.get('_ragflow_user_session_')
-        if not session_cookie:
-            logger.debug("未找到RAGFlow session cookie")
-            return None
-            
-        # 调用RAGFlow的用户信息接口
-        headers = {
-            'Cookie': f'_ragflow_user_session_={session_cookie}',
-            'Content-Type': 'application/json'
-        }
-        
-        response = requests.get(
-            f'{ragflow_base_url}/v1/user/info',
-            headers=headers,
-            timeout=5
-        )
-        
-        if response.status_code == 200:
-            data = response.json()
-            if data.get('retcode') == 0 and data.get('data', {}).get('id'):
-                user_id = data['data']['id']
-                logger.info(f"从RAGFlow session解析用户ID成功: {user_id}")
-                return user_id
-        
-        logger.debug(f"RAGFlow session解析失败: status={response.status_code}")
-        return None
-        
-    except Exception as e:
-        logger.warning(f"解析RAGFlow session失败: {e}")
-        return None
-
-def get_user_id_by_email(email):
-    """根据邮箱获取用户ID"""
-    try:
-        conn = mysql.connector.connect(**DB_CONFIG)
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT id FROM user WHERE email = %s LIMIT 1", (email,))
-        result = cursor.fetchone()
-        cursor.close()
-        conn.close()
-        
-        return result[0] if result else None
-    except Exception as e:
-        logger.warning(f"根据邮箱获取用户ID失败: {e}")
-        return None
-
-def get_default_admin_user_id():
-    """获取默认管理员用户ID"""
-    try:
-        conn = mysql.connector.connect(**DB_CONFIG)
-        cursor = conn.cursor()
-        
-        # 获取最早创建的超级管理员
-        cursor.execute("""
-            SELECT id FROM user 
-            WHERE is_superuser = 1 OR email = 'admin@gmail.com'
-            ORDER BY create_time ASC
-            LIMIT 1
-        """)
-        result = cursor.fetchone()
-        cursor.close()
-        conn.close()
-        
-        return result[0] if result else None
-    except Exception as e:
-        logger.warning(f"获取默认admin用户失败: {e}")
-        return None
 
 def get_user_info_from_db(user_id):
     """从数据库获取用户信息"""
