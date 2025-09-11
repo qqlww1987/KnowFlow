@@ -70,17 +70,21 @@ def create_team_route():
                 "message": "请求数据不能为空"
             }), 400
         
+        # 获取当前用户信息
+        current_user_id = getattr(g, 'current_user_id', None)
+        if not current_user_id:
+            return jsonify({"code": 401, "message": "未授权访问"}), 401
+        
         name = data.get('name')
-        owner_id = data.get('owner_id')
         description = data.get('description', '')
         
-        if not name or not owner_id:
+        if not name:
             return jsonify({
                 "code": 400,
-                "message": "团队名称和所有者ID不能为空"
+                "message": "团队名称不能为空"
             }), 400
         
-        team_id = create_team(name=name, owner_id=owner_id, description=description)
+        team_id = create_team(name=name, owner_id=current_user_id, description=description, created_by=current_user_id)
         
         if team_id:
             return jsonify({

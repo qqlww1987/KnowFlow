@@ -127,7 +127,7 @@ def get_team_by_id(team_id):
         return None
 
 
-def create_team(name, owner_id, description=""):
+def create_team(name, owner_id, description="", created_by=None):
     """创建新团队"""
     try:
         conn = mysql.connector.connect(**DB_CONFIG)
@@ -143,14 +143,14 @@ def create_team(name, owner_id, description=""):
         team_query = """
         INSERT INTO tenant (
             id, name, create_time, create_date, update_time, update_date, 
-            status, credit, llm_id, embd_id, asr_id, img2txt_id, rerank_id, tts_id, parser_ids
+            status, credit, llm_id, embd_id, asr_id, img2txt_id, rerank_id, tts_id, parser_ids, created_by
         ) VALUES (
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
         )
         """
         team_data = (
             team_id, name, create_time, current_date, create_time, current_date,
-            '1', 0, '', '', '', '', '', '', ''
+            '1', 0, '', '', '', '', '', '', '', created_by
         )
         cursor.execute(team_query, team_data)
         

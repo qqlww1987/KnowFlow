@@ -45,8 +45,14 @@ def create_knowledgebase():
         data = request.json
         if not data.get('name'):
             return error_response('知识库名称不能为空', code=400)
+        
+        # 获取当前用户信息
+        current_user_id = getattr(g, 'current_user_id', None)
+        if not current_user_id:
+            return error_response("未授权访问", code=401)
             
-        # 移除 created_by 参数
+        # 添加创建者信息
+        data['creator_id'] = current_user_id
         kb = KnowledgebaseService.create_knowledgebase(**data)
         return success_response(kb, "创建成功", code=0)
     except Exception as e:

@@ -109,7 +109,7 @@ def delete_user(user_id):
         print(f"删除用户错误: {err}")
         return False
 
-def create_user(user_data):
+def create_user(user_data, created_by=None):
     """
     创建新用户，并加入超级管理员的团队，并使用超级管理员的模型配置。
     时间将以 UTC+8 (Asia/Shanghai) 存储。
@@ -184,19 +184,19 @@ def create_user(user_data):
             id, create_time, create_date, update_time, update_date, access_token,
             nickname, password, email, avatar, language, color_schema, timezone,
             last_login_time, is_authenticated, is_active, is_anonymous, login_channel,
-            status, is_superuser
+            status, is_superuser, created_by
         ) VALUES (
             %s, %s, %s, %s, %s, %s,
             %s, %s, %s, %s, %s, %s, %s,
             %s, %s, %s, %s, %s,
-            %s, %s
+            %s, %s, %s
         )
         """
         user_data_tuple = (
             user_id, create_time, current_date, create_time, current_date, None, # 使用修改后的时间
             username, encrypted_password, email, None, "Chinese", "Bright", "UTC+8 Asia/Shanghai",
             current_date, 1, 1, 0, "password", # last_login_time 也使用 UTC+8 时间
-            1, 0
+            1, 0, created_by
         )
         cursor.execute(user_insert_query, user_data_tuple)
 
@@ -205,11 +205,11 @@ def create_user(user_data):
         INSERT INTO tenant (
             id, create_time, create_date, update_time, update_date, name,
             public_key, llm_id, embd_id, asr_id, img2txt_id, rerank_id, tts_id,
-            parser_ids, credit, status
+            parser_ids, credit, status, created_by
         ) VALUES (
             %s, %s, %s, %s, %s, %s,
             %s, %s, %s, %s, %s, %s, %s,
-            %s, %s, %s
+            %s, %s, %s, %s
         )
         """
 
@@ -220,14 +220,14 @@ def create_user(user_data):
                 None, str(admin_tenant['llm_id']), str(admin_tenant['embd_id']),
                 str(admin_tenant['asr_id']), str(admin_tenant['img2txt_id']),
                 str(admin_tenant['rerank_id']), str(admin_tenant['tts_id']),
-                str(admin_tenant['parser_ids']), str(admin_tenant['credit']), 1
+                str(admin_tenant['parser_ids']), str(admin_tenant['credit']), 1, created_by
             )
         else:
             # 如果是第一个用户，模型ID使用空字符串
             tenant_data = (
                 user_id, create_time, current_date, create_time, current_date, username + "'s Kingdom", # 使用修改后的时间
                 None, '', '', '', '', '', '',
-                '', "1000", 1
+                '', "1000", 1, created_by
             )
         cursor.execute(tenant_insert_query, tenant_data)
 

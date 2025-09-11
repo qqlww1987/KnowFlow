@@ -79,9 +79,14 @@ def delete_user_route(user_id):
 def create_user_route():
     """创建用户的API端点"""
     data = request.json
+    # 获取当前用户信息
+    current_user_id = getattr(g, 'current_user_id', None)
+    if not current_user_id:
+        return jsonify({"code": 401, "message": "未授权访问"}), 401
+    
     # 创建用户
     try:
-        success = create_user(user_data=data)
+        success = create_user(user_data=data, created_by=current_user_id)
         if success:
             return jsonify({
                 "code": 0,
