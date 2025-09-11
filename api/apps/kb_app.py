@@ -115,8 +115,27 @@ def update():
             code=settings.RetCode.AUTHENTICATION_ERROR
         )
     try:
-        if not KnowledgebaseService.query(
-                created_by=current_user.id, id=req["kb_id"]):
+        # 首先尝试RBAC权限检查
+        has_rbac_permission = False
+        try:
+            has_rbac_permission = check_rbac_permission(
+                current_user.id, 
+                RBACResourceType.KNOWLEDGEBASE, 
+                req["kb_id"], 
+                RBACPermissionType.KB_ADMIN
+                # 不传tenant_id，让RBAC底层使用default
+            )
+        except Exception as e:
+            logging.warning(f"RBAC permission check failed: {e}")
+        
+        # 如果有RBAC权限，查询知识库（不限制创建者）
+        if has_rbac_permission:
+            kbs = KnowledgebaseService.query(id=req["kb_id"])
+        else:
+            # 否则只允许创建者访问
+            kbs = KnowledgebaseService.query(created_by=current_user.id, id=req["kb_id"])
+        
+        if not kbs:
             return get_json_result(
                 data=False, message='Only owner of knowledgebase authorized for this operation.',
                 code=settings.RetCode.OPERATING_ERROR)
@@ -238,6 +257,7 @@ def rm():
                     RBACResourceType.KNOWLEDGEBASE, 
                     req["kb_id"], 
                     RBACPermissionType.KB_ADMIN
+                    # 不传tenant_id，让RBAC底层使用default
                 )
             except Exception as e:
                 logging.warning(f"RBAC permission check failed: {e}")

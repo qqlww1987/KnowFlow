@@ -494,22 +494,26 @@ class DocumentService(CommonService):
             from api.utils.rbac_utils import check_rbac_permission, RBACPermissionType, RBACResourceType
             from api.db.services.user_service import UserTenantService
             
-            # 获取用户的tenant_id
-            tenant_id = None
+            # 获取用户的tenant_id，如果获取失败则使用"default"
+            tenant_id = "default"  # 默认使用default tenant
             try:
                 user_tenants = UserTenantService.query(user_id=user_id)
                 if user_tenants:
                     tenant_id = user_tenants[0].tenant_id
             except Exception:
+                # 如果获取失败，保持使用default
                 pass
             
             has_permission = check_rbac_permission(
                 user_id=user_id,
                 resource_type=RBACResourceType.KNOWLEDGEBASE,
                 resource_id=kb_id,
-                permission_type=RBACPermissionType.KB_READ,
-                tenant_id=tenant_id
+                permission_type=RBACPermissionType.KB_READ
+                # 不传tenant_id，让RBAC底层使用default
             )
+            
+            import logging
+            logging.warning(f"RBAC权限检查: user_id={user_id}, kb_id={kb_id}, tenant_id={tenant_id}, has_permission={has_permission}")
             
             if has_permission:
                 return True
@@ -556,21 +560,22 @@ class DocumentService(CommonService):
             from api.utils.rbac_utils import check_rbac_permission, RBACPermissionType, RBACResourceType
             from api.db.services.user_service import UserTenantService
             
-            # 获取用户的tenant_id
-            tenant_id = None
+            # 获取用户的tenant_id，如果获取失败则使用"default"
+            tenant_id = "default"  # 默认使用default tenant
             try:
                 user_tenants = UserTenantService.query(user_id=user_id)
                 if user_tenants:
                     tenant_id = user_tenants[0].tenant_id
             except Exception:
+                # 如果获取失败，保持使用default
                 pass
             
             has_permission = check_rbac_permission(
                 user_id=user_id,
                 resource_type=RBACResourceType.KNOWLEDGEBASE,
                 resource_id=kb_id,
-                permission_type=RBACPermissionType.KB_WRITE,
-                tenant_id=tenant_id
+                permission_type=RBACPermissionType.KB_WRITE
+                # 不传tenant_id，让RBAC底层使用default
             )
             
             if has_permission:

@@ -1015,6 +1015,24 @@ def migrate_db():
         migrate(migrator.add_column("api_4_conversation", "errors", TextField(null=True, help_text="errors")))
     except Exception:
         pass
+    
+    # Add created_by fields for KnowFlow enterprise features
+    try:
+        migrate(migrator.add_column("user", "created_by", CharField(max_length=50, null=True, help_text="创建者用户ID", index=True)))
+    except Exception:
+        pass
+    try:
+        migrate(migrator.add_column("tenant", "created_by", CharField(max_length=50, null=True, help_text="创建者用户ID", index=True)))
+    except Exception:
+        pass
+    
+    # Set created_by to NULL for existing superuser accounts
+    try:
+        from peewee import SQL
+        DB.execute_sql("UPDATE user SET created_by = NULL WHERE is_superuser = 1 OR email = 'admin@gmail.com'")
+    except Exception:
+        pass
+        
     logging.disable(logging.NOTSET)
 
 

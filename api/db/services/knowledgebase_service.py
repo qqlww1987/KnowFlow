@@ -76,8 +76,8 @@ class KnowledgebaseService(CommonService):
                 user_id=user_id,
                 resource_type=RBACResourceType.KNOWLEDGEBASE,
                 resource_id=kb_id,
-                permission_type=RBACPermissionType.KB_ADMIN,
-                tenant_id='default'
+                permission_type=RBACPermissionType.KB_ADMIN
+                # 不传tenant_id，让RBAC底层使用default
             )
             if has_rbac_permission:
                 return True
@@ -215,6 +215,7 @@ class KnowledgebaseService(CommonService):
                 resource_type=RBACResourceType.KNOWLEDGEBASE,
                 resource_id=kb_id,
                 permission_type=RBACPermissionType.KB_READ
+                # 不传tenant_id，让RBAC底层使用default
             )
             print(f"KB {kb_id}: RBAC check result={has_kb_permission}")
             
