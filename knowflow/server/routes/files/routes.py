@@ -29,8 +29,17 @@ def upload_file():
     if 'files' not in request.files:
         return jsonify({'code': 400, 'message': '未选择文件', 'data': None}), 400
     
+    # 获取当前用户信息
+    current_user_id = getattr(g, 'current_user_id', None)
+    
+    if not current_user_id:
+        return jsonify({
+            "code": 401,
+            "message": "未授权访问"
+        }), 401
+    
     files = request.files.getlist('files')
-    upload_result = upload_files_to_server(files)
+    upload_result = upload_files_to_server(files, user_id=current_user_id)
     
     # 返回标准格式
     return jsonify({
@@ -50,6 +59,9 @@ def get_files():
         current_user_id = getattr(g, 'current_user_id', None)
         user_role = getattr(g, 'current_user_role', None)
         
+        # 添加调试日志
+        current_app.logger.info(f"[文件管理] 当前用户ID: {current_user_id}, 角色: {user_role}")
+        
         if not current_user_id:
             return jsonify({
                 "code": 401,
@@ -60,9 +72,15 @@ def get_files():
         from app import get_manageable_user_ids
         manageable_user_ids = get_manageable_user_ids(current_user_id, user_role)
         
+        # 添加调试日志
+        current_app.logger.info(f"[文件管理] 可管理用户ID列表: {manageable_user_ids}")
+        
         current_page = int(request.args.get('current_page', request.args.get('currentPage', 1)))
         page_size = int(request.args.get('size', 10))
         name_filter = request.args.get('name', '')
+        
+        # 添加调试日志 - 查询参数
+        current_app.logger.info(f"[文件管理] 查询参数 - page: {current_page}, size: {page_size}, filter: '{name_filter}', role: {user_role}")
         
         result, total = get_files_list(
             current_page, 
@@ -72,6 +90,9 @@ def get_files():
             manageable_user_ids=manageable_user_ids,
             user_role=user_role
         )
+        
+        # 调试日志 - 查询结果
+        current_app.logger.info(f"[文件管理] 查询结果 - 总数: {total}, 文件数量: {len(result)}")
         
         return jsonify({
             "code": 0,

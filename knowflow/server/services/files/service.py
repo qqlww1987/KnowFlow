@@ -114,7 +114,7 @@ def get_files_list(current_page, page_size, parent_id=None, name_filter="", mana
         
         # 查询文件列表
         query = f"""
-            SELECT f.id, f.name, f.parent_id, f.type, f.size, f.location, f.source_type, f.create_time
+            SELECT f.id, f.name, f.parent_id, f.type, f.size, f.location, f.source_type, f.create_time, f.created_by
             FROM file f
             {where_clause}
             ORDER BY f.create_time DESC
@@ -433,6 +433,8 @@ def batch_delete_files(file_ids):
 
 def upload_files_to_server(files, parent_id=None, user_id=None):
     """处理文件上传到服务器的核心逻辑"""
+    print(f"[文件上传] 传入的user_id: {user_id}")
+    
     if user_id is None:
         try:
             conn = get_db_connection()
@@ -560,6 +562,8 @@ def upload_files_to_server(files, parent_id=None, user_id=None):
                     "update_time": current_time,
                     "update_date": current_date
                 }
+                
+                print(f"[文件上传] 创建文件记录: {filename}, created_by: {user_id}")
                 
                 # 保存文件记录
                 conn = get_db_connection()

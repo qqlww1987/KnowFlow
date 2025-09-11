@@ -150,7 +150,9 @@ def get_manageable_user_ids(current_user_id, role):
             cursor.close()
             conn.close()
             
-            return [row[0] for row in results]
+            user_ids = [row[0] for row in results]
+            logger.info(f"[get_manageable_user_ids] 管理员 {current_user_id} 的可管理用户: {user_ids}")
+            return user_ids
             
         except Exception as e:
             logger.warning(f"获取可管理用户列表失败: {e}")
