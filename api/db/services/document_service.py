@@ -492,19 +492,7 @@ class DocumentService(CommonService):
             kb_id = doc.kb_id
             
             # 🎯 使用RBAC检查知识库读取权限
-            from api.utils.rbac_utils import check_rbac_permission, RBACPermissionType, RBACResourceType
-            from api.db.services.user_service import UserTenantService
-            
-            # 获取用户的tenant_id，如果获取失败则使用"default"
-            tenant_id = "default"  # 默认使用default tenant
-            try:
-                user_tenants = UserTenantService.query(user_id=user_id)
-                if user_tenants:
-                    tenant_id = user_tenants[0].tenant_id
-            except Exception:
-                # 如果获取失败，保持使用default
-                pass
-            
+            from api.utils.rbac_utils import check_rbac_permission, RBACPermissionType, RBACResourceType            
             has_permission = check_rbac_permission(
                 user_id=user_id,
                 resource_type=RBACResourceType.KNOWLEDGEBASE,
@@ -514,7 +502,7 @@ class DocumentService(CommonService):
             )
             
             import logging
-            logging.warning(f"RBAC权限检查: user_id={user_id}, kb_id={kb_id}, tenant_id={tenant_id}, has_permission={has_permission}")
+            logging.warning(f"RBAC权限检查: user_id={user_id}, kb_id={kb_id}, has_permission={has_permission}")
             
             if has_permission:
                 return True

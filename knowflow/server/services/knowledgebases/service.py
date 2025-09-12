@@ -278,11 +278,11 @@ class KnowledgebaseService:
             else:
                 print(f"使用传入的 creator_id 作为 tenant_id 和 created_by: {tenant_id}")
 
-            # --- 获取用户配置的向量模型 ---
+            # --- 获取用户配置的向量模型（与RAGFlow前端保持一致）---
             dynamic_embd_id = None
             default_embd_id = "bge-m3"  # Fallback default
             try:
-                # 直接从tenant表获取用户配置的向量模型
+                # 直接从tenant表获取用户配置的向量模型（与RAGFlow前端api/apps/kb_app.py第75行保持一致）
                 query_tenant_embedding = """
                     SELECT embd_id
                     FROM tenant
