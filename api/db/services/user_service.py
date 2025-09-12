@@ -159,8 +159,26 @@ class TenantService(CommonService):
             cls.model.tts_id,
             cls.model.parser_ids,
             UserTenant.role]
+        # 检查用户是否有RBAC管理员权限
+        from api.utils.rbac_utils import check_global_permission
+        has_rbac_admin = False
+        try:
+            has_rbac_admin = check_global_permission(user_id, "admin", None)
+        except:
+            pass
+        
+        # RBAC管理员或租户所有者都可以访问完整的租户信息
+        if has_rbac_admin:
+            # RBAC管理员可以访问所有租户信息
+            role_condition = ((UserTenant.role == UserTenantRole.OWNER) | 
+                             (UserTenant.role == UserTenantRole.ADMIN) | 
+                             (UserTenant.role == UserTenantRole.NORMAL))
+        else:
+            # 非RBAC管理员只能访问自己拥有的租户
+            role_condition = (UserTenant.role == UserTenantRole.OWNER)
+        
         return list(cls.model.select(*fields)
-                    .join(UserTenant, on=((cls.model.id == UserTenant.tenant_id) & (UserTenant.user_id == user_id) & (UserTenant.status == StatusEnum.VALID.value) & (UserTenant.role == UserTenantRole.OWNER)))
+                    .join(UserTenant, on=((cls.model.id == UserTenant.tenant_id) & (UserTenant.user_id == user_id) & (UserTenant.status == StatusEnum.VALID.value) & role_condition))
                     .where(cls.model.status == StatusEnum.VALID.value).dicts())
 
     @classmethod

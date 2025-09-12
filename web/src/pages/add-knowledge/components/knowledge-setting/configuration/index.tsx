@@ -135,25 +135,6 @@ export const ConfigurationForm = ({ form }: { form: FormInstance }) => {
         </Radio.Group>
       </Form.Item>
 
-      <Form.Item
-        name="parser_id"
-        label={t('parseMethod', 'Parse Method')}
-        rules={[
-          {
-            required: true,
-            message: t('parseMethodRequired', 'Please select a parse method'),
-          },
-        ]}
-      >
-        <Select placeholder={t('selectParseMethod', 'Select parse method')}>
-          {parserList.map((parser) => (
-            <Option key={parser.value} value={parser.value}>
-              {parser.label}
-            </Option>
-          ))}
-        </Select>
-      </Form.Item>
-
       <ConfigurationComponent></ConfigurationComponent>
 
       <Form.Item>

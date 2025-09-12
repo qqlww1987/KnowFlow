@@ -112,10 +112,12 @@ def get_files_list(current_page, page_size, parent_id=None, name_filter="", mana
         cursor.execute(count_query, params)
         total = cursor.fetchone()['total']
         
-        # 查询文件列表
+        # 查询文件列表（包含创建人信息）
         query = f"""
-            SELECT f.id, f.name, f.parent_id, f.type, f.size, f.location, f.source_type, f.create_time, f.created_by
+            SELECT f.id, f.name, f.parent_id, f.type, f.size, f.location, f.source_type, f.create_time, f.created_by,
+                   u.nickname as created_by_name
             FROM file f
+            LEFT JOIN user u ON f.created_by = u.id
             {where_clause}
             ORDER BY f.create_time DESC
             LIMIT %s OFFSET %s

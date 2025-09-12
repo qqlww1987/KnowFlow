@@ -37,6 +37,8 @@ interface FileData {
   kb_id?: string;
   location?: string;
   create_time?: string;
+  created_by?: string;
+  created_by_name?: string;
   status?: 'uploading' | 'success' | 'error';
   percent?: number;
 }
@@ -275,6 +277,13 @@ const FileManagementPage = () => {
       ),
     },
     {
+      title: '创建人',
+      dataIndex: 'created_by_name',
+      key: 'created_by_name',
+      width: 120,
+      render: (name: string) => name || '-',
+    },
+    {
       title: '大小',
       dataIndex: 'size',
       key: 'size',
@@ -419,7 +428,7 @@ const FileManagementPage = () => {
           rowKey="id"
           loading={loading}
           pagination={false}
-          scroll={{ x: 1000 }}
+          scroll={{ x: 1120 }}
           rowSelection={{
             selectedRowKeys,
             onChange: (selectedRowKeys: React.Key[]) =>
