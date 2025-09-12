@@ -377,7 +377,7 @@ class PermissionService:
                           resource_id: Optional[str] = None,
                           expires_at: Optional[datetime] = None) -> bool:
         """
-        为用户授予角色（单一角色语义：同一作用域内仅保留一个角色，重复分配直接替换）
+        为用户授予角色（单一角色语义：如果已有角色则更新，否则创建新角色）
         
         Args:
             user_id: 用户ID
@@ -406,41 +406,38 @@ class PermissionService:
             
             role_id = role_result[0]
             
-            # 单一角色语义：先删除同一作用域下已有的角色，再插入新的角色
-            delete_sql = "DELETE FROM rbac_user_roles WHERE user_id = %s"
-            delete_params = [user_id]
+            # 检查用户是否已有全局角色记录
+            check_sql = "SELECT id FROM rbac_user_roles WHERE user_id = %s AND resource_type IS NULL AND resource_id IS NULL"
+            cursor.execute(check_sql, (user_id,))
+            existing_record = cursor.fetchone()
             
-            if tenant_id:
-                delete_sql += " AND tenant_id = %s"
-                delete_params.append(tenant_id)
-            if resource_type is not None:
-                delete_sql += " AND resource_type = %s"
-                delete_params.append(resource_type.value)
+            if existing_record:
+                # 更新现有记录
+                update_sql = """
+                    UPDATE rbac_user_roles 
+                    SET role_id = %s, tenant_id = %s, granted_by = %s, 
+                        granted_at = NOW(), expires_at = %s, updated_at = NOW()
+                    WHERE user_id = %s AND resource_type IS NULL AND resource_id IS NULL
+                """
+                cursor.execute(update_sql, (
+                    role_id, tenant_id, granted_by, expires_at, user_id
+                ))
             else:
-                delete_sql += " AND resource_type IS NULL"
-            if resource_id is not None:
-                delete_sql += " AND resource_id = %s"
-                delete_params.append(resource_id)
-            else:
-                delete_sql += " AND resource_id IS NULL"
-            
-            cursor.execute(delete_sql, delete_params)
-            
-            # 插入新记录
-            insert_sql = """
-                INSERT INTO rbac_user_roles
-                (user_id, role_id, tenant_id, resource_type, resource_id,
-                 granted_by, granted_at, expires_at, is_active, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s, NOW(), %s, 1, NOW())
-            """
-            cursor.execute(insert_sql, (
-                user_id, role_id, tenant_id,
-                resource_type.value if resource_type else None,
-                resource_id, granted_by, expires_at
-            ))
+                # 插入新记录
+                insert_sql = """
+                    INSERT INTO rbac_user_roles
+                    (user_id, role_id, tenant_id, resource_type, resource_id,
+                     granted_by, granted_at, expires_at, is_active, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, NOW(), %s, 1, NOW())
+                """
+                cursor.execute(insert_sql, (
+                    user_id, role_id, tenant_id,
+                    resource_type.value if resource_type else None,
+                    resource_id, granted_by, expires_at
+                ))
             
             db.commit()
-            logger.info(f"成功为用户 {user_id} 授予角色 {role_code}（替换同域已有角色）")
+            logger.info(f"成功为用户 {user_id} 授予角色 {role_code}")
             return True
             
         except Exception as e:
@@ -520,6 +517,7 @@ class PermissionService:
                 JOIN rbac_roles r ON ur.role_id = r.id
                 WHERE ur.user_id = %s AND ur.is_active = 1
                 AND (ur.expires_at IS NULL OR ur.expires_at > NOW())
+                AND ur.resource_type IS NULL AND ur.resource_id IS NULL
             """
             params = [user_id]
             

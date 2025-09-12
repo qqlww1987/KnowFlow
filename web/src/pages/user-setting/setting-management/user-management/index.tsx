@@ -83,17 +83,11 @@ const UserManagementPage = () => {
     user: { priority: 5, color: '#d9d9d9' }, // 用户 - 灰色
   };
 
-  // 获取最高优先级角色
-  const getHighestPriorityRole = (
-    userRolesList: UserRole[],
-  ): UserRole | null => {
+  // 获取用户角色（每个用户只有一个角色）
+  const getUserRole = (userRolesList: UserRole[]): UserRole | null => {
     if (!userRolesList || userRolesList.length === 0) return null;
-
-    return userRolesList.reduce((highest, current) => {
-      const currentPriority = rolePriorityMap[current.code]?.priority || 999;
-      const highestPriority = rolePriorityMap[highest.code]?.priority || 999;
-      return currentPriority < highestPriority ? current : highest;
-    });
+    // 直接返回第一个角色，因为每个用户只能有一个角色
+    return userRolesList[0];
   };
   // 模拟用户数据
   // const mockUsers: UserData[] = [
@@ -169,9 +163,9 @@ const UserManagementPage = () => {
               `/api/knowflow/v1/rbac/users/${u.id}/roles`,
             );
             const rolesList = r?.data?.data ?? r?.data?.roles ?? [];
-            const highestRole = getHighestPriorityRole(rolesList);
-            if (highestRole) {
-              rolesMap[u.id] = highestRole;
+            const userRole = getUserRole(rolesList);
+            if (userRole) {
+              rolesMap[u.id] = userRole;
             }
           } catch (e) {
             // 错误情况下不设置角色
