@@ -92,7 +92,7 @@ def _update_document_progress(doc_id, progress=None, message=None, status=None, 
 
 
 
-def perform_parse(doc_id, doc_info, file_info, embedding_config):
+def perform_parse(doc_id, doc_info, file_info):
     """
     执行文档解析的核心逻辑
 
@@ -107,37 +107,6 @@ def perform_parse(doc_id, doc_info, file_info, embedding_config):
     temp_pdf_path = None
     temp_image_dir = None
     start_time = time.time()
-
-    
-      # 默认值处理
-    embedding_model_name = embedding_config.get("llm_name") if embedding_config and embedding_config.get("llm_name") else "bge-m3" # 默认模型
-    # 对模型名称进行处理
-    if embedding_model_name and '___' in embedding_model_name:
-        embedding_model_name = embedding_model_name.split('___')[0]
-    embedding_api_base = embedding_config.get("api_base") if embedding_config and embedding_config.get("api_base") else "http://localhost:8000" # 默认基础 URL
-    embedding_api_key = embedding_config.get("api_key") if embedding_config else None # 可能为 None 或空字符串
-    
-    # 构建完整的 Embedding API URL
-    embedding_url = None # 默认为 None
-    if embedding_api_base:
-        # 确保 embedding_api_base 包含协议头 (http:// 或 https://)
-        if not embedding_api_base.startswith(('http://', 'https://')):
-            embedding_api_base = 'http://' + embedding_api_base
-
-        # --- URL 拼接优化 (处理 /v1) ---
-        endpoint_segment = "embeddings"
-        full_endpoint_path = "v1/embeddings"
-        # 移除末尾斜杠以方便判断
-        normalized_base_url = embedding_api_base.rstrip('/')
-
-        if normalized_base_url.endswith('/v1'):
-            # 如果 base_url 已经是 http://host/v1 形式
-            embedding_url = normalized_base_url + '/' + endpoint_segment
-        else:
-            # 如果 base_url 是 http://host 或 http://host/api 等其他形式
-            embedding_url = normalized_base_url + '/' + full_endpoint_path
-
-    print(f"[Parser-INFO] 使用 Embedding 配置: URL='{embedding_url}', Model='{embedding_model_name}', Key={embedding_api_key}")
     
     try:
         kb_id = doc_info['kb_id']
@@ -211,16 +180,13 @@ def perform_parse(doc_id, doc_info, file_info, embedding_config):
                 # === DOTS OCR 解析路径 ===
                 print(f"[Parser-INFO] 使用 DOTS OCR 处理文档")
                 from .dots_parse.process_document import process_document_with_dots
+                
                 chunk_count = process_document_with_dots(
                     doc_id=doc_id,
                     file_path=temp_file_path,
                     kb_id=kb_id,
                     update_progress=update_progress,
-                    embedding_config={
-                        'llm_name': embedding_model_name,
-                        'api_base': embedding_api_base,
-                        'api_key': embedding_api_key
-                    },
+                    embedding_config=None,  # DOTS 也通过 RAGFlow batch API 获取嵌入模型
                     parser_config=parser_config  # 传递完整的解析器配置
                 )
             

@@ -1092,8 +1092,7 @@ class KnowledgebaseService:
             _update_document_progress(doc_id, run="1", progress=0.0, message="开始解析")
 
             # 调用后台解析函数
-            embedding_config = cls.get_system_embedding_config()
-            parse_result = perform_parse(doc_id, doc_info, file_info, embedding_config)
+            parse_result = perform_parse(doc_id, doc_info, file_info)
 
             # 返回解析结果
             return parse_result

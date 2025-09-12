@@ -255,6 +255,7 @@ class DocumentService(CommonService):
             logging.info(f"Cleaned {deleted_mappings} parent-child mappings for document {doc.id}")
             
             # 3. 获取所有子分块ID用于清理存储
+            TaskService.filter_delete([Task.doc_id == doc.id])
             page = 0
             page_size = 1000
             all_chunk_ids = []
