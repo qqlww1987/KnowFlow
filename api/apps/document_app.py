@@ -446,9 +446,23 @@ def rm():
 @validate_request("doc_ids", "run")
 def run():
     req = request.json
+    # 文档解析是写操作，需要检查写权限
     for doc_id in req["doc_ids"]:
-        if not DocumentService.accessible(doc_id, current_user.id):
-            return get_json_result(data=False, message="No authorization.", code=settings.RetCode.AUTHENTICATION_ERROR)
+        # 获取文档所属的知识库ID
+        kb_id = DocumentService.get_knowledgebase_id(doc_id)
+        if not kb_id:
+            return get_json_result(data=False, message="Document not found.", code=settings.RetCode.ARGUMENT_ERROR)
+        
+        # 检查用户对知识库的写权限
+        from api.utils.rbac_utils import check_rbac_permission, RBACPermissionType, RBACResourceType
+        has_write_permission = check_rbac_permission(
+            current_user.id,
+            RBACResourceType.KNOWLEDGEBASE,
+            kb_id,
+            RBACPermissionType.KB_WRITE
+        )
+        if not has_write_permission:
+            return get_json_result(data=False, message="没有权限，请联系管理赋予知识库写权限", code=settings.RetCode.AUTHENTICATION_ERROR)
     try:
         kb_table_num_map = {}
         for id in req["doc_ids"]:
@@ -483,19 +497,14 @@ def run():
             if str(req["run"]) == TaskStatus.RUNNING.value:
                 doc = doc.to_dict()
                 doc["tenant_id"] = tenant_id
-
                 doc_parser = doc.get("parser_id", ParserType.NAIVE)
-                
                 # 检查是否是KnowFlow专用的解析器 (DOTS/MinerU)
                 if doc_parser in [ParserType.DOTS.value, ParserType.MINERU.value]:
                     # 调用KnowFlow的解析API而不是RAGFlow taskqueue
                     try:
                         import requests
-                        import json
-                        
                         knowflow_api_url = "http://localhost:5000/api/v1/knowledgebases/documents/{}/parse".format(id)
                         response = requests.post(knowflow_api_url, json={"async": True})
-                        
                         if response.status_code == 200:
                             print(f"[INFO] 文档 {id} 已提交到KnowFlow解析API (parser: {doc_parser})")
                         else:
