@@ -578,6 +578,7 @@ General：实体和关系提取提示来自 GitHub - microsoft/graphrag：基于
       system: '系统',
       logout: '登出',
       api: 'API',
+      management: '管理',
       username: '用户名',
       usernameMessage: '请输入用户名',
       photo: '头像',

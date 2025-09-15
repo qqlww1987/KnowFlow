@@ -301,6 +301,7 @@ export default {
       system: 'Sistema',
       logout: 'Cerrar sesión',
       api: 'API',
+      management: 'Gestión',
       username: 'Nombre de usuario',
       usernameMessage: '¡Por favor ingresa tu nombre de usuario!',
       photo: 'Tu foto',

@@ -483,6 +483,7 @@ export default {
       system: 'Système',
       logout: 'Déconnexion',
       api: 'API',
+      management: 'Gestion',
       username: "Nom d'utilisateur",
       usernameMessage: "Veuillez saisir votre nom d'utilisateur !",
       photo: 'Votre photo',
