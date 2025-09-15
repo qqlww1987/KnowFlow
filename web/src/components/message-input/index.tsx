@@ -24,10 +24,9 @@ import {
   Space,
   Spin,
   Typography,
-  Upload,
 } from 'antd';
 import get from 'lodash/get';
-import { CircleStop, Paperclip, SendHorizontal } from 'lucide-react';
+import { CircleStop, SendHorizontal } from 'lucide-react';
 import {
   ChangeEventHandler,
   memo,
@@ -343,22 +342,6 @@ const MessageInput = ({
             width: fileList.length > 0 ? '50%' : '100%',
           }}
         >
-          {showUploadIcon && (
-            <Upload
-              onPreview={handlePreview}
-              onChange={handleChange}
-              multiple={false}
-              onRemove={handleRemove}
-              showUploadList={false}
-              beforeUpload={() => {
-                return false;
-              }}
-            >
-              <Button type={'primary'} disabled={disabled}>
-                <Paperclip className="size-4" />
-              </Button>
-            </Upload>
-          )}
           {sendLoading ? (
             <Button onClick={handleStopOutputMessage}>
               <CircleStop className="size-5" />
