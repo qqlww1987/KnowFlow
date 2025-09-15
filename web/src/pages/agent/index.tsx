@@ -25,6 +25,7 @@ import {
   Download,
   History,
   LaptopMinimalCheck,
+  Logs,
   ScreenShare,
   Settings,
   Upload,
@@ -61,7 +62,7 @@ function AgentDropdownMenuItem({
 
 export default function Agent() {
   const { id } = useParams();
-  const { navigateToAgentList } = useNavigatePage();
+  const { navigateToAgentList, navigateToAgentLogs } = useNavigatePage();
   const {
     visible: chatDrawerVisible,
     hideModal: hideChatDrawer,
@@ -139,6 +140,13 @@ export default function Agent() {
           <Button variant={'secondary'} onClick={showVersionDialog}>
             <History />
             {t('flow.historyversion')}
+          </Button>
+          <Button
+            variant={'secondary'}
+            onClick={navigateToAgentLogs(id as string)}
+          >
+            <Logs />
+            {t('flow.log')}
           </Button>
 
           <DropdownMenu>
