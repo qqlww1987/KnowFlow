@@ -49,24 +49,29 @@ def get_tenants_with_pagination(current_page, page_size, username='', current_us
         # 组合WHERE子句
         where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
         
-        # 查询总记录数 - 每个用户只计算一次（最新租户记录）
+        # 查询总记录数 - 每个用户只计算一次（优先个人租户）
         count_sql = f"""
-        SELECT COUNT(*) as total 
+        SELECT COUNT(*) as total
         FROM (
-            SELECT 
+            SELECT
                 t.id
-            FROM 
+            FROM
                 tenant t
             JOIN user_tenant ut ON t.id = ut.tenant_id AND ut.role = 'owner'
             JOIN user u ON ut.user_id = u.id
             JOIN (
-                SELECT ut2.user_id, MAX(t2.create_date) as max_create_date
-                FROM user_tenant ut2 
-                JOIN tenant t2 ON ut2.tenant_id = t2.id 
+                SELECT
+                    ut2.user_id,
+                    COALESCE(
+                        MAX(CASE WHEN ut2.user_id = t2.id THEN t2.id END),
+                        MAX(t2.id)
+                    ) as preferred_tenant_id
+                FROM user_tenant ut2
+                JOIN tenant t2 ON ut2.tenant_id = t2.id
                 WHERE ut2.role = 'owner'
                 GROUP BY ut2.user_id
-            ) latest ON u.id = latest.user_id AND t.create_date = latest.max_create_date
-            WHERE 
+            ) preferred ON t.id = preferred.preferred_tenant_id
+            WHERE
                 {where_sql}
         ) as unique_tenants
         """
@@ -76,29 +81,34 @@ def get_tenants_with_pagination(current_page, page_size, username='', current_us
         # 计算分页偏移量
         offset = (current_page - 1) * page_size
         
-        # 执行分页查询 - 每个用户只取最新的租户记录
+        # 执行分页查询 - 每个用户优先选择个人租户
         query = f"""
-        SELECT 
-            t.id, 
+        SELECT
+            t.id,
             u.nickname as username,
             t.llm_id as chat_model,
             t.embd_id as embedding_model,
-            t.create_date, 
+            t.create_date,
             t.update_date
-        FROM 
+        FROM
             tenant t
         JOIN user_tenant ut ON t.id = ut.tenant_id AND ut.role = 'owner'
         JOIN user u ON ut.user_id = u.id
         JOIN (
-            SELECT ut2.user_id, MAX(t2.create_date) as max_create_date
-            FROM user_tenant ut2 
-            JOIN tenant t2 ON ut2.tenant_id = t2.id 
+            SELECT
+                ut2.user_id,
+                COALESCE(
+                    MAX(CASE WHEN ut2.user_id = t2.id THEN t2.id END),
+                    MAX(t2.id)
+                ) as preferred_tenant_id
+            FROM user_tenant ut2
+            JOIN tenant t2 ON ut2.tenant_id = t2.id
             WHERE ut2.role = 'owner'
             GROUP BY ut2.user_id
-        ) latest ON u.id = latest.user_id AND t.create_date = latest.max_create_date
-        WHERE 
+        ) preferred ON t.id = preferred.preferred_tenant_id
+        WHERE
             {where_sql}
-        ORDER BY 
+        ORDER BY
             t.create_date DESC
         LIMIT %s OFFSET %s
         """

@@ -38,30 +38,42 @@ def get_teams_with_pagination(current_page, page_size, name='', current_user_id=
         # 组合WHERE子句
         where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
         
-        # 查询总记录数
-        count_sql = f"SELECT COUNT(*) as total FROM tenant t WHERE {where_sql}"
+        # 查询总记录数，排除个人租户
+        count_sql = f"""
+        SELECT COUNT(*) as total
+        FROM tenant t
+        WHERE {where_sql}
+        AND NOT EXISTS (
+            SELECT 1 FROM user u
+            WHERE u.id = t.id
+        )
+        """
         cursor.execute(count_sql, params)
         total = cursor.fetchone()['total']
         
         # 计算分页偏移量
         offset = (current_page - 1) * page_size
         
-        # 执行分页查询，包含负责人信息和成员数量
+        # 执行分页查询，包含负责人信息和成员数量，排除个人租户
         query = f"""
-        SELECT 
-            t.id, 
-            t.name, 
-            t.create_date, 
-            t.update_date, 
+        SELECT
+            t.id,
+            t.name,
+            t.create_date,
+            t.update_date,
             t.status,
-            (SELECT u.nickname FROM user_tenant ut JOIN user u ON ut.user_id = u.id 
+            (SELECT u.nickname FROM user_tenant ut JOIN user u ON ut.user_id = u.id
             WHERE ut.tenant_id = t.id AND ut.role = 'owner' LIMIT 1) as owner_name,
             (SELECT COUNT(*) FROM user_tenant ut WHERE ut.tenant_id = t.id AND ut.status = 1) as member_count
-        FROM 
+        FROM
             tenant t
-        WHERE 
+        WHERE
             {where_sql}
-        ORDER BY 
+            AND NOT EXISTS (
+                SELECT 1 FROM user u
+                WHERE u.id = t.id
+            )
+        ORDER BY
             t.create_date DESC
         LIMIT %s OFFSET %s
         """
@@ -131,18 +143,43 @@ def create_team(name, owner_id, description="", created_by=None):
     """创建新团队"""
     try:
         conn = mysql.connector.connect(**DB_CONFIG)
-        cursor = conn.cursor()
-        
+        cursor = conn.cursor(dictionary=True)
+
+        # 查询超级管理员的配置作为默认值
+        admin_query = """
+        SELECT t.llm_id, t.embd_id, t.asr_id, t.img2txt_id, t.rerank_id, t.tts_id, t.parser_ids
+        FROM tenant t
+        JOIN user u ON t.id = u.id
+        WHERE u.is_superuser = 1 OR u.email = 'admin@gmail.com'
+        ORDER BY u.create_time ASC
+        LIMIT 1
+        """
+        cursor.execute(admin_query)
+        admin_config = cursor.fetchone()
+
+        # 如果没有找到超级管理员配置，使用默认值
+        if not admin_config:
+            default_parser_ids = "naive:General,qa:Q&A,resume:Resume,manual:Manual,table:Table,paper:Paper,book:Book,laws:Laws,presentation:Presentation,picture:Picture,one:One,audio:Audio,email:Email,tag:Tag,mineru:MinerU,dots:DOTS"
+            admin_config = {
+                'llm_id': '',
+                'embd_id': '',
+                'asr_id': '',
+                'img2txt_id': '',
+                'rerank_id': '',
+                'tts_id': '',
+                'parser_ids': default_parser_ids
+            }
+
         # 生成团队ID
         team_id = generate_uuid()
         current_datetime = datetime.now()
         create_time = int(current_datetime.timestamp() * 1000)
         current_date = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
-        
-        # 创建团队记录
+
+        # 创建团队记录，继承超级管理员的配置
         team_query = """
         INSERT INTO tenant (
-            id, name, create_time, create_date, update_time, update_date, 
+            id, name, create_time, create_date, update_time, update_date,
             status, credit, llm_id, embd_id, asr_id, img2txt_id, rerank_id, tts_id, parser_ids, created_by
         ) VALUES (
             %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
@@ -150,7 +187,15 @@ def create_team(name, owner_id, description="", created_by=None):
         """
         team_data = (
             team_id, name, create_time, current_date, create_time, current_date,
-            '1', 0, '', '', '', '', '', '', '', created_by
+            '1', 0,
+            admin_config['llm_id'] or '',
+            admin_config['embd_id'] or '',
+            admin_config['asr_id'] or '',
+            admin_config['img2txt_id'] or '',
+            admin_config['rerank_id'] or '',
+            admin_config['tts_id'] or '',
+            admin_config['parser_ids'] or '',
+            created_by
         )
         cursor.execute(team_query, team_data)
         
