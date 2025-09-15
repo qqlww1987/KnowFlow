@@ -181,6 +181,10 @@ export const renameTag = (
   { fromTag, toTag }: IRenameTag,
 ) => post(api.renameTag(knowledgeId), { fromTag, toTag });
 
+export function deleteKnowledgeGraph(knowledgeId: string) {
+  return request.delete(api.getKnowledgeGraph(knowledgeId));
+}
+
 export function getKnowledgeGraph(knowledgeId: string) {
   return request.get(api.getKnowledgeGraph(knowledgeId));
 }
