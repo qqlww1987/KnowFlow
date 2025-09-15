@@ -129,7 +129,11 @@ graph TB
 - 至少 8GB 内存
 - 可选：NVIDIA GPU + nvidia-container-toolkit（GPU加速）
 
-#### 1. 启动 MinerU 服务
+#### 1. 启动文档解析服务
+
+可以在 MinerU 和 Dots 服务中任选一种，推荐 Dots ，MarkDown 文件标题识别效果更好。
+
+##### MinerU 
 
 基于 SGLang 的 MinerU 完全离线部署方案，镜像包含所有必要的模型文件，无需运行时下载：
 
@@ -156,19 +160,6 @@ docker run -d \
     zxwei/mineru-api-full:v2.1.11
 ```
 
-**带数据卷挂载的部署**
-```bash
-docker run -d \
-    --gpus all \
-    -p 8888:8888 \
-    -p 30000:30000 \
-    -v $(pwd)/data:/app/data \
-    -v $(pwd)/output:/app/output \
-    -e MINERU_MODEL_SOURCE=local \
-    -e SGLANG_MEM_FRACTION_STATIC=0.8 \
-    --name mineru-sglang \
-    zxwei/mineru-api-full:v2.1.11
-```
 
 > 💡 **镜像特性：**
 > - **完全离线部署**: 所有模型文件已预下载并打包在镜像中
@@ -178,7 +169,7 @@ docker run -d \
 > - **高性能**: GPU 加速推理，支持 CUDA 12.4
 > - **智能启动**: 支持环境变量配置，灵活的参数调优
 
-#### 2. MinerU 服务地址配置
+##### 2. MinerU 服务地址配置
 
 在 `/knowflow/server/services/config/settings.yaml` 配置文件中，配置 MinerU 服务地址以及解析模式:
 
@@ -203,7 +194,22 @@ docker run -d \
 ```
 
 
-#### 3. 启动容器，开始使用
+##### Dots 
+
+进入到 `knowflow/dots` 目录下, 执行拉取 Dots 镜像脚本，该脚本可以自动下载模型以及下载 Dots 镜像。
+
+```bash
+cd knowflow/dots
+./deploy.sh
+```
+
+默认端口是 8000，如有冲突，可以手动调整 compose 文件。
+
+
+
+
+
+#### 2. 启动 KnowFlow 容器，开始使用
 
 1. 拉取本项目代码：
 
@@ -225,7 +231,7 @@ docker compose -f docker-compose.yml up -d
 
 访问地址：`http://服务器IP:80`，进入 KnowFlow 首页
 
-#### 4. 默认管理员账户
+#### 3. 默认管理员账户
 
 系统启动后，请使用以下默认超级管理员账户登录：
 
@@ -235,6 +241,7 @@ docker compose -f docker-compose.yml up -d
 ```
 
 > 💡 **安全提示：** 首次登录后，请及时修改默认密码以确保系统安全。
+
 
 ### 方式二：源码部署
 
@@ -377,6 +384,7 @@ pnpm dev
 2. **按标题分块**：根据标题层级自动划分内容块
 3. **RAGFlow 原分块**：保持与官方完全一致的分块规则
 4. **父子分块**：父块较大用于补充上下文，子块用于向量检索
+5. **DOTS 解析**：先进的文档智能解析引擎，支持复杂版式和多模态内容
 
 <div align="center">
   <img src="knowflow/assets/mulcontent.png" alt="图文混排示例">
@@ -535,6 +543,20 @@ mineru:
     sglang:
       # 本地SGLang服务地址（如果使用vlm-sglang-client后端）
       server_url: "http://localhost:30000"
+```
+
+#### DOTS 解析使用
+
+**配置 DOTS 解析**
+1. 在知识库设置中选择"DOTS"解析方式
+2. 支持复杂文档版式和多模态内容理解
+3. 提供更准确的文档结构识别
+
+**使用步骤**
+```bash
+# 1. 创建知识库时选择 DOTS 解析器
+# 2. 上传文档自动使用 DOTS 解析
+# 3. 获得更精准的图文混排输出
 ```
 
 #### API 使用示例
