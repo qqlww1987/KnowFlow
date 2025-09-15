@@ -299,15 +299,37 @@ def retrieval_test():
     try:
         tenants = UserTenantService.query(user_id=current_user.id)
         for kb_id in kb_ids:
-            for tenant in tenants:
-                if KnowledgebaseService.query(
-                        tenant_id=tenant.tenant_id, id=kb_id):
-                    tenant_ids.append(tenant.tenant_id)
-                    break
+            # 首先尝试RBAC权限检查
+            has_rbac_permission = False
+            try:
+                from api.utils.rbac_utils import check_rbac_permission, RBACPermissionType, RBACResourceType
+                has_rbac_permission = check_rbac_permission(
+                    current_user.id,
+                    RBACResourceType.KNOWLEDGEBASE,
+                    kb_id,
+                    RBACPermissionType.KB_READ
+                )
+            except Exception as e:
+                import logging
+                logging.warning(f"RBAC权限检查失败，回退到租户检查: {e}")
+
+            if has_rbac_permission:
+                # 如果有RBAC权限，获取知识库的tenant_id
+                _, kb = KnowledgebaseService.get_by_id(kb_id)
+                if kb:
+                    tenant_ids.append(kb.tenant_id)
+                    continue
             else:
-                return get_json_result(
-                    data=False, message='Only owner of knowledgebase authorized for this operation.',
-                    code=settings.RetCode.OPERATING_ERROR)
+                # 回退到原有的租户检查逻辑
+                for tenant in tenants:
+                    if KnowledgebaseService.query(
+                            tenant_id=tenant.tenant_id, id=kb_id):
+                        tenant_ids.append(tenant.tenant_id)
+                        break
+                else:
+                    return get_json_result(
+                        data=False, message='Only owner of knowledgebase authorized for this operation.',
+                        code=settings.RetCode.OPERATING_ERROR)
 
         e, kb = KnowledgebaseService.get_by_id(kb_ids[0])
         if not e:

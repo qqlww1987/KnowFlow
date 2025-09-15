@@ -94,7 +94,7 @@ def create():
 
 @manager.route('/update', methods=['post'])  # noqa: F821
 @login_required
-@kb_write_required(resource_id_param='kb_id')
+@kb_admin_required(resource_id_param='kb_id')
 @validate_request("kb_id", "name", "description", "parser_id")
 @not_allowed_parameters("id", "tenant_id", "created_by", "create_time", "update_time", "create_date", "update_date", "created_by")
 def update():
@@ -108,36 +108,11 @@ def update():
             message=f"Dataset name length is {len(req['name'])} which is large than {DATASET_NAME_LIMIT}")
     req["name"] = req["name"].strip()
 
-    if not KnowledgebaseService.accessible4deletion(req["kb_id"], current_user.id):
-        return get_json_result(
-            data=False,
-            message='No authorization.',
-            code=settings.RetCode.AUTHENTICATION_ERROR
-        )
     try:
-        # 首先尝试RBAC权限检查
-        has_rbac_permission = False
-        try:
-            has_rbac_permission = check_rbac_permission(
-                current_user.id, 
-                RBACResourceType.KNOWLEDGEBASE, 
-                req["kb_id"], 
-                RBACPermissionType.KB_WRITE
-                # 不传tenant_id，让RBAC底层使用default
-            )
-        except Exception as e:
-            logging.warning(f"RBAC permission check failed: {e}")
-        
-        # 如果有RBAC权限，查询知识库（不限制创建者）
-        if has_rbac_permission:
-            kbs = KnowledgebaseService.query(id=req["kb_id"])
-        else:
-            # 否则只允许创建者访问
-            kbs = KnowledgebaseService.query(created_by=current_user.id, id=req["kb_id"])
-        
+        kbs = KnowledgebaseService.query(id=req["kb_id"])
         if not kbs:
             return get_json_result(
-                data=False, message='Only owner of knowledgebase authorized for this operation.',
+                data=False, message='Knowledgebase not found.',
                 code=settings.RetCode.OPERATING_ERROR)
 
         e, kb = KnowledgebaseService.get_by_id(req["kb_id"])
@@ -236,40 +211,12 @@ def list_kbs():
 @validate_request("kb_id")
 def rm():
     req = request.json
-    if not KnowledgebaseService.accessible4deletion(req["kb_id"], current_user.id):
-        return get_json_result(
-            data=False,
-            message='No authorization.',
-            code=settings.RetCode.AUTHENTICATION_ERROR
-        )
     try:
-        # 首先尝试查询用户创建的知识库
-        kbs = KnowledgebaseService.query(
-            created_by=current_user.id, id=req["kb_id"])
-        
-        # 如果不是创建者，检查是否有RBAC权限
+        kbs = KnowledgebaseService.query(id=req["kb_id"])
         if not kbs:
-            # 检查用户是否通过RBAC系统有管理权限（如超级管理员）
-            has_rbac_permission = False
-            try:
-                has_rbac_permission = check_rbac_permission(
-                    current_user.id, 
-                    RBACResourceType.KNOWLEDGEBASE, 
-                    req["kb_id"], 
-                    RBACPermissionType.KB_ADMIN
-                    # 不传tenant_id，让RBAC底层使用default
-                )
-            except Exception as e:
-                logging.warning(f"RBAC permission check failed: {e}")
-            
-            if has_rbac_permission:
-                # 如果有RBAC权限，查询知识库（不限制创建者）
-                kbs = KnowledgebaseService.query(id=req["kb_id"])
-            
-            if not kbs:
-                return get_json_result(
-                    data=False, message='Only owner of knowledgebase authorized for this operation.',
-                    code=settings.RetCode.OPERATING_ERROR)
+            return get_json_result(
+                data=False, message='Knowledgebase not found.',
+                code=settings.RetCode.OPERATING_ERROR)
 
         for doc in DocumentService.query(kb_id=req["kb_id"]):
             if not DocumentService.remove_document(doc, kbs[0].tenant_id):
