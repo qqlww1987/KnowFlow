@@ -372,23 +372,26 @@ export const useRunNextDocument = () => {
       const documentInfos = docInfoResponse.data;
 
       // Separate documents by parser type
-      const minerUDocIds: string[] = [];
-      const otherDocIds: string[] = [];
+      const knowFlowDocIds: string[] = [];
+      const ragFlowDocIds: string[] = [];
 
       documentInfos.forEach((doc: any) => {
-        if (doc.parser_id === DocumentParserType.MinerU) {
-          minerUDocIds.push(doc.id);
+        if (
+          doc.parser_id === DocumentParserType.MinerU ||
+          doc.parser_id === DocumentParserType.DOTS
+        ) {
+          knowFlowDocIds.push(doc.id);
         } else {
-          otherDocIds.push(doc.id);
+          ragFlowDocIds.push(doc.id);
         }
       });
 
       let allSuccess = true;
 
-      // Process MinerU documents with KnowFlow API
-      if (minerUDocIds.length > 0) {
+      // Process KnowFlow documents (MinerU and DOTS) with KnowFlow API
+      if (knowFlowDocIds.length > 0) {
         const ret = await runMinerUDocument({
-          doc_ids: minerUDocIds,
+          doc_ids: knowFlowDocIds,
           run,
           delete: shouldDelete,
         });
@@ -398,10 +401,10 @@ export const useRunNextDocument = () => {
         }
       }
 
-      // Process other documents with original API
-      if (otherDocIds.length > 0) {
+      // Process RAGFlow documents with original API
+      if (ragFlowDocIds.length > 0) {
         const ret = await kbService.document_run({
-          doc_ids: otherDocIds,
+          doc_ids: ragFlowDocIds,
           run,
           delete: shouldDelete,
         });
