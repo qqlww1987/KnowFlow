@@ -133,7 +133,7 @@ graph TB
 
 可以在 MinerU 和 Dots 服务中任选一种，推荐 Dots ，MarkDown 文件标题识别效果更好。
 
-##### MinerU 
+##### 1. 启动 MinerU 镜像
 
 基于 SGLang 的 MinerU 完全离线部署方案，镜像包含所有必要的模型文件，无需运行时下载：
 
@@ -194,7 +194,7 @@ docker run -d \
 ```
 
 
-##### Dots 
+##### 1. 启动 Dots 镜像 
 
 进入到 `knowflow/dots` 目录下, 执行拉取 Dots 镜像脚本，该脚本可以自动下载模型以及下载 Dots 镜像。
 
@@ -205,6 +205,32 @@ cd knowflow/dots
 
 默认端口是 8000，如有冲突，可以手动调整 compose 文件。
 
+
+##### 2. Dots 服务地址配置
+
+在 `/knowflow/server/services/config/settings.yaml` 配置文件中，配置 Dots 服务地址以及解析模式:
+
+```bash
+dots:
+  # VLLM 服务配置
+  vllm:
+    # DOTS OCR 服务地址
+    # 远程服务示例: http://{ip}:8000
+    # 本地服务示例: http://localhost:8000
+    url: "http://localhost:8000"
+    
+    # 模型名称（根据部署配置调整）
+    model_name: "dotsocr-model"
+    
+    # 请求超时时间（秒）
+    timeout: 300
+    
+    # 生成参数
+    temperature: 0.1
+    top_p: 1.0
+    max_completion_tokens: 16384
+    
+```
 
 
 
