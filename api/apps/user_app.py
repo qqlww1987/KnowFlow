@@ -578,10 +578,11 @@ def user_profile():
         # 2. 通过 HTTP API 检查 RBAC 系统中的管理员权限
         try:
             import requests
-            
+            from api.utils.rbac_utils import KNOWFLOW_API_URL
+
             # 调用 KnowFlow 后端的 RBAC API 检查全局管理员权限
             response = requests.post(
-                'http://localhost:5000/api/v1/rbac/permissions/check-global',
+                f'{KNOWFLOW_API_URL}/api/v1/rbac/permissions/check-global',
                 json={
                     'user_id': current_user.id,
                     'permission_type': 'admin'

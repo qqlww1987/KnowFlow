@@ -52,7 +52,7 @@ export const useFetchUserInfo = (): ResponseGetType<IUserInfo> => {
           // 2. 检查 RBAC 系统中的全局管理员权限
           try {
             const response = await fetch(
-              'http://localhost:5000/api/v1/rbac/permissions/check-global',
+              '/api/knowflow/v1/rbac/permissions/check-global',
               {
                 method: 'POST',
                 headers: {

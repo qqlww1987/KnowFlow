@@ -503,7 +503,8 @@ def run():
                     # 调用KnowFlow的解析API而不是RAGFlow taskqueue
                     try:
                         import requests
-                        knowflow_api_url = "http://localhost:5000/api/v1/knowledgebases/documents/{}/parse".format(id)
+                        from api.utils.rbac_utils import KNOWFLOW_API_URL
+                        knowflow_api_url = f"{KNOWFLOW_API_URL}/api/v1/knowledgebases/documents/{id}/parse"
                         response = requests.post(knowflow_api_url, json={"async": True})
                         if response.status_code == 200:
                             print(f"[INFO] 文档 {id} 已提交到KnowFlow解析API (parser: {doc_parser})")
