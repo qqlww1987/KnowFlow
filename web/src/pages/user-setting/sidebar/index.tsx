@@ -72,14 +72,8 @@ const SideBar = () => {
         }
         return true;
       })
-      .map((x) => {
-        return {
-          key: x,
-          icon: UserSettingIconMap[x],
-          label: t(x),
-        };
-      });
-  }, [userInfo?.is_superuser, t]);
+      .map((value) => getItem(value, value, UserSettingIconMap[value]));
+  }, [userInfo?.is_superuser]);
 
   const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
     if (key === UserSettingRouteKey.Logout) {
@@ -100,7 +94,7 @@ const SideBar = () => {
         mode="inline"
         items={items}
         onClick={handleMenuClick}
-        style={{ width: 200 }}
+        style={{ width: 312 }}
       />
     </section>
   );

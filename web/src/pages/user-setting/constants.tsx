@@ -7,26 +7,23 @@ import {
   ProfileIcon,
   TeamIcon,
 } from '@/assets/icon/Icon';
+import { IconFont } from '@/components/icon-font';
 import { LLMFactory } from '@/constants/llm';
 import { UserSettingRouteKey } from '@/constants/setting';
-import {
-  DatabaseOutlined,
-  FileOutlined,
-  SettingOutlined,
-} from '@ant-design/icons';
+import { MonitorOutlined } from '@ant-design/icons';
 
 export const UserSettingIconMap = {
   [UserSettingRouteKey.Profile]: <ProfileIcon />,
   [UserSettingRouteKey.Password]: <PasswordIcon />,
   [UserSettingRouteKey.Model]: <ModelProviderIcon />,
-  [UserSettingRouteKey.System]: <ModelProviderIcon />,
-  [UserSettingRouteKey.Api]: <ApiIcon />,
+  [UserSettingRouteKey.System]: <MonitorOutlined style={{ fontSize: 24 }} />,
   [UserSettingRouteKey.Team]: <TeamIcon />,
-  [UserSettingRouteKey.Management]: <ManagementIcon />,
-  [UserSettingRouteKey.FileManagement]: <FileOutlined />,
-  [UserSettingRouteKey.KnowledgeManagement]: <DatabaseOutlined />,
-  [UserSettingRouteKey.UserConfig]: <SettingOutlined />,
   [UserSettingRouteKey.Logout]: <LogOutIcon />,
+  [UserSettingRouteKey.Api]: <ApiIcon />,
+  [UserSettingRouteKey.MCP]: (
+    <IconFont name="mcp" className="size-6"></IconFont>
+  ),
+  [UserSettingRouteKey.Management]: <ManagementIcon />,
 };
 
 export * from '@/constants/setting';

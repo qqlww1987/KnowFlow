@@ -1,7 +1,8 @@
 import { Authorization } from '@/constants/authorization';
+import systemService from '@/services/system-service';
 import userService from '@/services/user-service';
 import authorizationUtil, { redirectToLogin } from '@/utils/authorization-util';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Form, message } from 'antd';
 import { FormInstance } from 'antd/lib';
 import { useEffect, useState } from 'react';
@@ -111,4 +112,15 @@ export const useHandleSubmittable = (form: FormInstance) => {
   }, [form, values]);
 
   return { submittable };
+};
+
+export const useSystemConfig = () => {
+  return useQuery({
+    queryKey: ['systemConfig'],
+    queryFn: async () => {
+      const { data } = await systemService.getSystemConfig();
+      return data;
+    },
+    staleTime: 5 * 60 * 1000, // 5分钟缓存
+  });
 };

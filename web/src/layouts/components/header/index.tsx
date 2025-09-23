@@ -51,7 +51,8 @@ const RagHeader = () => {
         icon: Search,
         iconActive: SearchActive,
       },
-      { path: '/flow', name: t('flow'), icon: Flow, iconActive: FlowActive },
+      // { path: '/flow', name: t('flow'), icon: Flow, iconActive: FlowActive },
+      { path: '/agent-list', name: t('flow'), icon: Flow, iconActive: FlowActive },
       {
         path: '/file',
         name: t('fileManager'),

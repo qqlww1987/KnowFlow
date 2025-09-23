@@ -1,0 +1,144 @@
+.flowListWrapper {
+  padding: 0 0 48px;
+  overflow: auto;
+  background: #ffffff;
+  height: 100%;
+}
+.topTitle {
+  height: 45px;
+  background: #f8fafc;
+  box-shadow: 0px 3 8px 0px rgba(0, 0, 0, 0.06);
+  font-family:
+    Alibaba PuHuiTi 2,
+    Alibaba PuHuiTi 20;
+  font-weight: 500;
+  font-size: 23px;
+  color: #0d1c2e;
+  line-height: 45px;
+  padding-left: 35px;
+}
+
+.topWrapper {
+  // display: flex;
+  // justify-content: space-between;
+  // align-items: flex-start;
+  padding: 18px 35px 20px;
+
+  .title {
+    font-family: Inter;
+    font-size: 23px;
+    font-style: normal;
+    font-weight: @fontWeight600;
+    line-height: 31px;
+    color: var(--ant-color-info);
+    font-weight: 500;
+  }
+  .description {
+    font-family: Inter;
+    font-style: normal;
+    font-weight: 400;
+    font-size: 12px;
+    color: #999999;
+    line-height: 17px;
+    margin-top: 8px;
+  }
+
+  .topButton {
+    font-family: Inter;
+    font-size: 14px;
+    font-style: normal;
+    font-weight: @fontWeight600;
+    line-height: 20px;
+  }
+
+  .filterButton {
+    display: flex;
+    align-items: center;
+    .topButton();
+  }
+}
+.flowCardContainer {
+  padding: 0 35px;
+  overflow: auto;
+  .knowledgeEmpty {
+    width: 100%;
+  }
+  .addCard {
+    width: 293px;
+    height: 138px;
+    background-image: url(@/assets/image/agent/addbg.png);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 100% 100%;
+    border-radius: 8px;
+    cursor: pointer;
+    .addIcon {
+      width: 36px;
+      height: 36px;
+      margin-top: 32px;
+      margin-left: 53px;
+      background-size: contain;
+      background-image: url(@/assets/image/agent/addbtn.png);
+      background-repeat: no-repeat;
+    }
+    .addDesc {
+      font-weight: 400;
+      font-size: 23px;
+      color: #1570ef;
+      line-height: 31px;
+      margin-top: 2px;
+      margin-left: 16px;
+    }
+  }
+}
+
+.templatesBox {
+  max-height: 70vh;
+  overflow: auto;
+}
+
+.agentTemplateModal {
+  top: 0;
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
+  height: 100vh;
+  max-height: 100vh;
+  padding: 0;
+
+  :global(.ant-modal-content) {
+    // width: 100vw;
+    height: 100%;
+    border-radius: 0;
+  }
+  .agentDescription {
+    padding-top: 18px;
+    height: 110px;
+  }
+  .createModalContent {
+    height: 90vh;
+  }
+  .agentTitleWrapper {
+    width: 80%;
+  }
+  .flowTemplateCard {
+    position: relative;
+    cursor: pointer;
+  }
+
+  .selectedFlowTemplateCard {
+    background-color: @selectedBackgroundColor;
+  }
+  .useButton {
+    position: absolute;
+    width: 84%;
+    left: 0;
+    right: 0;
+    bottom: 10px;
+    margin: auto;
+  }
+}
+
+.agentTemplateModalWrapper {
+  margin: 0;
+}

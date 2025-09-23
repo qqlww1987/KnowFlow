@@ -22,8 +22,11 @@ import {
   Tag,
   message,
 } from 'antd';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import styles from './index.less';
+
+import { getLlmNameAndFIdByLlmId, getRealModelName } from '@/utils/llm-util';
+import llmFactories from '@parent/conf/llm_factories.json';
 
 const { Option } = Select;
 
@@ -53,26 +56,45 @@ const UserConfigPage = () => {
     total: 0,
   });
 
-  // 模拟可用的模型选项
-  const chatModelOptions = [
-    'gpt-4o',
-    'gpt-4o-mini',
-    'gpt-3.5-turbo',
-    'claude-3-opus',
-    'claude-3-sonnet',
-    'claude-3-haiku',
-    'gemini-pro',
-    'gemini-1.5-pro',
-  ];
+  // 从 llm_factories.json 动态生成可用的模型选项
+  const chatModelOptions = useMemo(() => {
+    const set = new Set<string>();
+    try {
+      const factories = (llmFactories as any)?.factory_llm_infos ?? [];
+      factories.forEach((f: any) => {
+        // 仅选用启用的厂商（status === '1'）
+        if (String(f?.status ?? '') !== '1') return;
+        (f?.llm ?? []).forEach((m: any) => {
+          if (
+            String(m?.model_type ?? '').toLowerCase() === 'chat' &&
+            m?.llm_name
+          ) {
+            set.add(m.llm_name);
+          }
+        });
+      });
+    } catch {}
+    return Array.from(set).sort();
+  }, []);
 
-  const embeddingModelOptions = [
-    'text-embedding-3-large',
-    'text-embedding-3-small',
-    'text-embedding-ada-002',
-    'sentence-transformers',
-    'bge-large-zh-v1.5',
-    'bge-small-zh-v1.5',
-  ];
+  const embeddingModelOptions = useMemo(() => {
+    const set = new Set<string>();
+    try {
+      const factories = (llmFactories as any)?.factory_llm_infos ?? [];
+      factories.forEach((f: any) => {
+        if (String(f?.status ?? '') !== '1') return;
+        (f?.llm ?? []).forEach((m: any) => {
+          if (
+            String(m?.model_type ?? '').toLowerCase() === 'embedding' &&
+            m?.llm_name
+          ) {
+            set.add(m.llm_name);
+          }
+        });
+      });
+    } catch {}
+    return Array.from(set).sort();
+  }, []);
 
   useEffect(() => {
     loadConfigData();
@@ -87,6 +109,8 @@ const UserConfigPage = () => {
           size: pagination.pageSize,
           username: searchValue,
         },
+        // 保持与后端参数命名一致（camelCase）
+        skipSnakeCase: true,
       });
       const data = res?.data?.data || {};
       setConfigData(data.list || []);
@@ -126,6 +150,8 @@ const UserConfigPage = () => {
       if (currentConfig) {
         await request.put(`/api/v1/tenants/${currentConfig.id}`, {
           data: values,
+          // 保持与后端字段命名一致（camelCase）
+          skipSnakeCase: true,
         });
         message.success('修改配置成功');
         setEditModalVisible(false);
@@ -143,26 +169,17 @@ const UserConfigPage = () => {
   };
 
   const getModelDisplayName = (model: string): string => {
-    const modelMap: { [key: string]: string } = {
-      'gpt-4o': 'GPT-4o',
-      'gpt-4o-mini': 'GPT-4o Mini',
-      'gpt-3.5-turbo': 'GPT-3.5 Turbo',
-      'claude-3-opus': 'Claude-3 Opus',
-      'claude-3-sonnet': 'Claude-3 Sonnet',
-      'claude-3-haiku': 'Claude-3 Haiku',
-      'gemini-pro': 'Gemini Pro',
-      'gemini-1.5-pro': 'Gemini 1.5 Pro',
-      'text-embedding-3-large': 'Text Embedding 3 Large',
-      'text-embedding-3-small': 'Text Embedding 3 Small',
-      'text-embedding-ada-002': 'Ada 002',
-      'sentence-transformers': 'Sentence Transformers',
-      'bge-large-zh-v1.5': 'BGE Large ZH v1.5',
-      'bge-small-zh-v1.5': 'BGE Small ZH v1.5',
-    };
-    return modelMap[model] || model;
+    if (!model) return '未设置';
+    // 优先解析形如 "modelName__Factory@Factory" 的 id
+    const { llmName } = getLlmNameAndFIdByLlmId(model);
+    const parsed = getRealModelName(llmName || model);
+    if (parsed) return parsed;
+
+    return model;
   };
 
   const getModelColor = (model: string): string => {
+    if (!model) return 'default';
     if (model.includes('gpt')) return 'green';
     if (model.includes('claude')) return 'blue';
     if (model.includes('gemini')) return 'purple';
@@ -190,27 +207,30 @@ const UserConfigPage = () => {
       ellipsis: {
         showTitle: false,
       },
-      render: (model: string) => (
-        <Tag
-          color={getModelColor(model)}
-          icon={<RobotOutlined />}
-          style={{ maxWidth: '160px' }}
-        >
-          <span
-            title={getModelDisplayName(model)}
-            style={{
-              display: 'inline-block',
-              maxWidth: '120px',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              verticalAlign: 'top',
-            }}
+      render: (model: string) => {
+        const display = getModelDisplayName(model);
+        return (
+          <Tag
+            color={getModelColor(model)}
+            icon={<RobotOutlined />}
+            style={{ maxWidth: '160px' }}
           >
-            {getModelDisplayName(model)}
-          </span>
-        </Tag>
-      ),
+            <span
+              title={display}
+              style={{
+                display: 'inline-block',
+                maxWidth: '120px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                verticalAlign: 'top',
+              }}
+            >
+              {display}
+            </span>
+          </Tag>
+        );
+      },
     },
     {
       title: '嵌入模型',
@@ -220,27 +240,30 @@ const UserConfigPage = () => {
       ellipsis: {
         showTitle: false,
       },
-      render: (model: string) => (
-        <Tag
-          color={getModelColor(model)}
-          icon={<ApiOutlined />}
-          style={{ maxWidth: '160px' }}
-        >
-          <span
-            title={getModelDisplayName(model)}
-            style={{
-              display: 'inline-block',
-              maxWidth: '120px',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              verticalAlign: 'top',
-            }}
+      render: (model: string) => {
+        const display = getModelDisplayName(model);
+        return (
+          <Tag
+            color={getModelColor(model)}
+            icon={<ApiOutlined />}
+            style={{ maxWidth: '160px' }}
           >
-            {getModelDisplayName(model)}
-          </span>
-        </Tag>
-      ),
+            <span
+              title={display}
+              style={{
+                display: 'inline-block',
+                maxWidth: '120px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                verticalAlign: 'top',
+              }}
+            >
+              {display}
+            </span>
+          </Tag>
+        );
+      },
     },
     {
       title: '更新时间',
@@ -365,11 +388,7 @@ const UserConfigPage = () => {
             <Select
               placeholder="请选择聊天模型"
               showSearch
-              filterOption={(input, option) =>
-                (option?.children as unknown as string)
-                  ?.toLowerCase()
-                  .includes(input.toLowerCase())
-              }
+              optionFilterProp="value"
             >
               {chatModelOptions.map((model) => (
                 <Option key={model} value={model}>
@@ -389,11 +408,7 @@ const UserConfigPage = () => {
             <Select
               placeholder="请选择嵌入模型"
               showSearch
-              filterOption={(input, option) =>
-                (option?.children as unknown as string)
-                  ?.toLowerCase()
-                  .includes(input.toLowerCase())
-              }
+              optionFilterProp="value"
             >
               {embeddingModelOptions.map((model) => (
                 <Option key={model} value={model}>

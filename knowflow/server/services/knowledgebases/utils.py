@@ -56,6 +56,32 @@ def _get_kb_tenant_id(kb_id):
         if conn:
             conn.close()
 
+def _get_tenant_by_api_key(api_token):
+    """根据API token获取tenant_id"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT tenant_id FROM api_token WHERE token = %s", (api_token,))
+        result = cursor.fetchone()
+        
+        if result:
+            tenant_id = result[0]
+            print(f"[DEBUG] 根据API token获取到tenant_id: {tenant_id}")
+            return tenant_id
+        else:
+            print(f"[DEBUG] API token在数据库中未找到: {api_token[:20]}...")
+            return None
+            
+    except Exception as e:
+        print(f"[ERROR] 根据API token查询tenant_id失败: {e}")
+        return None
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
 def _get_tenant_api_key(tenant_id):
     """根据tenant_id获取API key，如果不存在则自动生成"""
     try:

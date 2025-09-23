@@ -16,6 +16,8 @@ from .tenants.routes import *
 from .files.routes import *
 from .knowledgebases.routes import *
 from .documents.routes import *
+from .rbac.rbac_routes import rbac_bp
+from .rbac.permission_routes import permission_bp
 
 def register_routes(app):
     """注册所有路由蓝图到应用"""
@@ -25,3 +27,5 @@ def register_routes(app):
     app.register_blueprint(files_bp)
     app.register_blueprint(knowledgebase_bp)
     app.register_blueprint(documents_bp)
+    app.register_blueprint(rbac_bp)
+    app.register_blueprint(permission_bp)

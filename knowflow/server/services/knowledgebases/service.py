@@ -90,7 +90,61 @@ class KnowledgebaseService:
         cursor.close()
         conn.close()
 
+        # 为每个知识库添加权限统计信息
+        for kb in results:
+            permission_stats = cls.get_knowledgebase_permission_stats(kb['id'])
+            kb['permission_stats'] = permission_stats
+
         return {"list": results, "total": total}
+
+    @classmethod
+    def get_knowledgebase_permission_stats(cls, kb_id):
+        """获取知识库的权限统计信息"""
+        conn = cls._get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        
+        try:
+            # 统计用户权限数量
+            user_count_query = """
+                SELECT COUNT(DISTINCT ur.user_id) as user_count
+                FROM rbac_user_roles ur
+                JOIN rbac_roles r ON ur.role_id = r.id
+                WHERE r.code IN ('admin', 'editor', 'viewer')
+                AND ur.resource_id = %s
+                AND ur.is_active = 1
+            """
+            cursor.execute(user_count_query, (kb_id,))
+            user_result = cursor.fetchone()
+            user_count = user_result['user_count'] if user_result else 0
+            
+            # 统计团队权限数量
+            team_count_query = """
+                SELECT COUNT(DISTINCT team_id) as team_count
+                FROM rbac_team_roles
+                WHERE role_code IN ('admin', 'editor', 'viewer')
+                AND resource_id = %s
+                AND is_active = 1
+            """
+            cursor.execute(team_count_query, (kb_id,))
+            team_result = cursor.fetchone()
+            team_count = team_result['team_count'] if team_result else 0
+            
+            return {
+                'user_count': user_count,
+                'team_count': team_count,
+                'total_count': user_count + team_count
+            }
+            
+        except Exception as e:
+            print(f"获取知识库权限统计失败: {e}")
+            return {
+                'user_count': 0,
+                'team_count': 0,
+                'total_count': 0
+            }
+        finally:
+            cursor.close()
+            conn.close()
 
     @classmethod
     def get_knowledgebase_detail(cls, kb_id):
@@ -617,7 +671,7 @@ class KnowledgebaseService:
                         thumbnail, kb_id, parser_id, parser_config, source_type,
                         type, created_by, name, location, size,
                         token_num, chunk_num, progress, progress_msg, process_begin_at,
-                        process_duation, meta_fields, run, status
+                        process_duration, meta_fields, run, status
                     ) VALUES (
                         %s, %s, %s, %s, %s,
                         %s, %s, %s, %s, %s,
@@ -651,7 +705,7 @@ class KnowledgebaseService:
                     0.0,
                     None,
                     "0",
-                    "1",  # process_duation到status
+                    "1",  # process_duration到status
                 ]
 
                 cursor.execute(doc_query, doc_params)
@@ -1343,3 +1397,204 @@ class KnowledgebaseService:
                 cursor.close()
             if conn and conn.is_connected():
                 conn.close()
+
+    @classmethod
+    def get_knowledgebase_permissions(cls, kb_id):
+        """获取知识库权限列表（包含用户权限和团队权限）"""
+        try:
+            conn = cls._get_db_connection()
+            cursor = conn.cursor(dictionary=True)
+            
+            # 1. 获取用户权限
+            user_query = """
+            SELECT DISTINCT 
+                ur.user_id,
+                ur.resource_id as kb_id,
+                r.code as role_code,
+                CASE 
+                    WHEN r.code = 'admin' THEN 'admin'
+                    WHEN r.code = 'editor' THEN 'write' 
+                    WHEN r.code = 'viewer' THEN 'read'
+                    ELSE r.code
+                END as permission_level,
+                ur.granted_at,
+                'user' as permission_source
+            FROM rbac_user_roles ur
+            JOIN rbac_roles r ON ur.role_id = r.id  
+            WHERE ur.resource_id = %s 
+                AND ur.is_active = 1
+                AND r.code IN ('admin', 'editor', 'viewer')
+            """
+            
+            cursor.execute(user_query, (kb_id,))
+            user_permissions = cursor.fetchall()
+            
+            # 2. 获取团队权限
+            team_query = """
+            SELECT DISTINCT
+                tr.team_id,
+                tr.resource_id as kb_id,
+                tr.role_code,
+                CASE 
+                    WHEN tr.role_code = 'admin' THEN 'admin'
+                    WHEN tr.role_code = 'editor' THEN 'write'
+                    WHEN tr.role_code = 'viewer' THEN 'read'
+                    ELSE tr.role_code
+                END as permission_level,
+                tr.granted_at,
+                'team' as permission_source
+            FROM rbac_team_roles tr
+            WHERE tr.resource_id = %s 
+                AND tr.is_active = 1
+                AND tr.role_code IN ('admin', 'editor', 'viewer')
+            """
+            
+            cursor.execute(team_query, (kb_id,))
+            team_permissions = cursor.fetchall()
+            
+            # 3. 获取用户信息
+            user_permissions_with_info = []
+            if user_permissions:
+                user_ids = [perm['user_id'] for perm in user_permissions]
+                placeholders = ','.join(['%s'] * len(user_ids))
+                user_info_query = f"SELECT id, nickname FROM user WHERE id IN ({placeholders})"
+                cursor.execute(user_info_query, user_ids)
+                users_data = cursor.fetchall()
+                users_info = {user['id']: user['nickname'] for user in users_data}
+                
+                for perm in user_permissions:
+                    user_permissions_with_info.append({
+                        'user_id': perm['user_id'],
+                        'username': users_info.get(perm['user_id'], f"用户{perm['user_id'][:8]}"),
+                        'permission_level': perm['permission_level'],
+                        'granted_at': perm['granted_at'].isoformat() if perm['granted_at'] else None,
+                        'permission_source': 'user'
+                    })
+            
+            # 4. 获取团队信息
+            team_permissions_with_info = []
+            if team_permissions:
+                team_ids = [perm['team_id'] for perm in team_permissions]
+                placeholders = ','.join(['%s'] * len(team_ids))
+                team_info_query = f"SELECT id, name FROM tenant WHERE id IN ({placeholders})"
+                cursor.execute(team_info_query, team_ids)
+                teams_data = cursor.fetchall()
+                teams_info = {team['id']: team['name'] for team in teams_data}
+                
+                for perm in team_permissions:
+                    team_permissions_with_info.append({
+                        'team_id': perm['team_id'],
+                        'team_name': teams_info.get(perm['team_id'], f"团队{perm['team_id'][:8]}"),
+                        'permission_level': perm['permission_level'],
+                        'granted_at': perm['granted_at'].isoformat() if perm['granted_at'] else None,
+                        'permission_source': 'team'
+                    })
+            
+            return {
+                'total': len(user_permissions_with_info) + len(team_permissions_with_info),
+                'user_permissions': user_permissions_with_info,
+                'team_permissions': team_permissions_with_info,
+                'permissions': user_permissions_with_info + team_permissions_with_info  # 保持向后兼容
+            }
+            
+        except Exception as e:
+            print(f"获取知识库权限失败: {e}")
+            return {
+                'total': 0,
+                'user_permissions': [],
+                'team_permissions': [],
+                'permissions': []
+            }
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
+    @classmethod
+    def grant_team_permission(cls, kb_id, team_id, permission_level, granted_by='system'):
+        """为团队授予知识库权限（使用团队角色系统）"""
+        try:
+            from services.rbac.permission_service import permission_service
+            from models.rbac_models import ResourceType
+            
+            # 权限级别映射到角色代码
+            role_mapping = {
+                'read': 'viewer',
+                'write': 'editor', 
+                'admin': 'admin'
+            }
+            
+            role_code = role_mapping.get(permission_level)
+            if not role_code:
+                raise ValueError(f"无效的权限级别: {permission_level}")
+            
+            # 使用团队角色系统授权
+            success = permission_service.grant_team_role(
+                team_id=team_id,
+                role_code=role_code,
+                resource_type=ResourceType.KNOWLEDGEBASE,
+                resource_id=kb_id,
+                tenant_id='default',  # 保持与权限检查时一致
+                granted_by=granted_by
+            )
+            
+            if success:
+                return {'success': True, 'message': f'团队权限授予成功: {permission_level}'}
+            else:
+                return {'success': False, 'message': '团队权限授予失败'}
+                
+        except Exception as e:
+            print(f"团队权限授予失败: {e}")
+            return {'success': False, 'message': f'团队权限授予失败: {str(e)}'}
+
+    @classmethod
+    def revoke_team_permission(cls, kb_id, team_id):
+        """撤销团队的知识库权限（使用团队角色系统）"""
+        try:
+            from services.rbac.permission_service import permission_service
+            from models.rbac_models import ResourceType
+            
+            # 撤销该团队在此知识库的所有角色
+            success = permission_service.revoke_team_role(
+                team_id=team_id,
+                resource_type=ResourceType.KNOWLEDGEBASE,
+                resource_id=kb_id,
+                tenant_id='default'
+            )
+            
+            if success:
+                return {'success': True, 'message': '团队权限撤销成功'}
+            else:
+                return {'success': False, 'message': '团队权限撤销失败或该团队无相关权限'}
+                
+        except Exception as e:
+            print(f"团队权限撤销失败: {e}")
+            return {'success': False, 'message': f'团队权限撤销失败: {str(e)}'}
+
+    @classmethod
+    def check_user_kb_permission(cls, user_id, kb_id, permission_level='read'):
+        """检查用户对知识库的权限"""
+        from services.rbac.permission_service import permission_service
+        from models.rbac_models import ResourceType, PermissionType
+        
+        # 映射权限级别到权限类型
+        permission_mapping = {
+            'read': PermissionType.READ,
+            'write': PermissionType.WRITE,
+            'admin': PermissionType.ADMIN,
+            'delete': PermissionType.DELETE
+        }
+        
+        permission_type = permission_mapping.get(permission_level, PermissionType.READ)
+        
+        # 执行权限检查
+        permission_check = permission_service.check_permission(
+            user_id=user_id,
+            resource_type=ResourceType.KNOWLEDGEBASE,
+            resource_id=kb_id,
+            permission_type=permission_type,
+            tenant_id='default'
+        )
+        
+        return permission_check.has_permission

@@ -51,8 +51,6 @@ const SystemModelSettingModal = ({
       onCancel={hideModal}
       okButtonProps={{ loading }}
       confirmLoading={loading}
-      width={680}
-      style={{ minWidth: '600px' }}
     >
       <Form form={form} onValuesChange={onFormLayoutChange} layout={'vertical'}>
         <Form.Item
@@ -67,8 +65,6 @@ const SystemModelSettingModal = ({
             ]}
             allowClear
             showSearch
-            optionFilterProp="label"
-            placeholder={t('pleaseSelect')}
           />
         </Form.Item>
         <Form.Item
@@ -80,8 +76,6 @@ const SystemModelSettingModal = ({
             options={allOptions[LlmModelType.Embedding]}
             allowClear
             showSearch
-            optionFilterProp="label"
-            placeholder={t('pleaseSelect')}
           />
         </Form.Item>
         <Form.Item
@@ -93,8 +87,6 @@ const SystemModelSettingModal = ({
             options={allOptions[LlmModelType.Image2text]}
             allowClear
             showSearch
-            optionFilterProp="label"
-            placeholder={t('pleaseSelect')}
           />
         </Form.Item>
 
@@ -107,8 +99,6 @@ const SystemModelSettingModal = ({
             options={allOptions[LlmModelType.Speech2text]}
             allowClear
             showSearch
-            optionFilterProp="label"
-            placeholder={t('pleaseSelect')}
           />
         </Form.Item>
         <Form.Item
@@ -120,8 +110,6 @@ const SystemModelSettingModal = ({
             options={allOptions[LlmModelType.Rerank]}
             allowClear
             showSearch
-            optionFilterProp="label"
-            placeholder={t('pleaseSelect')}
           />
         </Form.Item>
         <Form.Item
@@ -133,8 +121,6 @@ const SystemModelSettingModal = ({
             options={allOptions[LlmModelType.TTS]}
             allowClear
             showSearch
-            optionFilterProp="label"
-            placeholder={t('pleaseSelect')}
           />
         </Form.Item>
       </Form>

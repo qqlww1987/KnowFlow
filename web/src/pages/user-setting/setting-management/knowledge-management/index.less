@@ -51,6 +51,8 @@
   margin: 16px 0;
   padding-top: 16px;
   border-top: 1px solid #f0f0f0;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .batchAlert {
@@ -61,6 +63,14 @@
   .ant-table-thead > tr > th {
     background-color: #fafafa;
   }
+}
+
+.documentPaginationWrapper {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
 }
 
 @media (max-width: 768px) {
@@ -82,11 +92,22 @@
     flex-direction: column;
     gap: 16px;
     align-items: stretch;
+
+    .ant-space {
+      flex-wrap: wrap;
+      justify-content: center;
+    }
   }
 
   .kbInfo {
     .ant-descriptions-item {
       padding: 8px;
     }
+  }
+
+  .documentPaginationWrapper {
+    justify-content: center;
+    margin-top: 12px;
+    padding-top: 12px;
   }
 }
