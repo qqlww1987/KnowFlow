@@ -637,10 +637,8 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
               description: Total number of chunks that failed to add.
     """
     # 配置参数
-    MAX_CHUNKS_PER_REQUEST = 100
     DEFAULT_BATCH_SIZE = 10
     MAX_BATCH_SIZE = 50
-    MAX_CONTENT_LENGTH = 10000
     DB_BULK_SIZE = 10
     
     try:
@@ -669,11 +667,6 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
         if len(chunks_data) == 0:
             return get_error_data_result(message="No chunks provided")
         
-        if len(chunks_data) > MAX_CHUNKS_PER_REQUEST:
-            return get_error_data_result(
-                message=f"Too many chunks. Maximum allowed: {MAX_CHUNKS_PER_REQUEST}, received: {len(chunks_data)}"
-            )
-        
         # ===== 3. 数据验证 =====
         validated_chunks = []
         validation_errors = []
@@ -683,10 +676,6 @@ def batch_add_chunk(tenant_id, dataset_id, document_id):
             content = str(chunk_req.get("content", "")).strip()
             if not content:
                 validation_errors.append(f"Chunk {i}: content is required")
-                continue
-                
-            if len(content) > MAX_CONTENT_LENGTH:
-                validation_errors.append(f"Chunk {i}: content too long ({len(content)} chars, max {MAX_CONTENT_LENGTH})")
                 continue
             
             # 关键词和问题验证    
