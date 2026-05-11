@@ -39,14 +39,6 @@ export enum Routes {
   ResultView = `${Chunk}${Result}`,
   KnowledgeGraph = '/knowledge-graph',
   AgentLogPage = '/agent-log-page',
-  AgentShare = '/agent/share',
-  ChatShare = `${Chats}/share`,
-  UserSetting = '/user-setting',
-  DataFlows = '/data-flows',
-  DataFlow = '/data-flow',
-  DataSetOverview = '/dataset-overview',
-  DataSetSetting = '/dataset-setting',
-  DataflowResult = '/dataflow-result',
 }
 
 const routes = [
@@ -71,17 +63,7 @@ const routes = [
     layout: false,
   },
   {
-    path: Routes.ChatShare,
-    component: `@/pages${Routes.ChatShare}`,
-    layout: false,
-  },
-  {
-    path: Routes.AgentShare,
-    component: `@/pages${Routes.AgentShare}`,
-    layout: false,
-  },
-  {
-    path: Routes.Root,
+    path: '/',
     component: '@/layouts',
     layout: false,
     wrappers: ['@/wrappers/auth'],
@@ -358,20 +340,7 @@ const routes = [
         path: `${Routes.DatasetBase}${Routes.KnowledgeGraph}/:id`,
         component: `@/pages${Routes.DatasetBase}${Routes.KnowledgeGraph}`,
       },
-      {
-        path: `${Routes.DatasetBase}${Routes.DataSetOverview}/:id`,
-        component: `@/pages${Routes.DatasetBase}${Routes.DataSetOverview}`,
-      },
-      {
-        path: `${Routes.DatasetBase}${Routes.DataSetSetting}/:id`,
-        component: `@/pages${Routes.DatasetBase}${Routes.DataSetSetting}`,
-      },
     ],
-  },
-  {
-    path: `${Routes.DataflowResult}/:id`,
-    layout: false,
-    component: `@/pages${Routes.DataflowResult}`,
   },
   {
     path: `${Routes.ParsedResult}/chunks`,

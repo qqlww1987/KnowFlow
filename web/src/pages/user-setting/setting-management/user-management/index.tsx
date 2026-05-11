@@ -156,30 +156,16 @@ const UserManagementPage = () => {
 
       // 使用批量接口获取所有用户的角色
       const rolesMap: Record<string, UserRole> = {};
-      if (list.length > 0) {
-        try {
-          // 提取用户ID列表
-          const userIds = list.map((u: UserData) => u.id);
-
-          // 调用批量角色查询接口
-          const batchRolesRes = await request.post(
-            '/api/knowflow/v1/rbac/users/batch-roles',
-            {
-              data: {
-                user_ids: userIds,
-                tenant_id: 'default',
-              },
-            },
-          );
-
-          // 处理批量查询结果
-          const userRolesData = batchRolesRes?.data?.user_roles || {};
-
-          // 构建角色映射
-          Object.entries(userRolesData).forEach(([userId, rolesList]) => {
-            const userRole = getUserRole(rolesList as UserRole[]);
+      await Promise.all(
+        (list as UserData[]).map(async (u) => {
+          try {
+            const r = await request.get(
+              `/api/knowflow/v1/rbac/users/${u.id}/roles`,
+            );
+            const rolesList = r?.data?.data ?? r?.data?.roles ?? [];
+            const userRole = getUserRole(rolesList);
             if (userRole) {
-              rolesMap[userId] = userRole;
+              rolesMap[u.id] = userRole;
             }
           });
         } catch (error) {
@@ -264,10 +250,8 @@ const UserManagementPage = () => {
     setEditingUser(user);
     setCurrentUserId(user.id);
     try {
-      // 获取可分配的角色（根据当前用户权限过滤）
-      const rolesRes = await request.get(
-        '/api/knowflow/v1/rbac/assignable-roles',
-      );
+      // 获取所有角色
+      const rolesRes = await request.get('/api/knowflow/v1/rbac/roles');
       setRoles(rolesRes.data.data || []);
 
       // 获取用户当前角色（兼容不同返回结构）
@@ -328,29 +312,13 @@ const UserManagementPage = () => {
       setLoading(true);
       if (editingUser) {
         if (editingUser.id) {
-          const result = await request.put(
-            `/api/knowflow/v1/users/${editingUser.id}`,
-            {
-              data: values,
-            },
-          );
-          // 由于 getResponse: true，需要检查响应数据
-          if (result?.data?.code === 0) {
-            message.success('更新用户成功');
-            setUserModalVisible(false);
-            await loadUserData();
-          }
+          await request.put(`/api/knowflow/v1/users/${editingUser.id}`, {
+            data: values,
+          });
         }
       } else {
-        const result = await request.post('/api/knowflow/v1/users', {
-          data: values,
-        });
-        // 由于 getResponse: true，需要检查响应数据
-        if (result?.data?.code === 0) {
-          message.success('创建用户成功');
-          setUserModalVisible(false);
-          await loadUserData();
-        }
+        await request.post('/api/knowflow/v1/users', { data: values });
+        message.success('创建用户成功');
       }
     } catch (error) {
       // 错误已经由 request 拦截器显示，这里只记录日志

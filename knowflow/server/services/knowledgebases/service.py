@@ -390,7 +390,7 @@ class KnowledgebaseService:
                     0,  # chunk_num
                     0.7,  # similarity_threshold
                     0.3,  # vector_similarity_weight
-                    data.get("parser_id", "smart"),  # parser_id
+                    data.get("parser_id", "naive"),  # parser_id
                     default_parser_config,  # parser_config
                     0,  # pagerank
                     "1",  # status
@@ -704,19 +704,17 @@ class KnowledgebaseService:
                 current_date = current_datetime.strftime("%Y-%m-%d %H:%M:%S")  # 格式化日期字符串
 
                 # 获取知识库的parser_id和parser_config，如果没有则使用默认值
-                kb_parser_id = kb.get("parser_id", "smart")  # 默认使用 smart 而不是 naive
+                kb_parser_id = kb.get("parser_id", "mineru")
                 kb_parser_config = kb.get("parser_config")
                 if isinstance(kb_parser_config, str):
                     try:
                         kb_parser_config = json.loads(kb_parser_config)
                     except:
                         kb_parser_config = None
-
-                # 默认配置：使用 smart 分块方法 + MinerU 解析器
+                
                 default_parser_config = json.dumps(
                     kb_parser_config or {
-                        "chunk_token_num": 256,  # 默认 256 而不是 512
-                        "layout_recognize": "MinerU",  # 默认使用 MinerU 解析器
+                        "chunk_token_num": 512,
                         "delimiter": "\n!?;。；！？",
                         "auto_keywords": 0,
                         "auto_questions": 0,
@@ -1060,8 +1058,8 @@ class KnowledgebaseService:
 
             # 查询文档信息和知识库的解析方法
             doc_query = """
-                SELECT d.id, d.name, d.location, d.type, d.kb_id,
-                       COALESCE(d.parser_id, k.parser_id, 'smart') as parser_id,
+                SELECT d.id, d.name, d.location, d.type, d.kb_id, 
+                       COALESCE(d.parser_id, k.parser_id, 'mineru') as parser_id, 
                        d.parser_config, d.created_by
                 FROM document d
                 JOIN knowledgebase k ON d.kb_id = k.id

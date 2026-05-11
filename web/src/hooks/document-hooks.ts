@@ -363,8 +363,56 @@ export const useRunNextDocument = () => {
         run,
         delete: shouldDelete,
       });
-      const code = get(ret, 'data.code');
-      if (code === 0) {
+      if (docInfoResponse.code !== 0) {
+        throw new Error('Failed to fetch document info');
+      }
+
+      const documentInfos = docInfoResponse.data;
+
+      // Separate documents by parser type
+      const knowFlowDocIds: string[] = [];
+      const ragFlowDocIds: string[] = [];
+
+      documentInfos.forEach((doc: any) => {
+        if (
+          doc.parser_id === DocumentParserType.MinerU ||
+          doc.parser_id === DocumentParserType.DOTS
+        ) {
+          knowFlowDocIds.push(doc.id);
+        } else {
+          ragFlowDocIds.push(doc.id);
+        }
+      });
+
+      let allSuccess = true;
+
+      // Process KnowFlow documents (MinerU and DOTS) with KnowFlow API
+      if (knowFlowDocIds.length > 0) {
+        const ret = await runMinerUDocument({
+          doc_ids: knowFlowDocIds,
+          run,
+          delete: shouldDelete,
+        });
+        const code = get(ret, 'code');
+        if (code !== 0) {
+          allSuccess = false;
+        }
+      }
+
+      // Process RAGFlow documents with original API
+      if (ragFlowDocIds.length > 0) {
+        const ret = await kbService.document_run({
+          doc_ids: ragFlowDocIds,
+          run,
+          delete: shouldDelete,
+        });
+        const code = get(ret, 'data.code');
+        if (code !== 0) {
+          allSuccess = false;
+        }
+      }
+
+      if (allSuccess) {
         queryClient.invalidateQueries({ queryKey: ['fetchDocumentList'] });
         message.success(i18n.t('message.operated'));
         return 0;

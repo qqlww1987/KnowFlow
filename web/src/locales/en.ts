@@ -43,10 +43,6 @@ export default {
       previousPage: 'Previous',
       nextPage: 'Next',
       add: 'Add',
-      remove: 'Remove',
-      search: 'Search',
-      noDataFound: 'No data found.',
-      noData: 'No data',
       promptPlaceholder: `Please input or use / to quickly insert variables.`,
       mcp: {
         namePlaceholder: 'My MCP Server',
@@ -89,7 +85,6 @@ export default {
       flow: 'Agent',
       search: 'Search',
       welcome: 'Welcome to',
-      dataset: 'Dataset',
     },
     knowledgeList: {
       welcome: 'Welcome back',
@@ -170,7 +165,7 @@ export default {
       similarityThreshold: 'Similarity threshold',
       similarityThresholdTip:
         'RAGFlow employs either a combination of weighted keyword similarity and weighted vector cosine similarity, or a combination of weighted keyword similarity and weighted reranking score during retrieval. This parameter sets the threshold for similarities between the user query and chunks. Any chunk with a similarity score below this threshold will be excluded from the results. By default, the threshold is set to 0.2. This means that only chunks with hybrid similarity score of 20 or higher will be retrieved.',
-      vectorSimilarityWeight: 'Vector similarity weight',
+      vectorSimilarityWeight: 'Keyword similarity weight',
       vectorSimilarityWeightTip:
         'This sets the weight of keyword similarity in the combined similarity score, either used with vector cosine similarity or with reranking score. The total of the two weights must equal 1.0.',
       keywordSimilarityWeight: 'Keyword similarity weight',
@@ -227,7 +222,7 @@ export default {
       delimiterTip:
         'A delimiter or separator can consist of one or multiple special characters. If it is multiple characters, ensure they are enclosed in backticks( ``). For example, if you configure your delimiters like this: \\n`##`;, then your texts will be separated at line breaks, double hash symbols (##), and semicolons.',
       html4excel: 'Excel to HTML',
-      html4excelTip: `Use with the General chunking method. When disabled, spreadsheets (XLSX or XLS(Excel 97-2003)) in the knowledge base will be parsed into key-value pairs. When enabled, they will be parsed into HTML tables, splitting every 12 rows if the original table has more than 12 rows. See https://ragflow.io/docs/dev/enable_excel2html for details.`,
+      html4excelTip: `Use with the General chunking method. When disabled, spreadsheets (XLSX or XLS(Excel 97-2003)) in the knowledge base will be parsed into key-value pairs. When enabled, they will be parsed into HTML tables, splitting every 12 rows if the original table has more than 12 rows.`,
       autoKeywords: 'Auto-keyword',
       autoKeywordsTip: `Automatically extract N keywords for each chunk to increase their ranking for queries containing those keywords. Be aware that extra tokens will be consumed by the chat model specified in 'System model settings'. You can check or update the added keywords for a chunk from the chunk list. For details, see https://ragflow.io/docs/dev/autokeyword_autoquestion.`,
       autoQuestions: 'Auto-question',
@@ -290,9 +285,6 @@ export default {
         "If it is set to 'Team', all your team members will be able to manage the knowledge base.",
       chunkTokenNumberTip:
         'It kind of sets the token threshold for a creating a chunk. A segment with fewer tokens than this threshold will be combined with the following segments until the token count exceeds the threshold, at which point a chunk is created. No new chunk is created unless a delimiter is encountered, even if the threshold is exceeded.',
-      splitLevel: 'Heading Split Level',
-      splitLevelTip:
-        'Select heading level for chunking. H2 is suitable for most documents. If no H2 headings exist, higher-level headings will be used automatically.',
       chunkMethod: 'Chunking method',
       chunkMethodTip: 'View the tips on the right.',
       upload: 'Upload',
@@ -483,11 +475,6 @@ This auto-tagging feature enhances retrieval by adding another layer of domain-s
       enable: 'Enable',
       disable: 'Disable',
       delete: 'Delete',
-      parentChunk: 'Parent Chunk',
-      parentChunkContent: 'Parent Chunk Content',
-      childChunk: 'Child Chunk',
-      parentChunkLoadFailed: 'Failed to load parent chunk',
-      parentChunkSaveFailed: 'Failed to save parent chunk',
     },
     chat: {
       messagePlaceholder: 'Type your message here...',
@@ -545,7 +532,7 @@ This auto-tagging feature enhances retrieval by adding another layer of domain-s
       modelEnabledTools: 'Enabled tools',
       modelEnabledToolsTip:
         'Please select one or more tools for the chat model to use. It takes no effect for models not supporting tool call.',
-      freedom: 'Creativity',
+      freedom: 'Freedom',
       improvise: 'Improvise',
       precise: 'Precise',
       balance: 'Balance',
@@ -638,18 +625,6 @@ This auto-tagging feature enhances retrieval by adding another layer of domain-s
       crossLanguage: 'Cross-language search',
       crossLanguageTip: `Select one or more languages for cross‑language search. If no language is selected, the system searches with the original query.`,
       createChat: 'Create chat',
-      metadata: 'Meta Data',
-      metadataTip:
-        'Metadata filtering is the process of using metadata attributes (such as tags, categories, or access permissions) to refine and control the retrieval of relevant information within a system.',
-      conditions: 'Conditions',
-      addCondition: 'Add Condition',
-      meta: {
-        disabled: 'Disabled',
-        automatic: 'Automatic',
-        manual: 'Manual',
-      },
-      cancel: 'Cancel',
-      chatSetting: 'Chat setting',
     },
     setting: {
       profile: 'Profile',
@@ -1503,15 +1478,10 @@ This delimiter is used to split the input text into several text pieces echo of 
       openingSwitchTip:
         'Your users will see this welcome message at the beginning.',
       modeTip: 'The mode defines how the workflow is initiated.',
-      mode: 'Mode',
-      conversational: 'conversational',
-      task: 'task',
       beginInputTip:
         'By defining input parameters, this content can be accessed by other components in subsequent processes.',
       query: 'Query variables',
-      queryTip: 'Select the variable you want to use',
       agent: 'Agent',
-      addAgent: 'Add Agent',
       agentDescription:
         'Builds agent components equipped with reasoning, tool usage, and multi-agent collaboration. ',
       maxRecords: 'Max records',
@@ -1565,10 +1535,6 @@ This delimiter is used to split the input text into several text pieces echo of 
       },
       goto: 'Fail Branch',
       comment: 'Default Value',
-      sqlStatement: 'SQL Statement',
-      sqlStatementTip:
-        'Write your SQL query here. You can use variables, raw SQL, or mix both using variable syntax.',
-      frameworkPrompts: 'Framework',
     },
     llmTools: {
       bad_calculator: {
@@ -1594,59 +1560,7 @@ This delimiter is used to split the input text into several text pieces echo of 
       editMCP: 'Edit MCP',
     },
     search: {
-      searchApps: 'Search Apps',
       createSearch: 'Create Search',
-      searchGreeting: 'How can I help you today ？',
-      profile: 'Hide Profile',
-      locale: 'Locale',
-      embedCode: 'Embed code',
-      id: 'ID',
-      copySuccess: 'Copy Success',
-      welcomeBack: 'Welcome back',
-      searchSettings: 'Search Settings',
-      name: 'Name',
-      avatar: 'Avatar',
-      description: 'Description',
-      datasets: 'Datasets',
-      rerankModel: 'Rerank Model',
-      AISummary: 'AI Summary',
-      enableWebSearch: 'Enable Web Search',
-      enableRelatedSearch: 'Enable Related Search',
-      showQueryMindmap: 'Show Query Mindmap',
-      embedApp: 'Embed App',
-      relatedSearch: 'Related Search',
-      descriptionValue: 'You are an intelligent assistant.',
-      okText: 'Save',
-      cancelText: 'Cancel',
-      chooseDataset: 'Please select a dataset first',
-    },
-    language: {
-      english: 'English',
-      chinese: 'Chinese',
-      spanish: 'Spanish',
-      french: 'French',
-      german: 'German',
-      japanese: 'Japanese',
-      korean: 'Korean',
-      vietnamese: 'Vietnamese',
-    },
-    pagination: {
-      total: 'Total {{total}}',
-      page: '{{page}} /Page',
-    },
-    dataflowParser: {
-      parseSummary: 'Parse Summary',
-      parseSummaryTip: 'Parser：deepdoc',
-      rerunFromCurrentStep: 'Rerun From Current Step',
-      rerunFromCurrentStepTip: 'Changes detected. Click to re-run.',
-    },
-    dataflow: {
-      parser: 'Parser',
-      parserDescription: 'Parser',
-      chunker: 'Chunker',
-      chunkerDescription: 'Chunker',
-      tokenizer: 'Tokenizer',
-      tokenizerDescription: 'Tokenizer',
     },
   },
 };

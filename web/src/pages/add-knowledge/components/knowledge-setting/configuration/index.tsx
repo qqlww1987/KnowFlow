@@ -12,6 +12,7 @@ import {
 } from '../hooks';
 import { AudioConfiguration } from './audio';
 import { BookConfiguration } from './book';
+import { DOTSConfiguration } from './dots';
 import { EmailConfiguration } from './email';
 import { KnowledgeGraphConfiguration } from './knowledge-graph';
 import { LawsConfiguration } from './laws';
@@ -50,10 +51,8 @@ const ConfigurationComponentMap = {
   [DocumentParserType.Email]: EmailConfiguration,
   [DocumentParserType.Tag]: TagConfiguration,
   [DocumentParserType.KnowledgeGraph]: KnowledgeGraphConfiguration,
-  [DocumentParserType.Smart]: SmartConfiguration,
-  [DocumentParserType.Regex]: RegexConfiguration,
-  [DocumentParserType.ParentChild]: ParentChildConfiguration,
-  [DocumentParserType.Title]: TitleConfiguration,
+  [DocumentParserType.MinerU]: MinerUConfiguration,
+  [DocumentParserType.DOTS]: DOTSConfiguration,
 };
 
 function EmptyComponent() {

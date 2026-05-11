@@ -26,15 +26,17 @@ logger = logging.getLogger(__name__)
 class DOTSFastAPIAdapter:
     """DOTS OCR FastAPI 客户端适配器"""
     
-    def __init__(self, base_url: str = None, model_name: str = None):
+    def __init__(self, base_url: str = None, model_name: str = None, timeout: int = None):
         """初始化DOTS客户端适配器
-
+        
         Args:
             base_url: DOTS服务基础URL，默认从配置读取
             model_name: 模型名称，默认从配置读取
+            timeout: 超时时间，默认从配置读取
         """
         self.base_url = base_url or DOTS_CONFIG.vllm.url
         self.model_name = model_name or DOTS_CONFIG.vllm.model_name
+        self.timeout = timeout or DOTS_CONFIG.vllm.timeout
         
         # VLLM生成参数
         self.temperature = DOTS_CONFIG.vllm.temperature
@@ -232,7 +234,8 @@ class DOTSFastAPIAdapter:
             response = requests.post(
                 self.chat_url,
                 json=payload,
-                headers=headers
+                headers=headers,
+                timeout=self.timeout
             )
             
             if response.status_code == 200:

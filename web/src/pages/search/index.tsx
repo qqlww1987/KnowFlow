@@ -87,21 +87,7 @@ const SearchPage = () => {
   }, [searchStr, sendQuestion]);
 
   const suffixSearch = (
-    <SearchOutlined
-      onClick={handleSearch}
-      style={{
-        fontSize: 20,
-        color: '#3b82f6',
-        cursor: 'pointer',
-        transition: 'all 0.2s',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = 'scale(1.1)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'scale(1)';
-      }}
-    />
+    <div className={styles.sufSearch} onClick={handleSearch}></div>
   );
 
   const InputSearch = (

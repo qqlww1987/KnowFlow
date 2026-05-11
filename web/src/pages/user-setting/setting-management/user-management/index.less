@@ -7,54 +7,21 @@
   width: 100%;
   max-width: none !important;
 
-  :global {
-    .ant-table {
-      background: @color-bg-primary;
+  // 统一操作列样式 - 添加分割线
+  .ant-table {
+    .ant-table-tbody > tr > td:last-child {
+      text-align: right;
+      position: relative;
 
-      .ant-table-thead > tr > th {
-        background: @color-bg-secondary;
-        color: @color-text-secondary;
-        font-weight: @font-weight-semibold;
-        border-bottom: 2px solid @color-border-default;
-      }
-
-      .ant-table-tbody > tr {
-        &:hover > td {
-          background: @color-bg-hover;
-        }
-
-        > td {
-          border-bottom: 1px solid @color-border-subtle;
-
-          &:last-child {
-            text-align: right;
-            position: relative;
-
-            &::before {
-              content: '';
-              position: absolute;
-              left: 0;
-              top: 50%;
-              transform: translateY(-50%);
-              height: 20px;
-              width: 1px;
-              background-color: @color-border-default;
-            }
-          }
-        }
-      }
-    }
-
-    .ant-tag {
-      border-radius: @radius-sm;
-      border: 1px solid @color-border-subtle;
-      padding: 2px @space-sm;
-      font-size: @font-size-xs;
-
-      &.ant-tag-success {
-        background: @brand-primary-50;
-        border-color: @brand-primary-200;
-        color: @brand-primary-700;
+      &::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        height: 20px;
+        width: 1px;
+        background-color: #f0f0f0;
       }
     }
   }

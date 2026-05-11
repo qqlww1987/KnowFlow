@@ -25,7 +25,7 @@ export const useSaveKnowledge = () => {
     async (name: string, parserMethod?: string) => {
       const ret = await createKnowledge({
         name,
-        parser_id: parserMethod || 'smart',
+        parser_id: parserMethod || 'mineru',
       });
 
       if (ret?.code === 0) {

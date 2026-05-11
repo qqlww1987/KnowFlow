@@ -142,21 +142,19 @@ const TeamManagementPage = () => {
 
       // 使用批量接口获取所有团队的角色
       const rolesMap: Record<string, Role> = {};
-      if (list.length > 0) {
-        try {
-          // 提取团队ID列表
-          const teamIds = list.map((t: TeamData) => t.id);
+      await Promise.all(
+        (list as TeamData[]).map(async (team) => {
+          try {
+            const r = await request.get(
+              `/api/knowflow/v1/teams/${team.id}/roles`,
+            );
+            const teamRolesList = r?.data?.data ?? [];
 
-          // 并行请求批量角色查询和可分配角色列表
-          const [batchRolesRes, assignableRolesRes] = await Promise.all([
-            request.post('/api/knowflow/v1/rbac/teams/batch-roles', {
-              data: {
-                team_ids: teamIds,
-                tenant_id: 'default',
-              },
-            }),
-            request.get('/api/knowflow/v1/rbac/assignable-roles'),
-          ]);
+            // 团队角色API返回的是TeamRole对象，需要转换为Role格式
+            if (teamRolesList.length > 0) {
+              // 获取所有角色信息用于匹配
+              const rolesRes = await request.get('/api/knowflow/v1/rbac/roles');
+              const allRoles = rolesRes?.data?.data || [];
 
           // 处理批量查询结果
           const teamRolesData = batchRolesRes?.data?.team_roles || {};
@@ -284,10 +282,8 @@ const TeamManagementPage = () => {
   const handleTeamRoleManagement = async (team: TeamData) => {
     setCurrentTeam(team);
     try {
-      // 获取可分配的角色（根据当前用户权限过滤）
-      const rolesRes = await request.get(
-        '/api/knowflow/v1/rbac/assignable-roles',
-      );
+      // 获取所有可用角色作为选项
+      const rolesRes = await request.get('/api/knowflow/v1/rbac/roles');
       setTeamRoles(rolesRes?.data?.data || []);
 
       // 获取团队当前已分配角色，用于预选中

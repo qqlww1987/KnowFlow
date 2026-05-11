@@ -1,36 +1,22 @@
 import { DocumentParserType } from '@/constants/knowledge';
 import { useTranslate } from '@/hooks/common-hooks';
 import { InfoCircleOutlined } from '@ant-design/icons';
-import {
-  Alert,
-  Card,
-  Col,
-  Form,
-  Input,
-  InputNumber,
-  Row,
-  Select,
-  Switch,
-} from 'antd';
+import { Alert, Card, Col, Form, Input, InputNumber, Row, Select } from 'antd';
 import { memo } from 'react';
 
 interface ChunkingConfigProps {
   className?: string;
   parserType?: DocumentParserType; // 从外部传入切片方法类型（可选，用于文档级配置）
   initialValues?: {
+    strategy?: 'basic' | 'smart' | 'advanced' | 'strict_regex' | 'parent_child';
     chunk_token_num?: number;
     regex_pattern?: string;
-    enable_heading_in_content?: boolean;
-    split_level?: number;
     parent_config?: {
       parent_chunk_size?: number;
       parent_chunk_overlap?: number;
       retrieval_mode?: 'parent' | 'child' | 'hybrid';
-      parent_split_level?: number;
+      parent_split_level?: number; // AST语义分块：按照标题层级分割父分块
     };
-    enable_vision_enhancement?: boolean;
-    vision_description_format?: string;
-    vision_batch_size?: number;
   };
 }
 
@@ -40,51 +26,25 @@ export const ChunkingConfig = memo(function ChunkingConfig({
   initialValues = {
     chunk_token_num: 256,
     regex_pattern: '',
-    enable_heading_in_content: false,
-    split_level: 2,
     parent_config: {
       parent_chunk_size: 1024,
       parent_chunk_overlap: 100,
       retrieval_mode: 'parent',
-      parent_split_level: 2,
+      parent_split_level: 2, // 默认按H2标题分割
     },
-    enable_vision_enhancement: false,
-    vision_description_format: '[图片描述]: {desc}',
-    vision_batch_size: 3,
   },
 }: ChunkingConfigProps) {
   const { t } = useTranslate('knowledgeConfiguration');
-  const chunkTokenNum = Form.useWatch(['parser_config', 'chunk_token_num']);
-  const enableVision = Form.useWatch([
-    'parser_config',
-    'enable_vision_enhancement',
-  ]);
+  const strategy = Form.useWatch(['chunking_config', 'strategy']);
+  const chunkTokenNum = Form.useWatch(['chunking_config', 'chunk_token_num']);
 
-  // 根据切片方法类型决定展示哪些配置（如果没有传递 parserType，则不展示特殊配置）
-  const isRegex = parserType === DocumentParserType.Regex;
-  const isParentChild = parserType === DocumentParserType.ParentChild;
-
-  // 判断是否显示 enable_heading_in_content（smart/title/parent-child 支持）
-  const showHeadingInContent =
-    parserType &&
-    [
-      DocumentParserType.Smart,
-      DocumentParserType.Title,
-      DocumentParserType.ParentChild,
-    ].includes(parserType);
-
-  // 判断是否显示 split_level（只有 title 支持）
-  const showSplitLevel = parserType === DocumentParserType.Title;
-
-  // 判断是否显示图片理解配置（smart/regex/title/parent-child 都支持）
-  const showVisionConfig =
-    parserType &&
-    [
-      DocumentParserType.Smart,
-      DocumentParserType.Regex,
-      DocumentParserType.Title,
-      DocumentParserType.ParentChild,
-    ].includes(parserType);
+  const strategyOptions = [
+    { value: 'basic', label: '基础分块' },
+    { value: 'smart', label: '智能分块' },
+    { value: 'advanced', label: '按标题分块' },
+    { value: 'strict_regex', label: '正则分块' },
+    { value: 'parent_child', label: '父子分块' },
+  ];
 
   return (
     <div className={className}>
@@ -174,7 +134,7 @@ export const ChunkingConfig = memo(function ChunkingConfig({
         </Form.Item>
       )}
 
-      {isParentChild && (
+      {strategy === 'parent_child' && (
         <>
           <Alert
             message="AST父子分块模式说明"
@@ -193,7 +153,11 @@ export const ChunkingConfig = memo(function ChunkingConfig({
                 style={{ marginBottom: 16 }}
               >
                 <Form.Item
-                  name={['parser_config', 'parent_config', 'parent_chunk_size']}
+                  name={[
+                    'chunking_config',
+                    'parent_config',
+                    'parent_chunk_size',
+                  ]}
                   label="父分块大小"
                   initialValue={
                     initialValues.parent_config?.parent_chunk_size || 1024
@@ -223,7 +187,7 @@ export const ChunkingConfig = memo(function ChunkingConfig({
 
                 <Form.Item
                   name={[
-                    'parser_config',
+                    'chunking_config',
                     'parent_config',
                     'parent_chunk_overlap',
                   ]}
@@ -255,7 +219,7 @@ export const ChunkingConfig = memo(function ChunkingConfig({
 
                 <Form.Item
                   name={[
-                    'parser_config',
+                    'chunking_config',
                     'parent_config',
                     'parent_split_level',
                   ]}
@@ -309,7 +273,7 @@ export const ChunkingConfig = memo(function ChunkingConfig({
                 </Form.Item>
 
                 <Form.Item
-                  name={['parser_config', 'parent_config', 'retrieval_mode']}
+                  name={['chunking_config', 'parent_config', 'retrieval_mode']}
                   label="检索模式"
                   initialValue={
                     initialValues.parent_config?.retrieval_mode || 'parent'
@@ -328,79 +292,6 @@ export const ChunkingConfig = memo(function ChunkingConfig({
             </Col>
           </Row>
         </>
-      )}
-
-      {/* 图片理解配置 - 适用于 smart/regex/title/parent-child */}
-      {showVisionConfig && (
-        <Card title="图片理解" size="small" style={{ marginTop: 16 }}>
-          <Form.Item
-            name={['parser_config', 'enable_vision_enhancement']}
-            label="启用图片理解"
-            initialValue={initialValues.enable_vision_enhancement ?? false}
-            valuePropName="checked"
-            tooltip="开启后会使用视觉模型自动识别图片内容并生成描述"
-          >
-            <Switch />
-          </Form.Item>
-
-          {enableVision && (
-            <>
-              <Form.Item
-                name={['parser_config', 'vision_description_format']}
-                label="描述格式"
-                initialValue={
-                  initialValues.vision_description_format ||
-                  '[图片描述]: {desc}'
-                }
-                tooltip="{desc} 会被替换为实际的图片描述内容"
-                rules={[
-                  {
-                    validator: (_, value) => {
-                      if (
-                        enableVision &&
-                        (!value || !value.includes('{desc}'))
-                      ) {
-                        return Promise.reject(
-                          new Error('描述格式必须包含 {desc} 占位符'),
-                        );
-                      }
-                      return Promise.resolve();
-                    },
-                  },
-                ]}
-              >
-                <Input placeholder="[图片描述]: {desc}" />
-              </Form.Item>
-
-              <Form.Item
-                name={['parser_config', 'vision_batch_size']}
-                label="批量处理大小"
-                initialValue={initialValues.vision_batch_size || 3}
-                tooltip="同时处理的图片数量，建议设置为1-5之间"
-                rules={[
-                  {
-                    validator: (_, value) => {
-                      if (value < 1 || value > 10) {
-                        return Promise.reject(
-                          new Error('批量大小必须在1-10之间'),
-                        );
-                      }
-                      return Promise.resolve();
-                    },
-                  },
-                ]}
-                extra="单位：张，范围：1-10，值越大处理速度越快但占用资源越多"
-              >
-                <InputNumber
-                  min={1}
-                  max={10}
-                  placeholder="3"
-                  style={{ width: '100%' }}
-                />
-              </Form.Item>
-            </>
-          )}
-        </Card>
       )}
     </div>
   );

@@ -27,7 +27,7 @@ import { useTranslate } from './common-hooks';
 import { useSetPaginationParams } from './route-hook';
 import { useFetchTenantInfo, useSaveSetting } from './user-setting-hooks';
 
-export function usePrevious<T>(value: T) {
+function usePrevious<T>(value: T) {
   const ref = useRef<T>();
   useEffect(() => {
     ref.current = value;
@@ -245,7 +245,7 @@ export const useSendMessageWithSse = (
             [Authorization]: getAuthorization(),
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(omit(body, 'chatBoxId')),
+          body: JSON.stringify(body),
           signal: controller?.signal || sseRef.current?.signal,
         });
 
@@ -279,34 +279,23 @@ export const useSendMessageWithSse = (
             }
           }
         }
-        setDoneValue(body, true);
+        setDone(true);
         resetAnswer();
         return { data: await res, response };
       } catch (e) {
-        setDoneValue(body, true);
-
+        setDone(true);
         resetAnswer();
         // Swallow fetch errors silently
       }
     },
-    [initializeSseRef, setDoneValue, url, resetAnswer],
+    [initializeSseRef, url, resetAnswer],
   );
 
   const stopOutputMessage = useCallback(() => {
     sseRef.current?.abort();
   }, []);
 
-  return {
-    send,
-    answer,
-    done,
-    doneRecord,
-    allDone,
-    setDone,
-    resetAnswer,
-    stopOutputMessage,
-    clearDoneRecord,
-  };
+  return { send, answer, done, setDone, resetAnswer, stopOutputMessage };
 };
 
 export const useSpeechWithSse = (url: string = api.tts) => {
@@ -369,28 +358,37 @@ export const useScrollToBottom = (
     return () => container.removeEventListener('scroll', handleScroll);
   }, [containerRef, checkIfUserAtBottom]);
 
-  // Imperative scroll function
-  const scrollToBottom = useCallback(() => {
-    if (containerRef?.current) {
-      const container = containerRef.current;
-      container.scrollTo({
-        top: container.scrollHeight - container.clientHeight,
-        behavior: 'smooth',
-      });
-    }
-  }, [containerRef]);
-
   useEffect(() => {
     if (!messages) return;
     if (!containerRef?.current) return;
     requestAnimationFrame(() => {
       setTimeout(() => {
         if (isAtBottomRef.current) {
-          scrollToBottom();
+          // Try both scrollIntoView and direct scrollTo
+          ref.current?.scrollIntoView({ behavior: 'smooth' });
+          // Alternative: directly scroll container to bottom
+          if (containerRef.current) {
+            containerRef.current.scrollTo({
+              top: containerRef.current.scrollHeight,
+              behavior: 'smooth',
+            });
+          }
         }
       }, 100);
     });
-  }, [messages, containerRef, scrollToBottom]);
+  }, [messages, containerRef]);
+
+  // Imperative scroll function
+  const scrollToBottom = useCallback(() => {
+    ref.current?.scrollIntoView({ behavior: 'smooth' });
+    // Fallback: directly scroll container to bottom
+    if (containerRef?.current) {
+      containerRef.current.scrollTo({
+        top: containerRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
+    }
+  }, [containerRef]);
 
   return { scrollRef: ref, isAtBottom, scrollToBottom };
 };
@@ -557,15 +555,6 @@ export const useSelectDerivedMessages = () => {
     setDerivedMessages([]);
   }, [setDerivedMessages]);
 
-  const removeAllMessagesExceptFirst = useCallback(() => {
-    setDerivedMessages((list) => {
-      if (list.length <= 1) {
-        return list;
-      }
-      return list.slice(0, 1);
-    });
-  }, [setDerivedMessages]);
-
   return {
     scrollRef,
     messageContainerRef,
@@ -580,7 +569,6 @@ export const useSelectDerivedMessages = () => {
     removeMessagesAfterCurrentMessage,
     removeAllMessages,
     scrollToBottom,
-    removeAllMessagesExceptFirst,
   };
 };
 

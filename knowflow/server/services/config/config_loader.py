@@ -141,10 +141,14 @@ def _load_dots_env_vars() -> Dict[str, Any]:
         # VLLM服务配置
         'DOTS_VLLM_URL': 'vllm.url',
         'DOTS_MODEL_NAME': 'vllm.model_name',
+        'DOTS_TIMEOUT': 'vllm.timeout',
         'DOTS_TEMPERATURE': 'vllm.temperature',
         'DOTS_TOP_P': 'vllm.top_p',
         'DOTS_MAX_COMPLETION_TOKENS': 'vllm.max_completion_tokens',
-
+        
+        # DOTS处理配置
+        'DOTS_DEV_MODE': 'dev_mode',
+        'DOTS_CLEANUP_TEMP_FILES': 'cleanup_temp_files',
     }
     
     for env_key, config_path in env_mappings.items():
@@ -221,7 +225,6 @@ APP_CONFIG = CONFIG.app
 EXCEL_CONFIG = CONFIG.excel
 MINERU_CONFIG = CONFIG.mineru
 DOTS_CONFIG = CONFIG.dots
-PADDLEOCR_CONFIG = CONFIG.paddleocr
 
 # 打印加载的配置（在开发模式下）
 if APP_CONFIG.dev_mode:

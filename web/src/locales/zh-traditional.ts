@@ -69,7 +69,7 @@ export default {
       setting: '用戶設置',
       logout: '登出',
       fileManager: '文件管理',
-      flow: '智能體',
+      flow: 'Agent',
       search: '搜尋',
       welcome: '歡迎來到',
     },
@@ -1220,5 +1220,9 @@ export default {
       copySuccess: '複製成功',
       welcomeBack: '歡迎回來',
     },
+  },
+  modal: {
+    okText: '確認',
+    cancelText: '取消',
   },
 };

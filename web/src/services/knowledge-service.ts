@@ -162,8 +162,14 @@ const methods = {
     url: listTagByKnowledgeIds,
     method: 'get',
   },
-  getMeta: {
-    url: getMeta,
+  // knowflow mineru parser
+  knowflow_document_parse: {
+    url: knowflow_document_parse,
+    method: 'post',
+    timeout: 600000, // 10分钟超时，DOTS解析可能需要更长时间
+  },
+  knowflow_parse_progress: {
+    url: knowflow_parse_progress,
     method: 'get',
   },
   retrievalTestShare: {

@@ -42,11 +42,6 @@ export default {
       previousPage: '上一页',
       nextPage: '下一页',
       add: '添加',
-      remove: '移除',
-      search: '搜索',
-      noDataFound: '没有找到数据。',
-      noData: '暂无数据',
-      promptPlaceholder: '请输入或使用 / 快速插入变量。',
     },
     login: {
       login: '登录',
@@ -78,10 +73,9 @@ export default {
       setting: '用户设置',
       logout: '登出',
       fileManager: '文件管理',
-      flow: '智能体',
+      flow: 'Agent',
       search: '搜索',
       welcome: '欢迎来到',
-      dataset: '知识库',
     },
     knowledgeList: {
       welcome: '欢迎回来',
@@ -155,7 +149,7 @@ export default {
       similarityThreshold: '相似度阈值',
       similarityThresholdTip:
         '我们使用混合相似度得分来评估两行文本之间的距离。 它是加权关键词相似度和向量余弦相似度。 如果查询和块之间的相似度小于此阈值，则该块将被过滤掉。默认设置为 0.2，也就是说文本块的混合相似度得分至少 20 才会被召回。',
-      vectorSimilarityWeight: '向量相似度权重',
+      vectorSimilarityWeight: '关键字相似度权重',
       vectorSimilarityWeightTip:
         '我们使用混合相似性评分来评估两行文本之间的距离。它是加权关键字相似性和矢量余弦相似性或rerank得分（0〜1）。两个权重的总和为1.0。',
       keywordSimilarityWeight: '关键词相似度权重',
@@ -246,16 +240,6 @@ export default {
       theDocumentBeingParsedCannotBeDeleted: '正在解析的文档不能被删除',
     },
     knowledgeConfiguration: {
-      enableAutoGenerate: '是否启用自动生成',
-      teamPlaceholder: '请选择团队',
-      dataFlowPlaceholder: '请选择数据流',
-      buildItFromScratch: '去Scratch构建',
-      useRAPTORToEnhanceRetrieval: '使用 RAPTOR 提升检索效果',
-      extractKnowledgeGraph: '知识图谱提取',
-      dataFlow: '数据流',
-      parseType: '切片方法',
-      manualSetup: '手动设置',
-      builtIn: '内置',
       titleDescription: '在这里更新您的知识库详细信息，尤其是切片方法。',
       name: '知识库名称',
       photo: '知识库图片',
@@ -274,9 +258,6 @@ export default {
         '如果把知识库权限设为“团队”，则所有团队成员都可以操作该知识库。',
       chunkTokenNumberTip:
         '建议的生成文本块的 token 数阈值。如果切分得到的小文本段 token 数达不到这一阈值就会不断与之后的文本段合并，直至再合并下一个文本段会超过这一阈值为止，此时产生一个最终文本块。如果系统在切分文本段时始终没有遇到文本分段标识符，即便文本段 token 数已经超过这一阈值，系统也不会生成新文本块。',
-      splitLevel: '标题分割层级',
-      splitLevelTip:
-        '选择在哪个标题层级进行分块。H2 适合大多数文档结构。如果文档没有 H2 标题，系统会自动使用更高级别的标题。',
       chunkMethod: '切片方法',
       chunkMethodTip: '说明位于右侧。',
       upload: '上传',
@@ -476,11 +457,6 @@ General：实体和关系提取提示来自 GitHub - microsoft/graphrag：基于
       enable: '启用',
       disable: '禁用',
       delete: '删除',
-      parentChunk: '解析父块',
-      parentChunkContent: '父块内容',
-      childChunk: '子块',
-      parentChunkLoadFailed: '父块加载失败',
-      parentChunkSaveFailed: '父块保存失败',
     },
     chat: {
       messagePlaceholder: '请输入消息...',
@@ -517,21 +493,10 @@ General：实体和关系提取提示来自 GitHub - microsoft/graphrag：基于
       knowledgeBasesTip:
         '选择关联的知识库。新建或空知识库不会在下拉菜单中显示。',
       system: '系统提示词',
-      systemInitialValue: `你是一个严格按照知识库回答问题的智能助手。
-
-回答规则：
-1.你只能根据知识库原文回答，不得推理、总结、改写或省略任何与问题相关的内容
-2.回答必须完整列出所有相关信息，不得合并、概括或删减
-3.若知识库中包含多条独立信息，请逐条完整列出，保持原有编号和层级结构
-4.若知识库中找不到与问题直接相关的内容，回答必须包含：
-知识库中未找到您要的答案！
-5.禁止加入任何自己的解释、推测、总结性语言或通用知识
-6.若知识库中存在图片链接，必须保留原文位置，且图片及其上下文不得修改，示例格式：
-<img src="/minio/9a28e050a5c411f0a6f466fc51ac58de/8413bb3ddf9da30bee1b9ed76e2884ba18077172f838bd47cb9e79759a612cde.jpg" style="max-width: 300px;max-height: 500px;" alt="图片描述">
-
-知识库内容：
-{knowledge}
-知识库结束`,
+      systemInitialValue: `你是一个智能助手，请总结知识库的内容来回答问题，请列举知识库中的数据详细回答。当所有知识库内容都与问题无关时，你的回答必须包括“知识库中未找到您要的答案！”这句话。回答需要考虑聊天历史。
+        以下是知识库：
+        {knowledge}
+        以上是知识库。`,
       systemMessage: '请输入',
       systemTip:
         '当LLM回答问题时，你需要LLM遵循的说明，比如角色设计、答案长度和答案语言等。如果您的模型原生支持在问答中推理，可以通过 //no_thinking 关闭自动推理。',
@@ -639,20 +604,6 @@ General：实体和关系提取提示来自 GitHub - microsoft/graphrag：基于
       tavilyApiKeyHelp: '如何获取？',
       crossLanguage: '跨语言搜索',
       crossLanguageTip: `选择一种或多种语言进行跨语言搜索。如果未选择任何语言，系统将使用原始查询进行搜索。`,
-      metadata: '元数据',
-      metadataTip:
-        '元数据过滤是使用元数据属性（例如标签、类别或访问权限）来优化和控制系统内相关信息检索的过程。',
-      conditions: '条件',
-      addCondition: '增加条件',
-      meta: {
-        disabled: '禁用',
-        automatic: '自动',
-        manual: '手动',
-      },
-      cancel: '取消',
-      chatSetting: '聊天设置',
-      avatarHidden: '隐藏头像',
-      locale: '地区',
     },
     setting: {
       profile: '概要',
@@ -827,7 +778,6 @@ General：实体和关系提取提示来自 GitHub - microsoft/graphrag：基于
       view: '查看',
       modelsToBeAddedTooltip:
         '如果你的模型供应商在这里没有列出，但是宣称 OpenAI-compatible，可以通过选择卡片 OpenAI-API-compatible 设置相关模型。',
-      mcp: 'MCP',
     },
     message: {
       registered: '注册成功',
@@ -1423,7 +1373,6 @@ General：实体和关系提取提示来自 GitHub - microsoft/graphrag：基于
         team: '团队',
       },
       systemPrompt: '系统提示词',
-      userPrompt: '用户提示词',
       prompt: '提示词',
       promptMessage: '提示词是必填项',
       promptTip:
@@ -1439,26 +1388,21 @@ General：实体和关系提取提示来自 GitHub - microsoft/graphrag：基于
       openingCopy: '开场白文案',
       openingSwitchTip: '您的用户将在开始时看到此欢迎消息。',
       modeTip: '模式定义了工作流的启动方式。',
-      mode: '模式',
-      conversational: '对话式',
-      task: '任务',
       beginInputTip: '通过定义输入参数，此内容可以被后续流程中的其他组件访问。',
       query: '查询变量',
-      queryTip: '选择您想要使用的变量',
       agent: '智能体',
-      addAgent: '添加智能体',
       agentDescription: '构建具备推理、工具调用和多智能体协同的智能体组件。',
       maxRecords: '最大记录数',
-      createAgent: '创建智能体',
+      createAgent: 'Create Agent',
       stringTransform: '文本处理',
       userFillUp: '等待输入',
       userFillUpDescription: `此组件会暂停当前的流程并等待用户发送消息，接收到消息之后再进行之后的流程。`,
 
       codeExec: '代码',
-      tavilySearch: 'Tavily 搜索',
+      tavilySearch: 'Tavily Search',
       tavilySearchDescription: '通过 Tavily 服务搜索结果',
-      tavilyExtract: 'Tavily 提取',
-      tavilyExtractDescription: 'Tavily 提取',
+      tavilyExtract: 'Tavily Extract',
+      tavilyExtractDescription: 'Tavily Extract',
       log: '日志',
       management: '管理',
       import: '导入',
@@ -1487,10 +1431,6 @@ General：实体和关系提取提示来自 GitHub - microsoft/graphrag：基于
         httpRequest: '请求接口',
         wenCai: '查询财务数据',
       },
-      sqlStatement: 'SQL 语句',
-      sqlStatementTip:
-        '在此处编写您的 SQL 查询。您可以使用变量、原始 SQL，或使用变量语法混合使用两者。',
-      frameworkPrompts: '框架',
     },
     footer: {
       profile: 'All rights reserved @ React',
@@ -1510,64 +1450,12 @@ General：实体和关系提取提示来自 GitHub - microsoft/graphrag：基于
         },
       },
     },
-    modal: {
-      okText: '确认',
-      cancelText: '取消',
-    },
-    search: {
-      searchApps: '搜索',
-      createSearch: '创建查询',
-      searchGreeting: '今天我能为你做些什么？',
-      profile: '隐藏个人资料',
-      locale: '语言',
-      embedCode: '嵌入代码',
-      id: 'ID',
-      copySuccess: '复制成功',
-      welcomeBack: '欢迎回来',
-      searchSettings: '搜索设置',
-      name: '姓名',
-      avatar: '头像',
-      description: '描述',
-      datasets: '知识库',
-      rerankModel: 'rerank 模型',
-      AISummary: 'AI 总结',
-      enableWebSearch: '启用网页搜索',
-      enableRelatedSearch: '启用相关搜索',
-      showQueryMindmap: '显示查询思维导图',
-      embedApp: '嵌入网站',
-      relatedSearch: '相关搜索',
-      descriptionValue: '你是一位智能助手。',
-      okText: '保存',
-      cancelText: '返回',
-      chooseDataset: '请先选择知识库',
-    },
-    language: {
-      english: '英语',
-      chinese: '中文',
-      spanish: '西班牙语',
-      french: '法语',
-      german: '德语',
-      japanese: '日语',
-      korean: '韩语',
-      vietnamese: '越南语',
-    },
-    pagination: {
-      total: '总共 {{total}} 条',
-      page: '{{page}}条/页',
-    },
-    dataflowParser: {
-      parseSummary: '解析摘要',
-      parseSummaryTip: '解析器: deepdoc',
-      rerunFromCurrentStep: '从当前步骤重新运行',
-      rerunFromCurrentStepTip: '已修改，点击重新运行。',
-    },
-    dataflow: {
-      parser: '解析器',
-      parserDescription: '解析器',
-      chunker: '分块器',
-      chunkerDescription: '分块器',
-      tokenizer: '分词器',
-      tokenizerDescription: '分词器',
-    },
+  },
+  modal: {
+    okText: '确认',
+    cancelText: '取消',
+  },
+  search: {
+    createSearch: '新建查询',
   },
 };
