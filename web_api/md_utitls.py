@@ -91,7 +91,7 @@ def split_markdown_to_chunks_advanced(txt, chunk_token_num=1024, min_chunk_token
     target_max_tokens = min(800, chunk_token_num * 1.5)  # 最大800 tokens
     
     # 配置要作为分块边界的标题级别
-    headers_to_split_on = [1, 2, 3]  # H1, H2, H3 作为分块边界
+    headers_to_split_on = [1, 2, 3, 4]  # H1, H2, H3, H4 作为分块边界
     
     # 初始化 markdown-it 解析器
     md = MarkdownIt("commonmark", {"breaks": True, "html": True})
@@ -705,9 +705,11 @@ def _apply_size_control_and_optimization(chunks, min_tokens, target_tokens, max_
                 split_chunks = _split_oversized_chunk(chunk, target_tokens, max_tokens)
                 optimized_chunks.extend(split_chunks)
             else:
-                # 添加标记，但保持 integrity
-                table_separated_chunks = _separate_tables_from_chunk(chunk, target_tokens, max_tokens)
-                optimized_chunks.extend(table_separated_chunks)
+                # 父分段层面不拆分表格，保持完整性
+                # 表格拆分应发生在子分段时（_create_semantic_sub_chunks）
+                chunk['chunk_type'] = 'oversized_special'
+                chunk['has_special_content'] = has_special_content
+                optimized_chunks.append(chunk)
             
         elif chunk_tokens < min_tokens:
             # 超小分块，尝试与下一个分块合并
@@ -858,14 +860,24 @@ def _separate_tables_from_chunk(chunk, target_tokens, max_tokens):
             
             # 合并后的表格分块
             if table_chunk_tokens > max_tokens:
-                # 即使很大也要保持完整性（大表格会在后续子分段中按行拆分）
-                table_chunk = {
-                    'headers': headers.copy(),
-                    'nodes': table_chunk_nodes,
-                    'chunk_type': 'table_chunk',
-                    'has_special_content': True,
-                    'has_table_title': len(table_context_nodes) > 0
-                }
+                # 大表格按行拆分，每个子块保留表头
+                split_chunks = _split_large_table(node_info, headers.copy(), target_tokens, max_tokens)
+                
+                # 将表格上下文（标题等）合并到第一个拆分块
+                if table_context_nodes and split_chunks:
+                    first_chunk = split_chunks[0]
+                    context_content = "\n\n".join(
+                        [n.get('content', '') for n in table_context_nodes 
+                         if n.get('content', '').strip()]
+                    )
+                    if context_content:
+                        first_chunk['nodes'].insert(0, {
+                            'type': 'context', 
+                            'content': context_content
+                        })
+                        first_chunk['has_table_title'] = True
+                
+                separated_chunks.extend(split_chunks)
             else:
                 table_chunk = {
                     'headers': headers.copy(),
@@ -874,7 +886,7 @@ def _separate_tables_from_chunk(chunk, target_tokens, max_tokens):
                     'has_special_content': True,
                     'has_table_title': len(table_context_nodes) > 0
                 }
-            separated_chunks.append(table_chunk)
+                separated_chunks.append(table_chunk)
         else:
             # 非表格节点，累积到非表格内容中
             if non_table_tokens + node_tokens > target_tokens and non_table_nodes:
@@ -971,13 +983,15 @@ def _split_large_table(table_node_info, headers, target_tokens, max_tokens):
         }
         return [table_chunk]
     
-    # 大表格：按行拆分
+    # 大表格：按行拆分（支持一个节点中包含多个表格）
     try:
-        # 解析HTML表格，提取表头和数据行
-        thead_html, tbody_rows_html = _parse_html_table_rows(table_content)
-        
-        if not tbody_rows_html:
-            # 无法解析行结构，保持原样
+        # 【修复】先提取所有 <table>...</table> 块，分别处理
+        table_blocks = re.findall(
+            r'<table[^>]*>.*?</table>', table_content,
+            re.DOTALL | re.IGNORECASE
+        )
+        if not table_blocks:
+            # 无法提取表格块，保持原样
             table_chunk = {
                 'headers': headers.copy(),
                 'nodes': [table_node_info],
@@ -985,35 +999,70 @@ def _split_large_table(table_node_info, headers, target_tokens, max_tokens):
                 'has_special_content': True
             }
             return [table_chunk]
-        
-        # 计算表头部分的token数
-        header_tokens = num_tokens_from_string(thead_html) if thead_html else 0
-        available_tokens = min(max_tokens, target_tokens * 2) - header_tokens
-        
-        if available_tokens <= 0:
-            # 表头本身就超大了，只能整体保留
-            table_chunk = {
-                'headers': headers.copy(),
-                'nodes': [table_node_info],
-                'chunk_type': 'large_table_chunk',
-                'has_special_content': True
-            }
-            return [table_chunk]
-        
-        # 累积数据行，生成多个子块
-        table_chunks = []
-        current_rows = []
-        current_tokens = 0
-        
-        for row_html in tbody_rows_html:
-            row_tokens = num_tokens_from_string(row_html)
-            
-            # 单个行就超过可用空间
-            if row_tokens > available_tokens:
-                # 先保存当前累积的行
-                if current_rows:
-                    chunk_content = _build_table_html(thead_html, current_rows)
-                    table_chunks.append({
+
+        all_table_chunks = []
+
+        for block_html in table_blocks:
+            # 解析单个HTML表格，提取表头和数据行
+            thead_html, tbody_rows_html = _parse_html_table_rows(block_html)
+
+            if not tbody_rows_html:
+                # 无法解析行结构，将该表格整体保留
+                all_table_chunks.append({
+                    'headers': headers.copy(),
+                    'nodes': [{
+                        **table_node_info,
+                        'content': block_html
+                    }],
+                    'chunk_type': 'table_chunk_split',
+                    'has_special_content': True
+                })
+                continue
+
+            # 计算表头部分的token数
+            header_tokens = num_tokens_from_string(thead_html) if thead_html else 0
+            available_tokens = min(max_tokens, target_tokens * 2) - header_tokens
+
+            if available_tokens <= 0:
+                # 表头本身就超大了，整体保留
+                all_table_chunks.append({
+                    'headers': headers.copy(),
+                    'nodes': [{
+                        **table_node_info,
+                        'content': block_html
+                    }],
+                    'chunk_type': 'table_chunk_split',
+                    'has_special_content': True
+                })
+                continue
+
+            # 累积数据行，生成多个子块
+            current_rows = []
+            current_tokens = 0
+
+            for row_html in tbody_rows_html:
+                row_tokens = num_tokens_from_string(row_html)
+
+                # 单个行就超过可用空间
+                if row_tokens > available_tokens:
+                    # 先保存当前累积的行
+                    if current_rows:
+                        chunk_content = _build_table_html(thead_html, current_rows)
+                        all_table_chunks.append({
+                            'headers': headers.copy(),
+                            'nodes': [{
+                                **table_node_info,
+                                'content': chunk_content
+                            }],
+                            'chunk_type': 'table_chunk_split',
+                            'has_special_content': True
+                        })
+                        current_rows = []
+                        current_tokens = 0
+
+                    # 超大行单独作为一个分块（保留表头）
+                    chunk_content = _build_table_html(thead_html, [row_html])
+                    all_table_chunks.append({
                         'headers': headers.copy(),
                         'nodes': [{
                             **table_node_info,
@@ -1022,27 +1071,31 @@ def _split_large_table(table_node_info, headers, target_tokens, max_tokens):
                         'chunk_type': 'table_chunk_split',
                         'has_special_content': True
                     })
-                    current_rows = []
-                    current_tokens = 0
-                
-                # 超大行单独作为一个分块（保留表头）
-                chunk_content = _build_table_html(thead_html, [row_html])
-                table_chunks.append({
-                    'headers': headers.copy(),
-                    'nodes': [{
-                        **table_node_info,
-                        'content': chunk_content
-                    }],
-                    'chunk_type': 'table_chunk_split',
-                    'has_special_content': True
-                })
-                continue
-            
-            # 正常行：累积到当前块
-            if current_tokens + row_tokens > available_tokens and current_rows:
-                # 当前块已满，保存并开始新块
+                    continue
+
+                # 正常行：累积到当前块
+                if current_tokens + row_tokens > available_tokens and current_rows:
+                    # 当前块已满，保存并开始新块
+                    chunk_content = _build_table_html(thead_html, current_rows)
+                    all_table_chunks.append({
+                        'headers': headers.copy(),
+                        'nodes': [{
+                            **table_node_info,
+                            'content': chunk_content
+                        }],
+                        'chunk_type': 'table_chunk_split',
+                        'has_special_content': True
+                    })
+                    current_rows = [row_html]
+                    current_tokens = row_tokens
+                else:
+                    current_rows.append(row_html)
+                    current_tokens += row_tokens
+
+            # 处理最后剩余的行
+            if current_rows:
                 chunk_content = _build_table_html(thead_html, current_rows)
-                table_chunks.append({
+                all_table_chunks.append({
                     'headers': headers.copy(),
                     'nodes': [{
                         **table_node_info,
@@ -1051,27 +1104,9 @@ def _split_large_table(table_node_info, headers, target_tokens, max_tokens):
                     'chunk_type': 'table_chunk_split',
                     'has_special_content': True
                 })
-                current_rows = [row_html]
-                current_tokens = row_tokens
-            else:
-                current_rows.append(row_html)
-                current_tokens += row_tokens
-        
-        # 处理最后剩余的行
-        if current_rows:
-            chunk_content = _build_table_html(thead_html, current_rows)
-            table_chunks.append({
-                'headers': headers.copy(),
-                'nodes': [{
-                    **table_node_info,
-                    'content': chunk_content
-                }],
-                'chunk_type': 'table_chunk_split',
-                'has_special_content': True
-            })
-        
-        return table_chunks
-        
+
+        return all_table_chunks
+
     except Exception as e:
         print(f"⚠️ [WARNING] 大表格按行拆分失败: {e}，保持原样")
         table_chunk = {
@@ -1081,7 +1116,6 @@ def _split_large_table(table_node_info, headers, target_tokens, max_tokens):
             'has_special_content': True
         }
         return [table_chunk]
-
 
 def _parse_html_table_rows(html_content):
     """
@@ -1266,12 +1300,13 @@ def num_tokens_from_string(string: str, model_name: str = "cl100k_base") -> int:
     except Exception:
         return 0
     
-def create_child_chunks(content, sub_chunk_token_num=256, include_metadata=False):
+def create_child_chunks(content, sub_chunk_token_num=256, include_metadata=False, table_sub_chunk_token_num=320):
+    """创建子分段，支持文本和表格使用不同阈值"""
     parent_token_count = num_tokens_from_string(content)
     if  parent_token_count > sub_chunk_token_num:
                     # 使用相同的Markdown分块逻辑创建子分段
-                    sub_chunks = _create_semantic_sub_chunks(content, 
-                                                           sub_chunk_token_num, include_metadata)
+                    sub_chunks = _create_semantic_sub_chunks(content,
+                                                           sub_chunk_token_num, include_metadata, table_sub_chunk_token_num)
                     return sub_chunks
 # #这里增加父子分段的处理
 # def split_markdown_to_chunks_with_hierarchy(txt, chunk_token_num=1024, min_chunk_tokens=10, 
@@ -1409,7 +1444,25 @@ def _split_into_sentences(text):
     url_pattern = re.compile(r'https?://[^\s)\]）]+')
     protected_text = url_pattern.sub(_protect_url, text)
     
-    # 2. 保护数字编号和小数（如 2.0.4、3.7、A.1、3.14、v1.0.2）
+    # 2. 保护页码引用标记（如 ..36、...42、. . 52、. ..36 等中文文档中常见的页码格式）
+    # 这些点号不是句子结束符，而是指向页码的装饰性标记
+    # 常见格式：
+    #   - ..36      (两个点号直接连数字)
+    #   - ...42     (三个点号连数字)
+    #   - . ..36    (单点+空格+两点+数字)
+    #   - . . .20   (单点间空格+数字)
+    #   - .. 36     (两点+空格+数字)
+    page_ref_placeholders = []
+    def _protect_page_ref(match):
+        idx = len(page_ref_placeholders)
+        page_ref_placeholders.append(match.group(0))
+        return f'((PAGE_{idx}))'
+    # 匹配页码引用：一个或多个点号（可含中间空格）后跟数字
+    # 覆盖格式：..36、. ..36、. . .42、.. 36、...36 等
+    page_ref_pattern = re.compile(r'[\.。](?:\s*[\.。])+\s*\d+')
+    protected_text = page_ref_pattern.sub(_protect_page_ref, protected_text)
+    
+    # 3. 保护数字编号和小数（如 2.0.4、3.7、A.1、3.14、v1.0.2）
     # 模式说明：
     #   - 数字+点+数字：如 2.0、3.7、2.0.4
     #   - 字母+点+数字：如 A.1、v1.0
@@ -1475,7 +1528,7 @@ def _force_split_long_text(text, max_tokens):
     return chunks
 
 
-def _create_semantic_sub_chunks(parent_content, sub_chunk_token_num=256, include_metadata=False):
+def _create_semantic_sub_chunks(parent_content, sub_chunk_token_num=256, include_metadata=False, table_sub_chunk_token_num=None):
     """
     使用与父分段相同的语义分块方式创建子分段。
     
@@ -1491,6 +1544,10 @@ def _create_semantic_sub_chunks(parent_content, sub_chunk_token_num=256, include
     Returns:
         子分段列表
     """
+    # 表格阈值默认与文本阈值相同
+    if table_sub_chunk_token_num is None:
+        table_sub_chunk_token_num = sub_chunk_token_num
+    
     sub_chunks = []
     
     # 初始化 markdown-it 解析器用于子分段
@@ -1597,6 +1654,185 @@ def _create_semantic_sub_chunks(parent_content, sub_chunk_token_num=256, include
                 # 表格、代码块、引用块等结构性节点：保持原子完整性
                 chunk_tokens = num_tokens_from_string(chunk_data)
                 
+                # 大表格特殊处理：逐行累积，按token阈值切分（每块都带表头）
+                is_table = node.type == 'table' or _contains_html_table(chunk_data)
+                if is_table and chunk_tokens > table_sub_chunk_token_num:
+                    # 先flush当前累积的内容（如果有）
+                    if current_chunk and current_tokens >= 10:
+                        chunk_content = _finalize_ast_chunk(current_chunk, context_stack)
+                        if chunk_content.strip():
+                            if include_metadata:
+                                sub_chunk = {
+                                    'content': chunk_content,
+                                    'type': 'child',
+                                    'token_count': current_tokens
+                                }
+                            else:
+                                sub_chunk = {
+                                    'content': chunk_content,
+                                    'type': 'child'
+                                }
+                            sub_chunks.append(sub_chunk)
+                        current_chunk = []
+                        current_tokens = 0
+                    
+                    # 【修复】支持一个节点中包含多个表格的情况
+                    # 先分割为独立的表格块，再逐个处理
+                    if _contains_html_table(chunk_data):
+                        # HTML表格：提取每个 <table>...</table> 块分别处理
+                        table_blocks = re.findall(
+                            r'<table[^>]*>.*?</table>', chunk_data,
+                            re.DOTALL | re.IGNORECASE
+                        )
+                        # 如果没有提取到完整的 <table> 块，将整个内容作为一个块
+                        if not table_blocks:
+                            table_blocks = [chunk_data]
+                    else:
+                        # Markdown表格：按表格分割（通过双换行分隔）
+                        # 先尝试按完整表格结构分割
+                        md_table_blocks = []
+                        current_md_table = []
+                        for line in chunk_data.strip().split('\n'):
+                            if '|' in line:
+                                current_md_table.append(line)
+                            else:
+                                if current_md_table:
+                                    md_table_blocks.append('\n'.join(current_md_table))
+                                    current_md_table = []
+                        if current_md_table:
+                            md_table_blocks.append('\n'.join(current_md_table))
+                        # 如果无法分割，将整个内容作为一个块
+                        table_blocks = md_table_blocks if md_table_blocks else [chunk_data]
+
+                    # 逐个处理每个表格块
+                    for table_block in table_blocks:
+                        if not table_block.strip():
+                            continue
+
+                        is_html = _contains_html_table(table_block)
+                        if is_html:
+                            table_open_match = re.search(
+                                r'(<table[^>]*>)', table_block, re.IGNORECASE
+                            )
+                            table_close_match = re.search(
+                                r'(</table>)', table_block, re.IGNORECASE
+                            )
+                            table_open = (
+                                table_open_match.group(1)
+                                if table_open_match else '<table>'
+                            )
+                            table_close = (
+                                table_close_match.group(1)
+                                if table_close_match else '</table>'
+                            )
+
+                            all_tr_rows = re.findall(
+                                r'<tr[^>]*>.*?</tr>', table_block,
+                                re.DOTALL | re.IGNORECASE
+                            )
+                            header_lines = [
+                                row for row in all_tr_rows
+                                if re.search(r'<th\b', row, re.IGNORECASE)
+                            ]
+                            header_line = (
+                                header_lines[0] if header_lines else
+                                (all_tr_rows[0] if all_tr_rows else '')
+                            )
+                            data_lines = [
+                                row for row in all_tr_rows
+                                if row != header_line
+                                and re.search(r'<td\b', row, re.IGNORECASE)
+                            ]
+                            header_content = table_open + '\n' + header_line
+                        else:
+                            table_lines = table_block.strip().split('\n')
+                            header_line = (
+                                table_lines[0]
+                                if len(table_lines) >= 1 else ''
+                            )
+                            data_lines = [
+                                line for line in table_lines[2:]
+                                if line.strip() and '|' in line
+                            ]
+                            header_content = (
+                                table_lines[0] + '\n'
+                                + (table_lines[1] if len(table_lines) > 1 else '')
+                            )
+
+                        header_tokens = num_tokens_from_string(
+                            header_content.strip()
+                        )
+
+                        # 逐行累积，按token阈值切分
+                        current_table_rows = []
+                        current_table_tokens = 0
+
+                        for row_line in data_lines:
+                            row_tokens = num_tokens_from_string(row_line)
+                            new_block_tokens = (
+                                header_tokens + current_table_tokens + row_tokens
+                            )
+
+                            if (new_block_tokens > table_sub_chunk_token_num
+                                    and current_table_rows):
+                                if is_html:
+                                    sub_lines = [
+                                        table_open, header_line
+                                    ]
+                                    sub_lines.extend(current_table_rows)
+                                    sub_lines.append(table_close)
+                                else:
+                                    sub_lines = [header_content]
+                                    sub_lines.extend(current_table_rows)
+                                sub_content = '\n'.join(sub_lines)
+
+                                sub_tokens = num_tokens_from_string(sub_content)
+                                if include_metadata:
+                                    sub_chunk = {
+                                        'content': sub_content,
+                                        'type': 'child',
+                                        'token_count': sub_tokens
+                                    }
+                                else:
+                                    sub_chunk = {
+                                        'content': sub_content,
+                                        'type': 'child'
+                                    }
+                                sub_chunks.append(sub_chunk)
+                                current_table_rows = []
+                                current_table_tokens = 0
+
+                            current_table_rows.append(row_line)
+                            current_table_tokens += row_tokens
+
+                        # 处理剩余行
+                        if current_table_rows:
+                            if is_html:
+                                sub_lines = [table_open, header_line]
+                                sub_lines.extend(current_table_rows)
+                                sub_lines.append(table_close)
+                            else:
+                                sub_lines = [header_content]
+                                sub_lines.extend(current_table_rows)
+                            sub_content = '\n'.join(sub_lines)
+
+                            sub_tokens = num_tokens_from_string(sub_content)
+                            if include_metadata:
+                                sub_chunk = {
+                                    'content': sub_content,
+                                    'type': 'child',
+                                    'token_count': sub_tokens
+                                }
+                            else:
+                                sub_chunk = {
+                                    'content': sub_content,
+                                    'type': 'child'
+                                }
+                            sub_chunks.append(sub_chunk)
+
+                    continue
+                
+                # 原有逻辑：保持原子完整性
                 if (current_tokens + chunk_tokens > sub_chunk_token_num and
                         current_chunk and current_tokens >= 10):
                     chunk_content = _finalize_ast_chunk(current_chunk, context_stack)
@@ -1774,7 +2010,8 @@ def _create_line_based_sub_chunks(parent_content, sub_chunk_token_num=256, inclu
     # return sub_chunks
 
 def split_markdown_to_chunks_smart_with_hierarchy(txt, chunk_token_num=256, min_chunk_tokens=10,
-                                                 create_sub_chunks=True, sub_chunk_token_num=128):
+                                                 create_sub_chunks=True, sub_chunk_token_num=128,
+                                                 table_sub_chunk_token_num=None):
     """
     智能分块方法，支持父子分段结构
     """
@@ -1818,8 +2055,10 @@ def split_markdown_to_chunks_smart_with_hierarchy(txt, chunk_token_num=256, min_
                     
                     # 创建子分段
                     if create_sub_chunks and current_tokens > sub_chunk_token_num:
-                        sub_chunks = _create_semantic_sub_chunks(chunk_content, parent_id, 
-                                                               sub_chunk_token_num)
+                        sub_chunks = _create_semantic_sub_chunks(chunk_content,
+                                                               sub_chunk_token_num=sub_chunk_token_num,
+                                                               include_metadata=False,
+                                                               table_sub_chunk_token_num=table_sub_chunk_token_num)
                         chunks.extend(sub_chunks)
                 
                 current_chunk = []
@@ -1846,8 +2085,10 @@ def split_markdown_to_chunks_smart_with_hierarchy(txt, chunk_token_num=256, min_
                         
                         # 创建子分段
                         if create_sub_chunks and current_tokens > sub_chunk_token_num:
-                            sub_chunks = _create_semantic_sub_chunks(chunk_content, parent_id, 
-                                                                   sub_chunk_token_num)
+                            sub_chunks = _create_semantic_sub_chunks(chunk_content,
+                                                                   sub_chunk_token_num=sub_chunk_token_num,
+                                                                   include_metadata=False,
+                                                                   table_sub_chunk_token_num=table_sub_chunk_token_num)
                             chunks.extend(sub_chunks)
                     
                     current_chunk = []
@@ -1872,8 +2113,10 @@ def split_markdown_to_chunks_smart_with_hierarchy(txt, chunk_token_num=256, min_
                 
                 # 创建子分段
                 if create_sub_chunks and current_tokens > sub_chunk_token_num:
-                    sub_chunks = _create_semantic_sub_chunks(chunk_content, parent_id, 
-                                                           sub_chunk_token_num)
+                    sub_chunks = _create_semantic_sub_chunks(chunk_content,
+                                                           sub_chunk_token_num=sub_chunk_token_num,
+                                                           include_metadata=False,
+                                                           table_sub_chunk_token_num=table_sub_chunk_token_num)
                     chunks.extend(sub_chunks)
         
         return [chunk for chunk in chunks if chunk['content'].strip()]
@@ -1993,7 +2236,7 @@ def split_markdown_to_chunks_ast_parent_child(txt, chunk_token_num=256, min_chun
     if not txt or not txt.strip():
         return [], [], []
     
-    parent_split_level =  3  # 默认H2分割
+    parent_split_level =  4  # 默认H4分割
     
     try:
         # 1. 解析AST并创建增强节点
