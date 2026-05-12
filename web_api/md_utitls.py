@@ -2218,52 +2218,182 @@ def get_last_parent_child_result():
     """获取最后一次父子分块的完整结果"""
     global _last_parent_child_result
     return _last_parent_child_result
-def split_markdown_to_chunks_ast_parent_child(txt, chunk_token_num=256, min_chunk_tokens=10, 
-                                              doc_id='unknown'):
+
+
+def _compute_adaptive_split_level(enhanced_nodes,
+                                  target_parent_tokens=(400, 1200),
+                                  candidate_levels=(2, 3, 4, 5)):
     """
-    基于AST的父子分块方法
-    
+    根据文档标题结构和内容分布，自适应选择最优父分块切分级别。
+
+    策略：
+    1. 对每个候选级别，模拟切分并计算各分块的 token 分布。
+    2. 用评分函数衡量该级别的"质量"：
+       - 分块大小落在目标区间 [min_target, max_target] 的比例越高越好
+       - 超大分块（>max_target*1.5）越少越好
+       - 碎片分块（<min_target*0.3）越少越好
+       - 分块数量适中（避免过多或过少）
+    3. 选择得分最高的级别；如果全部都很差，回退到默认级别 3。
+
+    Args:
+        enhanced_nodes: 增强 AST 节点列表
+        target_parent_tokens: (最小目标, 最大目标) token 数，默认 (400, 1200)
+        candidate_levels: 候选标题级别，默认考察 H2~H5
+
+    Returns:
+        int: 最优父分块切分级别
+    """
+    min_target, max_target = target_parent_tokens
+    max_allowed = int(max_target * 1.5)
+    min_allowed = int(min_target * 0.3)
+
+    best_level = 3  # 默认回退
+    best_score = -float('inf')
+
+    # 预先收集所有 heading 的位置和级别，用于快速模拟
+    heading_indices = [
+        (i, n['header_level'])
+        for i, n in enumerate(enhanced_nodes)
+        if n['type'] == 'heading' and n.get('header_level')
+    ]
+
+    for level in candidate_levels:
+        # 模拟按当前 level 切分
+        chunk_tokens = []
+        current_tokens = 0
+
+        for i, node in enumerate(enhanced_nodes):
+            node_tokens = num_tokens_from_string(node.get('content', ''))
+
+            # 检查是否是切分边界
+            is_boundary = (
+                node['type'] == 'heading' and
+                node.get('header_level', 99) <= level
+            )
+
+            if is_boundary and current_tokens > 0:
+                chunk_tokens.append(current_tokens)
+                current_tokens = node_tokens
+            else:
+                current_tokens += node_tokens
+
+        if current_tokens > 0:
+            chunk_tokens.append(current_tokens)
+
+        if not chunk_tokens:
+            continue
+
+        total_chunks = len(chunk_tokens)
+        in_range = sum(1 for t in chunk_tokens if min_target <= t <= max_target)
+        oversized = sum(1 for t in chunk_tokens if t > max_allowed)
+        undersized = sum(1 for t in chunk_tokens if t < min_allowed)
+        avg_size = sum(chunk_tokens) / total_chunks
+
+        # 评分公式（可调参数）
+        # 核心：鼓励落在目标区间，惩罚超大和超小
+        in_range_ratio = in_range / total_chunks
+        oversized_penalty = oversized * 2.0          # 超大分块惩罚较重
+        undersized_penalty = undersized * 0.8        # 碎片惩罚较轻
+        count_penalty = 0.0
+
+        # 分块数量适中：假设理想范围是 3~30 个父分块
+        if total_chunks < 2:
+            count_penalty = 1.5
+        elif total_chunks > 40:
+            count_penalty = (total_chunks - 40) * 0.05
+
+        # 平均大小偏离目标中点的惩罚
+        target_mid = (min_target + max_target) / 2
+        avg_deviation = abs(avg_size - target_mid) / target_mid
+        avg_penalty = avg_deviation * 0.5
+
+        score = (
+            in_range_ratio * 10.0
+            - oversized_penalty
+            - undersized_penalty
+            - count_penalty
+            - avg_penalty
+        )
+
+        print(f"  [Adaptive] H{level}: chunks={total_chunks}, "
+              f"in_range={in_range}({in_range_ratio:.1%}), "
+              f"oversized={oversized}, undersized={undersized}, "
+              f"avg={avg_size:.0f}, score={score:.2f}")
+
+        if score > best_score:
+            best_score = score
+            best_level = level
+
+    print(f"  [Adaptive] ✅ 选择 H{best_level} 作为父分块切分级别 (score={best_score:.2f})")
+    return best_level
+
+
+def split_markdown_to_chunks_ast_parent_child(txt, chunk_token_num=256, min_chunk_tokens=10,
+                                              doc_id='unknown',
+                                              parent_split_level=None,
+                                              adaptive_split=True,
+                                              target_parent_tokens=(400, 1200)):
+    """
+    基于AST的父子分块方法（支持自适应父分块级别）
+
     Args:
         txt: 要分块的文本
         chunk_token_num: 子分块大小（tokens）
         min_chunk_tokens: 最小子分块大小
         doc_id: 文档ID
+        parent_split_level: 显式指定父分块切分级别（H1=1, H2=2...），
+                            若提供则忽略 adaptive_split
+        adaptive_split: 是否启用自适应切分级别，默认 True
+        target_parent_tokens: 自适应时的目标父分块大小区间 (min, max)
+
     Returns:
         tuple: (parent_chunks, child_chunks, relationships)
     """
 
-    
     if not txt or not txt.strip():
         return [], [], []
-    
-    parent_split_level =  4  # 默认H4分割
-    
+
     try:
         # 1. 解析AST并创建增强节点
         enhanced_nodes = _create_enhanced_ast_nodes(txt)
-        
-        # 2. 基于AST创建子分块
+
+        # 2. 确定父分块切分级别
+        if parent_split_level is not None:
+            chosen_level = parent_split_level
+            print(f"🎯 [AST] 使用显式父分块级别: H{chosen_level}")
+        elif adaptive_split:
+            print(f"🎯 [AST] 启动自适应父分块级别选择...")
+            chosen_level = _compute_adaptive_split_level(
+                enhanced_nodes,
+                target_parent_tokens=target_parent_tokens
+            )
+        else:
+            chosen_level = 4  # 传统默认
+            print(f"🎯 [AST] 使用默认父分块级别: H{chosen_level}")
+
+        # 3. 基于AST创建子分块
         child_chunks = _create_ast_child_chunks(
             enhanced_nodes, chunk_token_num, min_chunk_tokens, doc_id
         )
-        
-        # 3. 基于AST和标题层级创建父分块  
+
+        # 4. 基于AST和标题层级创建父分块（支持智能二级切分）
         parent_chunks = _create_ast_parent_chunks(
-            enhanced_nodes, parent_split_level, doc_id
+            enhanced_nodes, chosen_level, doc_id,
+            target_parent_tokens=target_parent_tokens
         )
-        
-        # 4. 建立精确的AST关联关系
+
+        # 5. 建立精确的AST关联关系
         relationships = _create_ast_relationships(
             child_chunks, parent_chunks, enhanced_nodes, doc_id,
         )
-        
+
         print(f"🎯 [AST] 创建父子分块完成:")
-        print(f"  👨 父分块: {len(parent_chunks)} 个")
-        print(f"  👶 子分块: {len(child_chunks)} 个") 
+        print(f"  👨 父分块: {len(parent_chunks)} 个 (H{chosen_level}切分)")
+        print(f"  👶 子分块: {len(child_chunks)} 个")
         print(f"  🔗 关联关系: {len(relationships)} 个")
-        
+
         return parent_chunks, child_chunks, relationships
-        
+
     except Exception as e:
         print(f"❌ [ERROR] AST父子分块失败: {e}")
         import traceback
@@ -2748,44 +2878,230 @@ def _create_ast_child_chunk_obj(nodes, order, doc_id):
     )
 
 
-def _create_ast_parent_chunks(enhanced_nodes, parent_split_level, doc_id):
-    """基于AST和标题层级创建父分块"""
+def _create_ast_parent_chunks(enhanced_nodes, parent_split_level, doc_id,
+                                 target_parent_tokens=(400, 1200),
+                                 max_split_level=6):
+    """
+    基于AST和标题层级创建父分块（支持智能二级切分）
+
+    核心策略：
+    1. 先按 parent_split_level 进行一级切分
+    2. 对每个分块，如果其 token 数超过 max_target * 1.5，
+       则尝试用更低级别的标题（parent_split_level + 1, +2...）进行二级切分
+    3. 二级切分时，子分块会继承父分块的标题上下文
+
+    Args:
+        enhanced_nodes: 增强AST节点列表
+        parent_split_level: 一级切分标题级别
+        doc_id: 文档ID
+        target_parent_tokens: 目标父分块大小区间 (min, max)
+        max_split_level: 最大切分标题级别（防止无限递归）
+
+    Returns:
+        list: 父分块列表
+    """
+    min_target, max_target = target_parent_tokens
+    max_allowed = int(max_target * 1.5)
+
+    # 第一步：按一级级别切分
+    raw_sections = _split_nodes_by_level(enhanced_nodes, parent_split_level)
+
     parent_chunks = []
-    current_section_nodes = []
-    current_section_header = None
     parent_order = 0
-    
-    for node_info in enhanced_nodes:
-        # 检查是否是父分块边界标题
-        if (node_info['type'] == 'heading' and 
-            node_info.get('header_level', 99) <= parent_split_level):
-            
-            # 完成当前父分块
-            if current_section_nodes:
-                parent_chunk = _create_ast_parent_chunk_obj(
-                    current_section_nodes, current_section_header, parent_order, doc_id
-                )
-                parent_chunks.append(parent_chunk)
-                parent_order += 1
-            
-            # 开始新的父分块
-            current_section_nodes = [node_info]
-            current_section_header = {
-                'level': node_info['header_level'],
-                'title': node_info['header_title'],
-                'context_stack': node_info['context_stack']
+
+    for section_nodes, section_header in raw_sections:
+        if not section_nodes:
+            continue
+
+        section_content = "\n\n".join(
+            n['content'] for n in section_nodes if n.get('content', '').strip()
+        )
+        section_tokens = num_tokens_from_string(section_content)
+
+        # 判断是否需要二级切分
+        needs_secondary_split = (
+            section_tokens > max_allowed and
+            parent_split_level < max_split_level
+        )
+
+        if needs_secondary_split:
+            # 尝试二级切分：查找更低级别的标题作为子边界
+            sub_chunks = _try_secondary_split(
+                section_nodes, section_header,
+                parent_split_level, max_split_level,
+                max_allowed, doc_id, parent_order
+            )
+            parent_chunks.extend(sub_chunks)
+            parent_order += len(sub_chunks)
+        else:
+            # 不需要二级切分，直接创建父分块
+            parent_chunk = _create_ast_parent_chunk_obj(
+                section_nodes, section_header, parent_order, doc_id
+            )
+            parent_chunks.append(parent_chunk)
+            parent_order += 1
+
+    return parent_chunks
+
+
+def _split_nodes_by_level(nodes, split_level):
+    """
+    按指定标题级别将节点切分为多个段
+
+    Returns:
+        list of (section_nodes, section_header): 每个段及其标题信息
+    """
+    sections = []
+    current_nodes = []
+    current_header = None
+
+    for node in nodes:
+        is_boundary = (
+            node['type'] == 'heading' and
+            node.get('header_level', 99) <= split_level
+        )
+
+        if is_boundary:
+            # 保存当前段
+            if current_nodes:
+                sections.append((current_nodes, current_header))
+
+            # 开始新段
+            current_nodes = [node]
+            current_header = {
+                'level': node['header_level'],
+                'title': node['header_title'],
+                'context_stack': node['context_stack']
             }
         else:
-            current_section_nodes.append(node_info)
-    
-    # 处理最后一个父分块
-    if current_section_nodes:
-        parent_chunk = _create_ast_parent_chunk_obj(
-            current_section_nodes, current_section_header, parent_order, doc_id
+            current_nodes.append(node)
+
+    # 保存最后一段
+    if current_nodes:
+        sections.append((current_nodes, current_header))
+
+    return sections
+
+
+def _try_secondary_split(section_nodes, section_header, current_level, max_level,
+                          max_allowed, doc_id, order_start):
+    """
+    尝试对超大段进行二级切分（改进版：允许部分超大分块，优先整体改善）
+
+    策略：
+    1. 从 current_level + 1 开始，逐级尝试更低级别的标题
+    2. 评估标准：相比不切分，超大分块的比例是否显著降低
+    3. 接受"大部分分块合理，少数仍略大"的情况（避免一刀切）
+    4. 如果所有级别都无法改善，则保持原样
+
+    Returns:
+        list: 切分后的父分块列表
+    """
+    # 计算原始段的大小
+    original_content = "\n\n".join(
+        n['content'] for n in section_nodes if n.get('content', '').strip()
+    )
+    original_tokens = num_tokens_from_string(original_content)
+
+    # 先尝试找到最优的二级切分级别
+    best_level = None
+    best_score = -float('inf')
+    best_sections = None
+
+    for try_level in range(current_level + 1, max_level + 1):
+        sub_sections = _split_nodes_by_level(section_nodes, try_level)
+
+        # 过滤掉只有标题的空段
+        valid_sections = []
+        for nodes, header in sub_sections:
+            content = "\n\n".join(
+                n['content'] for n in nodes if n.get('content', '').strip()
+            )
+            if content.strip():
+                valid_sections.append((nodes, header, num_tokens_from_string(content)))
+
+        if not valid_sections:
+            continue
+
+        # 评估这个级别的切分质量
+        tokens_list = [t for _, _, t in valid_sections]
+        total_chunks = len(tokens_list)
+        oversized = sum(1 for t in tokens_list if t > max_allowed)
+        undersized = sum(1 for t in tokens_list if t < 50)
+        in_range = sum(1 for t in tokens_list if 200 <= t <= max_allowed)
+
+        # 改进的评分逻辑：
+        # 1. 鼓励产生多个分块（说明有有效切分）
+        # 2. 鼓励分块落在合理范围
+        # 3. 轻微惩罚超大分块（但不是一票否决）
+        # 4. 如果只有一个分块且和原来一样大，说明这个级别无效
+
+        if total_chunks == 1 and tokens_list[0] >= original_tokens * 0.95:
+            # 这个级别没有实际切分效果，跳过
+            continue
+
+        # 超大分块比例（越低越好）
+        oversized_ratio = oversized / total_chunks if total_chunks > 0 else 1.0
+        # 原始超大比例是 1.0（整个段都是超大）
+        improvement = 1.0 - oversized_ratio
+
+        score = (
+            improvement * 8.0           # 改善程度是核心指标
+            + in_range * 1.0             # 合理范围分块奖励
+            - undersized * 0.5           # 碎片惩罚
+            - oversized * 0.3            # 剩余超大分块轻微惩罚
         )
-        parent_chunks.append(parent_chunk)
-    
-    return parent_chunks
+
+        if score > best_score:
+            best_score = score
+            best_level = try_level
+            best_sections = valid_sections
+
+    # 如果没有找到合适的二级切分级别，保持原样
+    if best_level is None or best_sections is None:
+        chunk = _create_ast_parent_chunk_obj(
+            section_nodes, section_header, order_start, doc_id
+        )
+        chunk.metadata['split_strategy'] = 'single_level_oversized'
+        return [chunk]
+
+    # 使用最优级别进行二级切分
+    result_chunks = []
+    order = order_start
+
+    for nodes, header, _ in best_sections:
+        content = "\n\n".join(
+            n['content'] for n in nodes if n.get('content', '').strip()
+        )
+        if not content.strip():
+            continue
+
+        # 二级切分的分块继承一级标题上下文
+        effective_header = header or section_header
+        if header and section_header:
+            # 合并上下文：保留高级别标题信息
+            merged_context = section_header['context_stack'].copy()
+            # 确保当前标题也在上下文中
+            if header['title'] not in [c['title'] for c in merged_context]:
+                merged_context.append({
+                    'level': header['level'],
+                    'title': header['title']
+                })
+            effective_header = {
+                'level': header['level'],
+                'title': header['title'],
+                'context_stack': merged_context
+            }
+
+        chunk = _create_ast_parent_chunk_obj(
+            nodes, effective_header, order, doc_id
+        )
+        chunk.metadata['split_strategy'] = f'secondary_H{current_level}_to_H{best_level}'
+        chunk.metadata['primary_header'] = section_header['title'] if section_header else ''
+        result_chunks.append(chunk)
+        order += 1
+
+    return result_chunks
 
 
 def _create_ast_parent_chunk_obj(nodes, header_info, order, doc_id):
