@@ -1150,8 +1150,9 @@ def _apply_size_control_and_optimization(chunks, min_tokens, target_tokens, max_
             chunk['has_special_content'] = has_special_content
             optimized_chunks.append(chunk)
             
-        elif chunk_tokens > max_tokens and not has_special_content:
-            # 超大分块，需要进一步分割（除非包含特殊内容）
+        elif chunk_tokens > max_tokens:
+            # 超大分块，需要进一步分割
+            # 改进：总是切分超大分块，切分策略内部会保护表格等特殊内容
             split_chunks = _split_oversized_chunk(chunk, target_tokens, max_tokens)
             optimized_chunks.extend(split_chunks)
             
@@ -1167,8 +1168,8 @@ def _apply_size_control_and_optimization(chunks, min_tokens, target_tokens, max_
                 enhanced_chunk = _enhance_small_chunk_with_context(chunk)
                 optimized_chunks.append(enhanced_chunk)
         else:
-            # 包含特殊内容的超大分块，保持完整性但添加标记
-            chunk['chunk_type'] = 'oversized_special'
+            # 正常大小但包含特殊内容的分块
+            chunk['chunk_type'] = 'normal_special'
             chunk['has_special_content'] = has_special_content
             optimized_chunks.append(chunk)
         
@@ -1199,49 +1200,86 @@ def _has_special_content(chunk):
 
 
 def _split_oversized_chunk(chunk, target_tokens, max_tokens):
-    """分割超大分块，在段落边界进行分割"""
-    split_chunks = []
+    """
+    分割超大分块（改进版：优先用更低级别标题切分，回退到段落切分）
+    
+    策略：
+    1. 检查块内是否有更低级别的标题（如当前按H3切分，块内有H4/H5标题）
+    2. 如果有，用这些标题作为边界切分，保留标题结构
+    3. 如果没有低级别标题，回退到原来的段落边界切分
+    """
     nodes = chunk.get('nodes', [])
     headers = chunk.get('headers', {})
     
+    if not nodes:
+        return [chunk]
+    
+    # 找出当前块中已有的最高标题级别
+    existing_heading_levels = set()
+    for node in nodes:
+        if node.get('type') == 'heading':
+            existing_heading_levels.add(node.get('level', 99))
+    
+    # 找出当前headers中的最高级别（即当前切分边界级别）
+    current_split_level = max(headers.keys()) if headers else 3
+    
+    # 检查是否有更低级别的标题可用作切分边界
+    lower_levels = [l for l in existing_heading_levels if l > current_split_level]
+    
+    if lower_levels:
+        # 有低级别标题，优先用标题切分
+        min_lower_level = min(lower_levels)
+        return _split_oversized_chunk_by_headings(chunk, min_lower_level, target_tokens, max_tokens)
+    else:
+        # 没有低级别标题，回退到段落切分
+        return _split_oversized_chunk_by_paragraphs(chunk, target_tokens, max_tokens)
+
+
+def _split_oversized_chunk_by_headings(chunk, split_level, target_tokens, max_tokens):
+    """
+    用更低级别标题切分超大分块
+    
+    与 _split_by_header_levels 类似，但只作用于单个块内部
+    """
+    nodes = chunk.get('nodes', [])
+    headers = chunk.get('headers', {})
+    
+    split_chunks = []
     current_nodes = []
-    current_tokens = 0
+    current_header = None
     
     for node_info in nodes:
-        node_content = node_info.get('content', '')
-        node_tokens = num_tokens_from_string(node_content)
+        is_boundary = (
+            node_info.get('type') == 'heading' and
+            node_info.get('level', 99) <= split_level
+        )
         
-        # 检查是否是标题节点
-        is_heading = node_info.get('type') == 'heading'
-        
-        # 如果当前节点会导致超出目标大小，且当前已有内容
-        if current_tokens + node_tokens > target_tokens and current_nodes:
-            # 创建一个分块
-            new_chunk = {
-                'headers': headers.copy(),
-                'nodes': current_nodes.copy(),
-                'chunk_type': 'split_from_oversized',
-                'has_special_content': any(_has_special_content({'nodes': [n]}) for n in current_nodes)
-            }
-            split_chunks.append(new_chunk)
+        if is_boundary and current_nodes:
+            # 完成当前分块
+            chunk_content = "\n\n".join(
+                n.get('content', '') for n in current_nodes if n.get('content', '').strip()
+            )
+            if chunk_content.strip():
+                new_chunk = {
+                    'headers': headers.copy(),
+                    'nodes': current_nodes.copy(),
+                    'chunk_type': 'split_by_lower_heading',
+                    'has_special_content': any(_has_special_content({'nodes': [n]}) for n in current_nodes)
+                }
+                split_chunks.append(new_chunk)
             
             # 开始新分块
             current_nodes = [node_info]
-            current_tokens = node_tokens
-            
-            # 如果是标题，更新headers上下文
-            if is_heading:
-                level = node_info.get('level', 3)
-                title = node_info.get('title', '')
-                new_headers = {k: v for k, v in headers.items() if k < level}
-                new_headers[level] = title
-                headers = new_headers
+            # 更新headers上下文
+            level = node_info.get('level', 3)
+            title = node_info.get('title', '')
+            headers = {k: v for k, v in headers.items() if k < level}
+            headers[level] = title
+            current_header = node_info
         else:
             current_nodes.append(node_info)
-            current_tokens += node_tokens
-            
             # 更新标题上下文
-            if is_heading:
+            if node_info.get('type') == 'heading':
                 level = node_info.get('level', 3)
                 title = node_info.get('title', '')
                 headers = {k: v for k, v in headers.items() if k < level}
@@ -1249,13 +1287,99 @@ def _split_oversized_chunk(chunk, target_tokens, max_tokens):
     
     # 添加最后一个分块
     if current_nodes:
-        final_chunk = {
-            'headers': headers.copy(),
-            'nodes': current_nodes,
-            'chunk_type': 'split_from_oversized',
-            'has_special_content': any(_has_special_content({'nodes': [n]}) for n in current_nodes)
-        }
-        split_chunks.append(final_chunk)
+        chunk_content = "\n\n".join(
+            n.get('content', '') for n in current_nodes if n.get('content', '').strip()
+        )
+        if chunk_content.strip():
+            final_chunk = {
+                'headers': headers.copy(),
+                'nodes': current_nodes,
+                'chunk_type': 'split_by_lower_heading',
+                'has_special_content': any(_has_special_content({'nodes': [n]}) for n in current_nodes)
+            }
+            split_chunks.append(final_chunk)
+    
+    return split_chunks
+
+
+def _split_oversized_chunk_by_paragraphs(chunk, target_tokens, max_tokens):
+    """分割超大分块，在段落边界进行分割（改进版：保护特殊内容节点）"""
+    split_chunks = []
+    nodes = chunk.get('nodes', [])
+    headers = chunk.get('headers', {})
+    
+    current_nodes = []
+    current_tokens = 0
+    
+    def _flush_current_nodes():
+        """将当前累积的节点 flush 为一个分块"""
+        nonlocal current_nodes, current_tokens
+        if current_nodes:
+            new_chunk = {
+                'headers': headers.copy(),
+                'nodes': current_nodes.copy(),
+                'chunk_type': 'split_from_oversized',
+                'has_special_content': any(_has_special_content({'nodes': [n]}) for n in current_nodes)
+            }
+            split_chunks.append(new_chunk)
+            current_nodes = []
+            current_tokens = 0
+    
+    for node_info in nodes:
+        node_content = node_info.get('content', '')
+        node_tokens = num_tokens_from_string(node_content)
+        node_type = node_info.get('type', '')
+        
+        # 检查是否是特殊内容节点（表格、代码块等需要保持完整的）
+        is_special = node_type in ['table', 'code_block']
+        # 检查是否是标题节点
+        is_heading = node_type == 'heading'
+        
+        # 特殊内容节点：保持完整，不拆开
+        if is_special:
+            # 先 flush 当前累积的普通节点
+            _flush_current_nodes()
+            
+            # 特殊内容节点单独作为一个分块（保持完整）
+            # 更新标题上下文（如果节点本身包含标题信息）
+            special_chunk = {
+                'headers': headers.copy(),
+                'nodes': [node_info],
+                'chunk_type': 'split_from_oversized_special',
+                'has_special_content': True
+            }
+            split_chunks.append(special_chunk)
+            continue
+        
+        # 标题节点：总是作为分块边界（类似 _split_by_header_levels 的逻辑）
+        if is_heading:
+            # 先 flush 当前累积
+            _flush_current_nodes()
+            
+            # 标题节点开始新分块
+            current_nodes = [node_info]
+            current_tokens = node_tokens
+            
+            # 更新headers上下文
+            level = node_info.get('level', 3)
+            title = node_info.get('title', '')
+            headers = {k: v for k, v in headers.items() if k < level}
+            headers[level] = title
+            continue
+        
+        # 普通节点：检查是否会导致超出目标大小
+        if current_tokens + node_tokens > target_tokens and current_nodes:
+            _flush_current_nodes()
+            
+            # 开始新分块
+            current_nodes = [node_info]
+            current_tokens = node_tokens
+        else:
+            current_nodes.append(node_info)
+            current_tokens += node_tokens
+    
+    # 添加最后一个分块
+    _flush_current_nodes()
     
     return split_chunks
 

@@ -12,7 +12,7 @@ from mineru.utils.enum_class import MakeMode
 from mineru.utils.draw_bbox import draw_layout_bbox
 from mineru.data.data_reader_writer import FileBasedDataWriter
 
-from md_utitls import split_markdown_to_chunks_advanced,split_markdown_to_chunks_parent_child
+from markdown_chunker import split_markdown_to_chunks_advanced,create_child_chunks
 from popeline import create_document_file_mineru, create_segments_from_chunks, update_markdown_image_urls_with_api, upload_document_segments
 from vlm import process_file_vlm
 app = Flask(__name__)
@@ -302,7 +302,7 @@ def file_parse_dify():
         txtNew= update_markdown_image_urls_with_api(md_file_path=combined_md_path,api_base_url=api_base_url, image_dir=output_image_path, api_key=api_key)
         # txtNew= update_markdown_image_urls_with_api(combined_md_path, output_image_path, "app-zLh7zvRCvSQGmSQZjAqDiAiO")
         # 然后这里进行文件分块处理
-        chunks=split_markdown_to_chunks_parent_child(txtNew)
+        # chunks=split_markdown_to_chunks_parent_child(txtNew)
         chunks= split_markdown_to_chunks_advanced(txtNew)
         # chunks= split_markdown_to_chunks_with_hierarchy(txtNew)
         seglist= create_segments_from_chunks(chunks)

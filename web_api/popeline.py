@@ -26,7 +26,7 @@ from mineru.utils.draw_bbox import draw_layout_bbox, draw_span_bbox
 from mineru.utils.language import remove_invalid_surrogates
 
 from md_split import split_markdown_chunk
-from md_utitls import create_child_chunks, num_tokens_from_string
+from markdown_chunker  import create_child_chunks, num_tokens_from_string
 pdf_extensions = [".pdf"]
 def process_file_pipeline(
     file_bytes: bytes,
