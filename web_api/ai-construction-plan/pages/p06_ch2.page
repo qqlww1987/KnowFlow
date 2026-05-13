@@ -1,0 +1,55 @@
+pageType: chapter
+background:
+  type: solid
+  color: "$darkBg"
+elements:
+  - elementId: bg-pattern
+    elementType: image
+    bounds: [680, 0, 600, 720]
+    src: "/mnt/agents/output/ai-construction-plan/images/blueprints.png"
+    fit: {mode: cover}
+    opacity: 0.15
+  - elementId: big-number
+    elementType: text
+    bounds: [60, 180, 300, 160]
+    content:
+      fontSize: 160
+      color: "#C8963E20"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>02</strong></p>
+  - elementId: accent-line
+    elementType: shape
+    bounds: [380, 260, 60, 3]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: chapter-title
+    elementType: text
+    bounds: [380, 280, 700, 56]
+    content:
+      fontSize: 36
+      color: "#FFFFFF"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>AI生成所需原始文件体系</strong></p>
+  - elementId: chapter-subtitle
+    elementType: text
+    bounds: [380, 350, 700, 30]
+    content:
+      fontSize: 18
+      color: "#FFFFFF80"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p>从模板到成稿，梳理AI生成施组文档所需的全部原始输入文件</p>
+  - elementId: bottom-line
+    elementType: shape
+    bounds: [60, 650, 1160, 1]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "#FFFFFF15"

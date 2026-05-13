@@ -1,0 +1,128 @@
+pageType: content
+background:
+  type: solid
+  color: "$background"
+elements:
+  - elementId: page-title
+    elementType: text
+    bounds: [60, 40, 1000, 40]
+    content:
+      style: "$title"
+      wrap: false
+      text: |
+        <p><strong>工程技术知识库（I）：路基与桥涵工程核心工艺</strong></p>
+  - elementId: title-accent
+    elementType: shape
+    bounds: [60, 85, 40, 3]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: left-card
+    elementType: shape
+    bounds: [60, 110, 570, 520]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: left-icon
+    elementType: icon
+    bounds: [80, 125, 32, 32]
+    iconName: "fas:road"
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: left-title
+    elementType: text
+    bounds: [122, 128, 400, 26]
+    content:
+      fontSize: 20
+      color: "$primary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>路基工程知识模块</strong></p>
+  - elementId: left-content
+    elementType: text
+    bounds: [80, 170, 530, 440]
+    content:
+      fontSize: 14
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.65
+      text: |
+        <p><strong style="color:$accent;">土石方调配模型</strong></p>
+        <p>• 挖填平衡计算 / 纵向调配 / 弃土场选址</p>
+        <p>• 经济运距分析 / 机械选型匹配</p>
+        <p style="margin-top:10px"><strong style="color:$accent;">爆破参数库</strong></p>
+        <p>• 孔网参数 / 装药结构 / 起爆方式</p>
+        <p>• 安全距离计算 / 振动控制标准</p>
+        <p style="margin-top:10px"><strong style="color:$accent;">边坡防护工艺</strong></p>
+        <p>• 锚索框架梁 / 锚杆框架梁 / 拱形骨架</p>
+        <p>• 抗滑桩 / 衬砌拱 / 植生板绿化</p>
+        <p style="margin-top:10px"><strong style="color:$accent;">排水系统模板</strong></p>
+        <p>• 边沟/排水沟/截水沟/急流槽</p>
+        <p>• 渗沟/盲沟/泄水孔</p>
+  - elementId: right-card
+    elementType: shape
+    bounds: [650, 110, 570, 520]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: right-icon
+    elementType: icon
+    bounds: [670, 125, 32, 32]
+    iconName: "fas:bridge-water"
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: right-title
+    elementType: text
+    bounds: [712, 128, 400, 26]
+    content:
+      fontSize: 20
+      color: "$primary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>桥涵工程知识模块</strong></p>
+  - elementId: right-content
+    elementType: text
+    bounds: [670, 170, 530, 440]
+    content:
+      fontSize: 14
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.65
+      text: |
+        <p><strong style="color:$accent;">桩基成孔方式选择</strong></p>
+        <p>• 冲击钻 / 旋挖钻 / 人工挖孔（水磨钻）</p>
+        <p>• 地质条件→成孔方式智能匹配逻辑</p>
+        <p style="margin-top:10px"><strong style="color:$accent;">下部结构施工</strong></p>
+        <p>• 圆柱墩/方墩翻模法 / 系梁盖梁支架法</p>
+        <p>• 模板规格库 / 混凝土浇筑工艺</p>
+        <p style="margin-top:10px"><strong style="color:$accent;">T梁预制架设</strong></p>
+        <p>• 梁场规划 / 台座设计 / 张拉压浆</p>
+        <p>• 架桥机选型 / 运梁线路规划</p>
+        <p style="margin-top:10px"><strong style="color:$accent;">现浇箱梁与涵洞</strong></p>
+        <p>• 满堂支架/少支架法 / 模板台车</p>
+        <p>• 盖板涵/箱涵/圆管涵施工工艺</p>
+  - elementId: bottom-line
+    elementType: shape
+    bounds: [60, 660, 1160, 2]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: page-num
+    elementType: text
+    bounds: [1190, 680, 50, 24]
+    content:
+      fontSize: 13
+      color: "$secondary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      align: [right, middle]
+      text: |
+        <p>12</p>

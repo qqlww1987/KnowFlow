@@ -1,0 +1,109 @@
+pageType: content
+background:
+  type: solid
+  color: "$background"
+elements:
+  - elementId: page-title
+    elementType: text
+    bounds: [60, 40, 900, 40]
+    content:
+      style: "$title"
+      wrap: false
+      text: |
+        <p><strong>施组文档16章结构全景与数据依赖图谱</strong></p>
+  - elementId: title-accent
+    elementType: shape
+    bounds: [60, 85, 40, 3]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: left-card
+    elementType: shape
+    bounds: [60, 110, 540, 530]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: left-title
+    elementType: text
+    bounds: [80, 125, 500, 28]
+    content:
+      fontSize: 18
+      color: "$primary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>文档16章结构（原文档目录）</strong></p>
+  - elementId: left-content
+    elementType: text
+    bounds: [80, 160, 500, 465]
+    content:
+      fontSize: 14
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.7
+      text: |
+        <p><span style="color:$accent;"><strong>一、项目概述</strong></span> — 项目概况 / 自然条件 / 工程概况</p>
+        <p><span style="color:$accent;"><strong>二、编制说明</strong></span> — 编制依据 / 编制原则 / 编制范围</p>
+        <p><span style="color:$accent;"><strong>三、施工总体部署</strong></span> — 目标 / 组织机构 / 项目布置 / 段落划分</p>
+        <p><span style="color:$accent;"><strong>四、总体施工安排</strong></span> — 施工顺序 / 首件工程 / 路基安排</p>
+        <p><span style="color:$accent;"><strong>五、施工总体计划</strong></span> — 进度 / 劳务 / 材料 / 设备 / 资金</p>
+        <p><span style="color:$accent;"><strong>六、重点难点及科研</strong></span> — 重难点分析 / 专项方案 / 四新技术</p>
+        <p><span style="color:$accent;"><strong>七、主要工程施工方案</strong></span> — 测量 / 路基 / 涵洞 / 桥梁 / 临电</p>
+        <p><span style="color:$accent;"><strong>八~十二、管理体系</strong></span> — 安全 / 职业健康 / 质量 / 环保 / 文明施工</p>
+        <p><span style="color:$accent;"><strong>十三~十六、其他</strong></span> — 季节性施工 / 党建 / 资金管理 / 信息化</p>
+  - elementId: right-card
+    elementType: shape
+    bounds: [620, 110, 600, 530]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: right-title
+    elementType: text
+    bounds: [640, 125, 560, 28]
+    content:
+      fontSize: 18
+      color: "$primary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>每章对应的核心数据源</strong></p>
+  - elementId: right-content
+    elementType: text
+    bounds: [640, 160, 560, 465]
+    content:
+      fontSize: 14
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.7
+      text: |
+        <p><strong style="color:$primary;">设计图纸类</strong></p>
+        <p>施工图设计文件、地勘报告、工程量清单</p>
+        <p style="margin-top:10px"><strong style="color:$primary;">合同文件类</strong></p>
+        <p>承包合同、招标文件、技术规范</p>
+        <p style="margin-top:10px"><strong style="color:$primary;">规范标准类</strong></p>
+        <p>JTG系列标准、企业标准化手册</p>
+        <p style="margin-top:10px"><strong style="color:$primary;">现场条件类</strong></p>
+        <p>踏勘报告、征地拆迁、材料调查、气象水文</p>
+        <p style="margin-top:10px"><strong style="color:$primary;">企业管理类</strong></p>
+        <p>组织机构模板、历史项目库、定额库</p>
+  - elementId: bottom-line
+    elementType: shape
+    bounds: [60, 660, 1160, 2]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: page-num
+    elementType: text
+    bounds: [1190, 680, 50, 24]
+    content:
+      fontSize: 13
+      color: "$secondary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      align: [right, middle]
+      text: |
+        <p>04</p>

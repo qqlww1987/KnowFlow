@@ -1,0 +1,189 @@
+pageType: content
+background:
+  type: solid
+  color: "$background"
+elements:
+  - elementId: page-title
+    elementType: text
+    bounds: [60, 40, 1000, 40]
+    content:
+      style: "$title"
+      wrap: false
+      text: |
+        <p><strong>工程技术知识库（II）：施工组织与资源配置</strong></p>
+  - elementId: title-accent
+    elementType: shape
+    bounds: [60, 85, 40, 3]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: col1-card
+    elementType: shape
+    bounds: [60, 110, 370, 250]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: col1-icon
+    elementType: icon
+    bounds: [80, 125, 32, 32]
+    iconName: "fas:calendar-days"
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: col1-title
+    elementType: text
+    bounds: [122, 128, 280, 26]
+    content:
+      fontSize: 18
+      color: "$primary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>进度计划编制规则</strong></p>
+  - elementId: col1-content
+    elementType: text
+    bounds: [80, 165, 330, 180]
+    content:
+      fontSize: 14
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.65
+      text: |
+        <p>• 网络计划（关键线路法CPM）</p>
+        <p>• 工序衔接逻辑与搭接关系</p>
+        <p>• 节点工期计算方法</p>
+        <p>• 季节性施工影响因素</p>
+        <p>• 进度偏差分析与调整规则</p>
+  - elementId: col2-card
+    elementType: shape
+    bounds: [450, 110, 370, 250]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: col2-icon
+    elementType: icon
+    bounds: [470, 125, 32, 32]
+    iconName: "fas:users-gear"
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: col2-title
+    elementType: text
+    bounds: [512, 128, 280, 26]
+    content:
+      fontSize: 18
+      color: "$primary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>资源配置模型</strong></p>
+  - elementId: col2-content
+    elementType: text
+    bounds: [470, 165, 330, 180]
+    content:
+      fontSize: 14
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.65
+      text: |
+        <p>• 劳动力需求曲线（S曲线）</p>
+        <p>• 设备进出场计划模板</p>
+        <p>• 材料供应计划编制规则</p>
+        <p>• 资金周转计划模型</p>
+        <p>• 企业定额消耗量标准</p>
+  - elementId: col3-card
+    elementType: shape
+    bounds: [840, 110, 380, 250]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: col3-icon
+    elementType: icon
+    bounds: [860, 125, 32, 32]
+    iconName: "fas:helmet-safety"
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: col3-title
+    elementType: text
+    bounds: [902, 128, 290, 26]
+    content:
+      fontSize: 18
+      color: "$primary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>安全质量环保体系</strong></p>
+  - elementId: col3-content
+    elementType: text
+    bounds: [860, 165, 340, 180]
+    content:
+      fontSize: 14
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.65
+      text: |
+        <p>• 安全管理制度与应急预案</p>
+        <p>• 质量保证体系与检验流程</p>
+        <p>• 环保水保措施模板</p>
+        <p>• 文明施工标准化要求</p>
+        <p>• 职业健康管理规范</p>
+  - elementId: bottom-card
+    elementType: shape
+    bounds: [60, 385, 1160, 240]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$primary"
+  - elementId: bottom-icon
+    elementType: icon
+    bounds: [90, 405, 36, 36]
+    iconName: "fas:wrench"
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: bottom-title
+    elementType: text
+    bounds: [140, 408, 500, 28]
+    content:
+      fontSize: 20
+      color: "#FFFFFF"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>临时设施布置规则库</strong></p>
+  - elementId: bottom-content
+    elementType: text
+    bounds: [90, 455, 1100, 145]
+    content:
+      fontSize: 15
+      color: "#FFFFFFCC"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.8
+      text: |
+        <p><span style="color:$accent;"><strong>项目驻地</strong></span>  选址原则（距工地距离/交通便利性/场地面积≥3000㎡）</p>
+        <p><span style="color:$accent;"><strong>拌合站</strong></span>  产能计算→设备选型（120型/180型）→环保设施配置</p>
+        <p><span style="color:$accent;"><strong>梁场</strong></span>  台座数量=日产量×养护周期 / 龙门吊跨度≥梁长+2m</p>
+        <p><span style="color:$accent;"><strong>施工便道</strong></span>  宽度≥4.5m / 纵坡≤10% / 与地方道路衔接方案</p>
+  - elementId: bottom-line
+    elementType: shape
+    bounds: [60, 660, 1160, 2]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: page-num
+    elementType: text
+    bounds: [1190, 680, 50, 24]
+    content:
+      fontSize: 13
+      color: "$secondary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      align: [right, middle]
+      text: |
+        <p>13</p>

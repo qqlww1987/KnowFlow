@@ -1,0 +1,128 @@
+pageType: content
+background:
+  type: solid
+  color: "$background"
+elements:
+  - elementId: page-title
+    elementType: text
+    bounds: [60, 40, 900, 40]
+    content:
+      style: "$title"
+      wrap: false
+      text: |
+        <p><strong>知识库总体架构：四层金字塔模型</strong></p>
+  - elementId: title-accent
+    elementType: shape
+    bounds: [60, 85, 40, 3]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: layer4
+    elementType: shape
+    bounds: [340, 110, 600, 100]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: layer4-text
+    elementType: text
+    bounds: [340, 110, 600, 100]
+    content:
+      fontSize: 20
+      color: "#FFFFFF"
+      fontFamily: "Liter, MiSans"
+      align: [center, middle]
+      text: |
+        <p><strong>④ 智能生成层</strong></p>
+        <p style="margin-top:4px"><span style="font-size:14px;">施组文档模板库 / 篇章结构知识 / 自动排版规则</span></p>
+  - elementId: layer3
+    elementType: shape
+    bounds: [240, 220, 800, 100]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "#4A5459"
+  - elementId: layer3-text
+    elementType: text
+    bounds: [240, 220, 800, 100]
+    content:
+      fontSize: 20
+      color: "#FFFFFF"
+      fontFamily: "Liter, MiSans"
+      align: [center, middle]
+      text: |
+        <p><strong>③ 工艺工法层</strong></p>
+        <p style="margin-top:4px"><span style="font-size:14px;">分项工程施工工艺库 / 专项方案模板库 / 质量通病防治库</span></p>
+  - elementId: layer2
+    elementType: shape
+    bounds: [140, 330, 1000, 100]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$primary"
+  - elementId: layer2-text
+    elementType: text
+    bounds: [140, 330, 1000, 100]
+    content:
+      fontSize: 20
+      color: "#FFFFFF"
+      fontFamily: "Liter, MiSans"
+      align: [center, middle]
+      text: |
+        <p><strong>② 企业知识层</strong></p>
+        <p style="margin-top:4px"><span style="font-size:14px;">企业定额库 / 工法库 / 历史项目知识库 / 管理制度库</span></p>
+  - elementId: layer1
+    elementType: shape
+    bounds: [60, 440, 1160, 100]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$darkBg"
+  - elementId: layer1-text
+    elementType: text
+    bounds: [60, 440, 1160, 100]
+    content:
+      fontSize: 20
+      color: "#FFFFFF"
+      fontFamily: "Liter, MiSans"
+      align: [center, middle]
+      text: |
+        <p><strong>① 基础规范层</strong></p>
+        <p style="margin-top:4px"><span style="font-size:14px;">国家技术标准 / 行业规范（JTG系列）/ 地方法规 / 强制性条文</span></p>
+  - elementId: note-card
+    elementType: shape
+    bounds: [60, 570, 1160, 60]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: note-text
+    elementType: text
+    bounds: [80, 575, 1120, 50]
+    content:
+      fontSize: 14
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      align: [center, middle]
+      lineHeight: 1.5
+      text: |
+        <p><strong style="color:$accent;">更新机制：</strong>基础规范层按年度更新 | 企业知识层按项目更新 | 工艺工法层按技术迭代更新 | 智能生成层按使用反馈持续优化</p>
+  - elementId: bottom-line
+    elementType: shape
+    bounds: [60, 660, 1160, 2]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: page-num
+    elementType: text
+    bounds: [1190, 680, 50, 24]
+    content:
+      fontSize: 13
+      color: "$secondary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      align: [right, middle]
+      text: |
+        <p>11</p>

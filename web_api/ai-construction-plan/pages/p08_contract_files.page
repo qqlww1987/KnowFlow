@@ -1,0 +1,150 @@
+pageType: content
+background:
+  type: solid
+  color: "$background"
+elements:
+  - elementId: page-title
+    elementType: text
+    bounds: [60, 40, 900, 40]
+    content:
+      style: "$title"
+      wrap: false
+      text: |
+        <p><strong>合同与组织类文件：施组框架的约束条件</strong></p>
+  - elementId: title-accent
+    elementType: shape
+    bounds: [60, 85, 40, 3]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: left-card
+    elementType: shape
+    bounds: [60, 110, 560, 260]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: left-icon
+    elementType: icon
+    bounds: [80, 125, 32, 32]
+    iconName: "fas:file-contract"
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: left-title
+    elementType: text
+    bounds: [122, 128, 300, 26]
+    content:
+      fontSize: 18
+      color: "$primary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>工程承包合同</strong></p>
+  - elementId: left-content
+    elementType: text
+    bounds: [80, 170, 520, 180]
+    content:
+      fontSize: 14
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.7
+      text: |
+        <p>• <strong>合同工期</strong>：明确开工/竣工日期及关键节点</p>
+        <p>• <strong>质量目标</strong>：合格率指标、品质工程创建要求</p>
+        <p>• <strong>安全目标</strong>：零死亡/零重伤等安全控制指标</p>
+        <p>• <strong>计价方式</strong>：清单计价/变更计价规则</p>
+        <p>• <strong>变更条款</strong>：变更程序/计价原则/审批权限</p>
+  - elementId: right-card
+    elementType: shape
+    bounds: [640, 110, 580, 260]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: right-icon
+    elementType: icon
+    bounds: [660, 125, 32, 32]
+    iconName: "fas:building"
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: right-title
+    elementType: text
+    bounds: [702, 128, 300, 26]
+    content:
+      fontSize: 18
+      color: "$primary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>企业标准化文件</strong></p>
+  - elementId: right-content
+    elementType: text
+    bounds: [660, 170, 540, 180]
+    content:
+      fontSize: 14
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.7
+      text: |
+        <p>• <strong>项目策划书</strong>：管理目标/经营目标/成本目标</p>
+        <p>• <strong>企业标准化手册</strong>：CI标准/管理流程/报表模板</p>
+        <p>• <strong>项目组织机构模板</strong>：部门设置/岗位职责/人员编制</p>
+        <p>• <strong>同类历史施组</strong>：知识复用的核心数据源</p>
+  - elementId: highlight-card
+    elementType: shape
+    bounds: [60, 395, 1160, 230]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$primary"
+  - elementId: highlight-icon
+    elementType: icon
+    bounds: [90, 415, 36, 36]
+    iconName: "fas:triangle-exclamation"
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: highlight-title
+    elementType: text
+    bounds: [140, 418, 500, 28]
+    content:
+      fontSize: 20
+      color: "#FFFFFF"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>这些文件构成AI生成的"约束边界"</strong></p>
+  - elementId: highlight-content
+    elementType: text
+    bounds: [90, 465, 1100, 140]
+    content:
+      fontSize: 15
+      color: "#FFFFFFCC"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.7
+      text: |
+        <p><span style="color:$accent;"><strong>时间约束</strong></span>  合同工期决定总体进度计划的编制逻辑，关键节点决定施工顺序安排</p>
+        <p><span style="color:$accent;"><strong>空间约束</strong></span>  项目驻地/拌合站/梁场/弃土场的选址受红线范围、环保要求和运距制约</p>
+        <p><span style="color:$accent;"><strong>资源约束</strong></span>  目标成本决定资源配置方案，企业定额决定人材机消耗量标准</p>
+        <p><span style="color:$accent;"><strong>制度约束</strong></span>  企业标准化手册决定文档格式、管理流程和报表体系的标准化输出</p>
+  - elementId: bottom-line
+    elementType: shape
+    bounds: [60, 660, 1160, 2]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: page-num
+    elementType: text
+    bounds: [1190, 680, 50, 24]
+    content:
+      fontSize: 13
+      color: "$secondary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      align: [right, middle]
+      text: |
+        <p>08</p>

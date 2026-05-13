@@ -1,0 +1,965 @@
+{
+  "schema_version": "1.0",
+  "description": "基于两份工艺工法的知识图谱示例数据",
+  "node_labels": [
+    "WorkMethod",
+    "ProcessStep",
+    "Material",
+    "Equipment",
+    "Specification",
+    "GeoCondition",
+    "Structure",
+    "Project"
+  ],
+  "relationship_types": [
+    "HAS_STEP",
+    "USES_MATERIAL",
+    "USES_EQUIPMENT",
+    "REFERS_TO",
+    "APPLIED_IN",
+    "SUITABLE_FOR",
+    "APPLIES_TO",
+    "HAS_PARAMETER",
+    "REQUIRES",
+    "COMPARES_TO",
+    "HAS_GEOLOGY",
+    "HAS_STRUCTURE"
+  ],
+  "nodes": [
+    {
+      "id": "WM-LJ-02-QY-001",
+      "label": "WorkMethod",
+      "properties": {
+        "name": "高水位沙性路基压密注浆加固施工工法",
+        "level": "企业级",
+        "category": "路基工程-地基处理",
+        "keywords": [
+          "压密注浆",
+          "高水位",
+          "沙性地基",
+          "软基处理"
+        ],
+        "efficiency": "噪音小、无震动",
+        "cost_comparison": "比高压旋喷每m³省85元"
+      }
+    },
+    {
+      "id": "WM-QL-05-SJ-C3-2025",
+      "label": "WorkMethod",
+      "properties": {
+        "name": "PC斜拉桥变宽主梁后支点挂篮施工工法",
+        "level": "省级",
+        "category": "桥梁工程-斜拉桥施工",
+        "keywords": [
+          "斜拉桥",
+          "变宽主梁",
+          "后支点挂篮",
+          "悬臂浇筑"
+        ],
+        "efficiency": "单节段12天，效率提升14%",
+        "innovation": "智能集中控制一机两泵四顶"
+      }
+    },
+    {
+      "id": "WM-QL-05-QY-ALT",
+      "label": "WorkMethod",
+      "properties": {
+        "name": "前支点挂篮施工工法",
+        "level": "传统工艺",
+        "category": "桥梁工程-斜拉桥施工",
+        "note": "后支点挂篮的对比替代方案"
+      }
+    },
+    {
+      "id": "PS-001-01",
+      "label": "ProcessStep",
+      "properties": {
+        "name": "施工准备",
+        "work_method": "WM-LJ-02-QY-001",
+        "seq": 1,
+        "key_points": "清除耕植土、回填沙、开挖沟槽集水坑"
+      }
+    },
+    {
+      "id": "PS-001-02",
+      "label": "ProcessStep",
+      "properties": {
+        "name": "测量放线",
+        "work_method": "WM-LJ-02-QY-001",
+        "seq": 2,
+        "key_points": "全站仪定位、偏差≤2cm"
+      }
+    },
+    {
+      "id": "PS-001-03",
+      "label": "ProcessStep",
+      "properties": {
+        "name": "原材料检验",
+        "work_method": "WM-LJ-02-QY-001",
+        "seq": 3,
+        "key_points": "水泥200t/批取样、外加剂按GB8076检测"
+      }
+    },
+    {
+      "id": "PS-001-04",
+      "label": "ProcessStep",
+      "properties": {
+        "name": "钻机就位",
+        "work_method": "WM-LJ-02-QY-001",
+        "seq": 4,
+        "key_points": "试验段确定浆比重、流量、提升速度"
+      }
+    },
+    {
+      "id": "PS-001-05",
+      "label": "ProcessStep",
+      "properties": {
+        "name": "水泥浆拌制",
+        "work_method": "WM-LJ-02-QY-001",
+        "seq": 5,
+        "key_points": "100m设制浆点、搅拌≥3min"
+      }
+    },
+    {
+      "id": "PS-001-06",
+      "label": "ProcessStep",
+      "properties": {
+        "name": "打孔",
+        "work_method": "WM-LJ-02-QY-001",
+        "seq": 6,
+        "key_points": "Φ25mm钻头、垂直偏差≤1%"
+      }
+    },
+    {
+      "id": "PS-001-07",
+      "label": "ProcessStep",
+      "properties": {
+        "name": "注浆",
+        "work_method": "WM-LJ-02-QY-001",
+        "seq": 7,
+        "key_points": "压力0.5-1.0MPa、跳孔梅花形、双控原则"
+      }
+    },
+    {
+      "id": "PS-001-08",
+      "label": "ProcessStep",
+      "properties": {
+        "name": "注浆结束",
+        "work_method": "WM-LJ-02-QY-001",
+        "seq": 8,
+        "key_points": "提管、清洗管路"
+      }
+    },
+    {
+      "id": "PS-002-01",
+      "label": "ProcessStep",
+      "properties": {
+        "name": "挂篮设计",
+        "work_method": "WM-QL-05-SJ-C3-2025",
+        "seq": 1,
+        "key_points": "后支点三角挂篮：主桁+行走+悬吊+锚固+底篮+平台+预埋件"
+      }
+    },
+    {
+      "id": "PS-002-02",
+      "label": "ProcessStep",
+      "properties": {
+        "name": "施工准备",
+        "work_method": "WM-QL-05-SJ-C3-2025",
+        "seq": 2,
+        "key_points": "方案编审、厂内探伤、主桁预压"
+      }
+    },
+    {
+      "id": "PS-002-03",
+      "label": "ProcessStep",
+      "properties": {
+        "name": "挂篮安装",
+        "work_method": "WM-QL-05-SJ-C3-2025",
+        "seq": 3,
+        "key_points": "塔吊+卷扬机拼装"
+      }
+    },
+    {
+      "id": "PS-002-04",
+      "label": "ProcessStep",
+      "properties": {
+        "name": "挂篮预压",
+        "work_method": "WM-QL-05-SJ-C3-2025",
+        "seq": 4,
+        "key_points": "水袋上挂下压、测定弹性变形"
+      }
+    },
+    {
+      "id": "PS-002-05",
+      "label": "ProcessStep",
+      "properties": {
+        "name": "钢筋及预应力管道施工",
+        "work_method": "WM-QL-05-SJ-C3-2025",
+        "seq": 5,
+        "key_points": "横隔梁→主梁→顶板顺序"
+      }
+    },
+    {
+      "id": "PS-002-06",
+      "label": "ProcessStep",
+      "properties": {
+        "name": "混凝土浇筑",
+        "work_method": "WM-QL-05-SJ-C3-2025",
+        "seq": 6,
+        "key_points": "大纵肋→横隔板→小纵肋及桥面板"
+      }
+    },
+    {
+      "id": "PS-002-07",
+      "label": "ProcessStep",
+      "properties": {
+        "name": "主梁预应力施工",
+        "work_method": "WM-QL-05-SJ-C3-2025",
+        "seq": 7,
+        "key_points": "先纵向后横向、智能张拉"
+      }
+    },
+    {
+      "id": "PS-002-08",
+      "label": "ProcessStep",
+      "properties": {
+        "name": "斜拉索张挂及终张",
+        "work_method": "WM-QL-05-SJ-C3-2025",
+        "seq": 8,
+        "key_points": "单根循环牵引、初张80%、终张100%"
+      }
+    },
+    {
+      "id": "PS-002-09",
+      "label": "ProcessStep",
+      "properties": {
+        "name": "挂篮行走",
+        "work_method": "WM-QL-05-SJ-C3-2025",
+        "seq": 9,
+        "key_points": "14步标准流程、智能集中控制"
+      }
+    },
+    {
+      "id": "MAT-001",
+      "label": "Material",
+      "properties": {
+        "name": "42.5R普通硅酸盐水泥",
+        "category": "胶凝材料",
+        "test_std": "JTGF801-2012",
+        "sampling_rule": "袋装≤200t/批，散装≤500t/批"
+      }
+    },
+    {
+      "id": "MAT-002",
+      "label": "Material",
+      "properties": {
+        "name": "粉煤灰",
+        "category": "掺合料"
+      }
+    },
+    {
+      "id": "MAT-003",
+      "label": "Material",
+      "properties": {
+        "name": "水玻璃（外加剂）",
+        "category": "外加剂",
+        "test_std": "GB8076-2008",
+        "function": "速凝"
+      }
+    },
+    {
+      "id": "MAT-004",
+      "label": "Material",
+      "properties": {
+        "name": "预应力钢绞线",
+        "category": "钢材",
+        "used_in": "斜拉桥主梁预应力"
+      }
+    },
+    {
+      "id": "MAT-005",
+      "label": "Material",
+      "properties": {
+        "name": "C50混凝土",
+        "category": "混凝土",
+        "used_in": "斜拉桥主梁浇筑"
+      }
+    },
+    {
+      "id": "EQ-001",
+      "label": "Equipment",
+      "properties": {
+        "name": "钻机注浆机",
+        "power": "45KW",
+        "function": "下钻送浆"
+      }
+    },
+    {
+      "id": "EQ-002",
+      "label": "Equipment",
+      "properties": {
+        "name": "压浆泵",
+        "model": "SYB50挤压式",
+        "pressure": "0.5-1.6MPa",
+        "function": "送浆"
+      }
+    },
+    {
+      "id": "EQ-003",
+      "label": "Equipment",
+      "properties": {
+        "name": "砂浆搅拌机",
+        "power": "2.2KW",
+        "function": "制浆"
+      }
+    },
+    {
+      "id": "EQ-004",
+      "label": "Equipment",
+      "properties": {
+        "name": "塔吊",
+        "model": "6024",
+        "function": "挂篮安装"
+      }
+    },
+    {
+      "id": "EQ-005",
+      "label": "Equipment",
+      "properties": {
+        "name": "智能集中控制系统",
+        "model": "一机两泵四顶",
+        "function": "挂篮行走控制",
+        "precision": "1mm"
+      }
+    },
+    {
+      "id": "EQ-006",
+      "label": "Equipment",
+      "properties": {
+        "name": "HBT90地泵",
+        "function": "混凝土浇筑"
+      }
+    },
+    {
+      "id": "EQ-007",
+      "label": "Equipment",
+      "properties": {
+        "name": "智能张拉机",
+        "function": "预应力张拉"
+      }
+    },
+    {
+      "id": "SPEC-001",
+      "label": "Specification",
+      "properties": {
+        "no": "JTGF801-2012",
+        "name": "公路工程质量检验评定标准",
+        "category": "质量检验"
+      }
+    },
+    {
+      "id": "SPEC-002",
+      "label": "Specification",
+      "properties": {
+        "no": "GB8076-2008",
+        "name": "混凝土外加剂规范",
+        "category": "材料标准"
+      }
+    },
+    {
+      "id": "SPEC-003",
+      "label": "Specification",
+      "properties": {
+        "no": "JGJ79-2012",
+        "name": "建筑地基处理技术规范",
+        "category": "地基处理",
+        "key_formula": "注浆量估算公式8.2.3-3"
+      }
+    },
+    {
+      "id": "SPEC-004",
+      "label": "Specification",
+      "properties": {
+        "no": "JTG/T 3650-2020",
+        "name": "公路桥涵施工技术规范",
+        "category": "施工技术"
+      }
+    },
+    {
+      "id": "SPEC-005",
+      "label": "Specification",
+      "properties": {
+        "no": "CJJ/T 281-2018",
+        "name": "桥梁悬臂浇筑施工技术标准",
+        "category": "专项技术"
+      }
+    },
+    {
+      "id": "SPEC-006",
+      "label": "Specification",
+      "properties": {
+        "no": "JTG F80/1-2017",
+        "name": "公路工程质量检验评定标准",
+        "category": "质量检验"
+      }
+    },
+    {
+      "id": "SPEC-007",
+      "label": "Specification",
+      "properties": {
+        "no": "GB50205-2020",
+        "name": "钢结构工程施工及验收规范",
+        "category": "钢结构"
+      }
+    },
+    {
+      "id": "SPEC-008",
+      "label": "Specification",
+      "properties": {
+        "no": "JGJ46-2005",
+        "name": "施工现场临时用电安全技术规范",
+        "category": "安全"
+      }
+    },
+    {
+      "id": "GEO-001",
+      "label": "GeoCondition",
+      "properties": {
+        "name": "海陆交汇区域沙性地质",
+        "features": "地下水位高、流沙严重、中砂层",
+        "soil_type": "沙性土",
+        "water_table": "高"
+      }
+    },
+    {
+      "id": "GEO-002",
+      "label": "GeoCondition",
+      "properties": {
+        "name": "半流态中细沙质土体",
+        "features": "松、散、软",
+        "soil_type": "细砂",
+        "state": "半流态"
+      }
+    },
+    {
+      "id": "GEO-003",
+      "label": "GeoCondition",
+      "properties": {
+        "name": "黏土地基（排水条件）",
+        "features": "有排水条件",
+        "soil_type": "黏土"
+      }
+    },
+    {
+      "id": "STR-001",
+      "label": "Structure",
+      "properties": {
+        "name": "路基",
+        "category": "路基工程",
+        "subcategory": "地基加固区域"
+      }
+    },
+    {
+      "id": "STR-002",
+      "label": "Structure",
+      "properties": {
+        "name": "PC斜拉桥",
+        "category": "桥梁工程",
+        "span_type": "大跨度",
+        "deck_width": "变宽36.2m-37.496m"
+      }
+    },
+    {
+      "id": "STR-003",
+      "label": "Structure",
+      "properties": {
+        "name": "双纵肋主梁",
+        "category": "主梁结构",
+        "rib_height": "2.7m",
+        "rib_width": "2.2m"
+      }
+    },
+    {
+      "id": "STR-004",
+      "label": "Structure",
+      "properties": {
+        "name": "半漂浮体系斜拉桥",
+        "category": "结构体系",
+        "features": "塔梁阻尼器+竖向支座"
+      }
+    },
+    {
+      "id": "PRJ-001",
+      "label": "Project",
+      "properties": {
+        "name": "福清市江阴张厝片区填海造地项目",
+        "location": "福建省福清市",
+        "cost": "1557万元",
+        "period": "2013.1-2013.10",
+        "scale": "压密注浆5500㎡"
+      }
+    },
+    {
+      "id": "PRJ-002",
+      "label": "Project",
+      "properties": {
+        "name": "泉州台商投资区东西主干道拓改工程",
+        "location": "福建省泉州市",
+        "cost": "13500万元",
+        "period": "2012.8-2013.12"
+      }
+    },
+    {
+      "id": "PRJ-003",
+      "label": "Project",
+      "properties": {
+        "name": "宜金高速XJ1标中都河特大桥",
+        "location": "四川省",
+        "main_span": "148+320+148m",
+        "total_length": "1009m",
+        "output_value": "1.02亿元",
+        "savings": "181.48万元"
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "from": "WM-LJ-02-QY-001",
+      "to": "PS-001-01",
+      "type": "HAS_STEP",
+      "properties": {
+        "seq": 1
+      }
+    },
+    {
+      "from": "WM-LJ-02-QY-001",
+      "to": "PS-001-02",
+      "type": "HAS_STEP",
+      "properties": {
+        "seq": 2
+      }
+    },
+    {
+      "from": "WM-LJ-02-QY-001",
+      "to": "PS-001-03",
+      "type": "HAS_STEP",
+      "properties": {
+        "seq": 3
+      }
+    },
+    {
+      "from": "WM-LJ-02-QY-001",
+      "to": "PS-001-04",
+      "type": "HAS_STEP",
+      "properties": {
+        "seq": 4
+      }
+    },
+    {
+      "from": "WM-LJ-02-QY-001",
+      "to": "PS-001-05",
+      "type": "HAS_STEP",
+      "properties": {
+        "seq": 5
+      }
+    },
+    {
+      "from": "WM-LJ-02-QY-001",
+      "to": "PS-001-06",
+      "type": "HAS_STEP",
+      "properties": {
+        "seq": 6
+      }
+    },
+    {
+      "from": "WM-LJ-02-QY-001",
+      "to": "PS-001-07",
+      "type": "HAS_STEP",
+      "properties": {
+        "seq": 7
+      }
+    },
+    {
+      "from": "WM-LJ-02-QY-001",
+      "to": "PS-001-08",
+      "type": "HAS_STEP",
+      "properties": {
+        "seq": 8
+      }
+    },
+    {
+      "from": "WM-QL-05-SJ-C3-2025",
+      "to": "PS-002-01",
+      "type": "HAS_STEP",
+      "properties": {
+        "seq": 1
+      }
+    },
+    {
+      "from": "WM-QL-05-SJ-C3-2025",
+      "to": "PS-002-02",
+      "type": "HAS_STEP",
+      "properties": {
+        "seq": 2
+      }
+    },
+    {
+      "from": "WM-QL-05-SJ-C3-2025",
+      "to": "PS-002-03",
+      "type": "HAS_STEP",
+      "properties": {
+        "seq": 3
+      }
+    },
+    {
+      "from": "WM-QL-05-SJ-C3-2025",
+      "to": "PS-002-04",
+      "type": "HAS_STEP",
+      "properties": {
+        "seq": 4
+      }
+    },
+    {
+      "from": "WM-QL-05-SJ-C3-2025",
+      "to": "PS-002-05",
+      "type": "HAS_STEP",
+      "properties": {
+        "seq": 5
+      }
+    },
+    {
+      "from": "WM-QL-05-SJ-C3-2025",
+      "to": "PS-002-06",
+      "type": "HAS_STEP",
+      "properties": {
+        "seq": 6
+      }
+    },
+    {
+      "from": "WM-QL-05-SJ-C3-2025",
+      "to": "PS-002-07",
+      "type": "HAS_STEP",
+      "properties": {
+        "seq": 7
+      }
+    },
+    {
+      "from": "WM-QL-05-SJ-C3-2025",
+      "to": "PS-002-08",
+      "type": "HAS_STEP",
+      "properties": {
+        "seq": 8
+      }
+    },
+    {
+      "from": "WM-QL-05-SJ-C3-2025",
+      "to": "PS-002-09",
+      "type": "HAS_STEP",
+      "properties": {
+        "seq": 9
+      }
+    },
+    {
+      "from": "WM-LJ-02-QY-001",
+      "to": "MAT-001",
+      "type": "USES_MATERIAL",
+      "properties": {
+        "usage": "注浆主料",
+        "spec": "42.5R"
+      }
+    },
+    {
+      "from": "WM-LJ-02-QY-001",
+      "to": "MAT-002",
+      "type": "USES_MATERIAL",
+      "properties": {
+        "usage": "掺合料"
+      }
+    },
+    {
+      "from": "WM-LJ-02-QY-001",
+      "to": "MAT-003",
+      "type": "USES_MATERIAL",
+      "properties": {
+        "usage": "速凝剂",
+        "note": "解决高水位浆液流失"
+      }
+    },
+    {
+      "from": "WM-QL-05-SJ-C3-2025",
+      "to": "MAT-004",
+      "type": "USES_MATERIAL",
+      "properties": {
+        "usage": "主梁预应力"
+      }
+    },
+    {
+      "from": "WM-QL-05-SJ-C3-2025",
+      "to": "MAT-005",
+      "type": "USES_MATERIAL",
+      "properties": {
+        "usage": "主梁混凝土"
+      }
+    },
+    {
+      "from": "WM-LJ-02-QY-001",
+      "to": "EQ-001",
+      "type": "USES_EQUIPMENT",
+      "properties": {
+        "quantity_rule": "根据工程量确定"
+      }
+    },
+    {
+      "from": "WM-LJ-02-QY-001",
+      "to": "EQ-002",
+      "type": "USES_EQUIPMENT"
+    },
+    {
+      "from": "WM-LJ-02-QY-001",
+      "to": "EQ-003",
+      "type": "USES_EQUIPMENT"
+    },
+    {
+      "from": "WM-QL-05-SJ-C3-2025",
+      "to": "EQ-004",
+      "type": "USES_EQUIPMENT",
+      "properties": {
+        "quantity": "2台"
+      }
+    },
+    {
+      "from": "WM-QL-05-SJ-C3-2025",
+      "to": "EQ-005",
+      "type": "USES_EQUIPMENT",
+      "properties": {
+        "note": "核心创新设备"
+      }
+    },
+    {
+      "from": "WM-QL-05-SJ-C3-2025",
+      "to": "EQ-006",
+      "type": "USES_EQUIPMENT",
+      "properties": {
+        "quantity": "2台"
+      }
+    },
+    {
+      "from": "WM-QL-05-SJ-C3-2025",
+      "to": "EQ-007",
+      "type": "USES_EQUIPMENT"
+    },
+    {
+      "from": "WM-LJ-02-QY-001",
+      "to": "SPEC-001",
+      "type": "REFERS_TO",
+      "properties": {
+        "purpose": "原材料检测/质量控制"
+      }
+    },
+    {
+      "from": "WM-LJ-02-QY-001",
+      "to": "SPEC-002",
+      "type": "REFERS_TO",
+      "properties": {
+        "purpose": "外加剂检测"
+      }
+    },
+    {
+      "from": "WM-LJ-02-QY-001",
+      "to": "SPEC-003",
+      "type": "REFERS_TO",
+      "properties": {
+        "purpose": "注浆量计算"
+      }
+    },
+    {
+      "from": "WM-QL-05-SJ-C3-2025",
+      "to": "SPEC-004",
+      "type": "REFERS_TO"
+    },
+    {
+      "from": "WM-QL-05-SJ-C3-2025",
+      "to": "SPEC-005",
+      "type": "REFERS_TO",
+      "properties": {
+        "purpose": "核心参考标准"
+      }
+    },
+    {
+      "from": "WM-QL-05-SJ-C3-2025",
+      "to": "SPEC-006",
+      "type": "REFERS_TO"
+    },
+    {
+      "from": "WM-QL-05-SJ-C3-2025",
+      "to": "SPEC-007",
+      "type": "REFERS_TO"
+    },
+    {
+      "from": "WM-LJ-02-QY-001",
+      "to": "GEO-001",
+      "type": "SUITABLE_FOR",
+      "properties": {
+        "match_degree": "核心适用",
+        "note": "针对此地质研发"
+      }
+    },
+    {
+      "from": "WM-LJ-02-QY-001",
+      "to": "GEO-002",
+      "type": "SUITABLE_FOR",
+      "properties": {
+        "match_degree": "适用"
+      }
+    },
+    {
+      "from": "WM-LJ-02-QY-001",
+      "to": "GEO-003",
+      "type": "SUITABLE_FOR",
+      "properties": {
+        "match_degree": "有条件适用",
+        "condition": "需有排水条件"
+      }
+    },
+    {
+      "from": "WM-LJ-02-QY-001",
+      "to": "STR-001",
+      "type": "APPLIES_TO"
+    },
+    {
+      "from": "WM-QL-05-SJ-C3-2025",
+      "to": "STR-002",
+      "type": "APPLIES_TO",
+      "properties": {
+        "match_degree": "核心适用"
+      }
+    },
+    {
+      "from": "WM-QL-05-SJ-C3-2025",
+      "to": "STR-003",
+      "type": "APPLIES_TO"
+    },
+    {
+      "from": "WM-QL-05-SJ-C3-2025",
+      "to": "STR-004",
+      "type": "APPLIES_TO"
+    },
+    {
+      "from": "WM-LJ-02-QY-001",
+      "to": "PRJ-001",
+      "type": "APPLIED_IN",
+      "properties": {
+        "effect": "优良",
+        "saving": "163.6万元"
+      }
+    },
+    {
+      "from": "WM-LJ-02-QY-001",
+      "to": "PRJ-002",
+      "type": "APPLIED_IN",
+      "properties": {
+        "effect": "按期完成"
+      }
+    },
+    {
+      "from": "WM-QL-05-SJ-C3-2025",
+      "to": "PRJ-003",
+      "type": "APPLIED_IN",
+      "properties": {
+        "effect": "无安全质量问题",
+        "saving": "181.48万元",
+        "efficiency_up": "14%"
+      }
+    },
+    {
+      "from": "WM-QL-05-SJ-C3-2025",
+      "to": "WM-QL-05-QY-ALT",
+      "type": "COMPARES_TO",
+      "properties": {
+        "comparison_dimension": "施工效率/安全性/适用性",
+        "this_advantage": "工序简单、一次调索、变宽段无行走难题",
+        "alternative_advantage": "技术成熟、拉索作用充分发挥"
+      }
+    },
+    {
+      "from": "PS-001-04",
+      "to": "EQ-001",
+      "type": "REQUIRES"
+    },
+    {
+      "from": "PS-001-05",
+      "to": "EQ-003",
+      "type": "REQUIRES"
+    },
+    {
+      "from": "PS-001-07",
+      "to": "EQ-002",
+      "type": "REQUIRES"
+    },
+    {
+      "from": "PS-002-03",
+      "to": "EQ-004",
+      "type": "REQUIRES"
+    },
+    {
+      "from": "PS-002-09",
+      "to": "EQ-005",
+      "type": "REQUIRES",
+      "properties": {
+        "note": "核心依赖设备"
+      }
+    },
+    {
+      "from": "PRJ-001",
+      "to": "GEO-001",
+      "type": "HAS_GEOLOGY",
+      "properties": {
+        "detail": "人工填筑层+中砂层，厚1.8-12.1m"
+      }
+    },
+    {
+      "from": "PRJ-002",
+      "to": "GEO-001",
+      "type": "HAS_GEOLOGY",
+      "properties": {
+        "detail": "海陆交汇区域半流态中细沙"
+      }
+    },
+    {
+      "from": "PRJ-003",
+      "to": "STR-002",
+      "type": "HAS_STRUCTURE",
+      "properties": {
+        "detail": "148+320+148m PC斜拉桥"
+      }
+    }
+  ],
+  "statistics": {
+    "total_nodes": 50,
+    "total_relationships": 55,
+    "node_distribution": {
+      "WorkMethod": 3,
+      "ProcessStep": 17,
+      "Material": 5,
+      "Equipment": 7,
+      "Specification": 8,
+      "GeoCondition": 3,
+      "Structure": 4,
+      "Project": 3
+    },
+    "relationship_distribution": {
+      "HAS_STEP": 17,
+      "USES_MATERIAL": 5,
+      "USES_EQUIPMENT": 7,
+      "REFERS_TO": 7,
+      "SUITABLE_FOR": 3,
+      "APPLIES_TO": 4,
+      "APPLIED_IN": 3,
+      "COMPARES_TO": 1,
+      "REQUIRES": 5,
+      "HAS_GEOLOGY": 2,
+      "HAS_STRUCTURE": 1
+    }
+  }
+}

@@ -1,0 +1,303 @@
+pageType: content
+background:
+  type: solid
+  color: "$background"
+elements:
+  - elementId: page-title
+    elementType: text
+    bounds: [60, 40, 1000, 40]
+    content:
+      style: "$title"
+      wrap: false
+      text: |
+        <p><strong>生成流程五步法：从原始文件到完整施组的技术路线</strong></p>
+  - elementId: title-accent
+    elementType: shape
+    bounds: [60, 85, 40, 3]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: step1-bg
+    elementType: shape
+    bounds: [60, 110, 220, 300]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: step1-badge
+    elementType: shape
+    bounds: [60, 110, 220, 50]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: step1-badge-text
+    elementType: text
+    bounds: [60, 110, 220, 50]
+    content:
+      fontSize: 16
+      color: "#FFFFFF"
+      fontFamily: "Liter, MiSans"
+      align: [center, middle]
+      wrap: false
+      text: |
+        <p><strong>STEP 1 数据提取</strong></p>
+  - elementId: step1-content
+    elementType: text
+    bounds: [75, 175, 190, 235]
+    content:
+      fontSize: 13
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.65
+      text: |
+        <p><strong style="color:$primary;">输入</strong></p>
+        <p>设计图纸/地勘报告/合同文件/现场踏勘报告</p>
+        <p style="margin-top:8px"><strong style="color:$primary;">处理</strong></p>
+        <p>OCR识别/表格提取/BIM导出/实体标注</p>
+        <p style="margin-top:8px"><strong style="color:$primary;">输出</strong></p>
+        <p>结构化工程数据JSON</p>
+  - elementId: arrow1
+    elementType: shape
+    bounds: [280, 250, 25, 0]
+    shapeName: straightConnector1
+    arrow: [null, "arrow"]
+    border: {style: solid, width: 2, color: "$accent"}
+  - elementId: step2-bg
+    elementType: shape
+    bounds: [305, 110, 220, 300]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: step2-badge
+    elementType: shape
+    bounds: [305, 110, 220, 50]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$primary"
+  - elementId: step2-badge-text
+    elementType: text
+    bounds: [305, 110, 220, 50]
+    content:
+      fontSize: 16
+      color: "#FFFFFF"
+      fontFamily: "Liter, MiSans"
+      align: [center, middle]
+      wrap: false
+      text: |
+        <p><strong>STEP 2 知识检索</strong></p>
+  - elementId: step2-content
+    elementType: text
+    bounds: [320, 175, 190, 235]
+    content:
+      fontSize: 13
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.65
+      text: |
+        <p><strong style="color:$primary;">输入</strong></p>
+        <p>结构化工程数据 + 工程类型特征</p>
+        <p style="margin-top:8px"><strong style="color:$primary;">处理</strong></p>
+        <p>向量检索/知识图谱查询/规范匹配</p>
+        <p style="margin-top:8px"><strong style="color:$primary;">输出</strong></p>
+        <p>关联工艺工法/方案模板</p>
+  - elementId: arrow2
+    elementType: shape
+    bounds: [525, 250, 25, 0]
+    shapeName: straightConnector1
+    arrow: [null, "arrow"]
+    border: {style: solid, width: 2, color: "$accent"}
+  - elementId: step3-bg
+    elementType: shape
+    bounds: [550, 110, 220, 300]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: step3-badge
+    elementType: shape
+    bounds: [550, 110, 220, 50]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$primary"
+  - elementId: step3-badge-text
+    elementType: text
+    bounds: [550, 110, 220, 50]
+    content:
+      fontSize: 16
+      color: "#FFFFFF"
+      fontFamily: "Liter, MiSans"
+      align: [center, middle]
+      wrap: false
+      text: |
+        <p><strong>STEP 3 智能规划</strong></p>
+  - elementId: step3-content
+    elementType: text
+    bounds: [565, 175, 190, 235]
+    content:
+      fontSize: 13
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.65
+      text: |
+        <p><strong style="color:$primary;">输入</strong></p>
+        <p>工程数据 + 检索知识 + 合同约束</p>
+        <p style="margin-top:8px"><strong style="color:$primary;">处理</strong></p>
+        <p>多Agent协同：大纲生成/章节编排/内容框架</p>
+        <p style="margin-top:8px"><strong style="color:$primary;">输出</strong></p>
+        <p>完整文档大纲+内容框架</p>
+  - elementId: arrow3
+    elementType: shape
+    bounds: [770, 250, 25, 0]
+    shapeName: straightConnector1
+    arrow: [null, "arrow"]
+    border: {style: solid, width: 2, color: "$accent"}
+  - elementId: step4-bg
+    elementType: shape
+    bounds: [795, 110, 220, 300]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: step4-badge
+    elementType: shape
+    bounds: [795, 110, 220, 50]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$primary"
+  - elementId: step4-badge-text
+    elementType: text
+    bounds: [795, 110, 220, 50]
+    content:
+      fontSize: 16
+      color: "#FFFFFF"
+      fontFamily: "Liter, MiSans"
+      align: [center, middle]
+      wrap: false
+      text: |
+        <p><strong>STEP 4 内容生成</strong></p>
+  - elementId: step4-content
+    elementType: text
+    bounds: [810, 175, 190, 235]
+    content:
+      fontSize: 13
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.65
+      text: |
+        <p><strong style="color:$primary;">输入</strong></p>
+        <p>大纲框架 + 知识片段 + 计算结果</p>
+        <p style="margin-top:8px"><strong style="color:$primary;">处理</strong></p>
+        <p>LLM分章节并行生成/图表自动绘制</p>
+        <p style="margin-top:8px"><strong style="color:$primary;">输出</strong></p>
+        <p>16章完整施组初稿</p>
+  - elementId: arrow4
+    elementType: shape
+    bounds: [1015, 250, 25, 0]
+    shapeName: straightConnector1
+    arrow: [null, "arrow"]
+    border: {style: solid, width: 2, color: "$accent"}
+  - elementId: step5-bg
+    elementType: shape
+    bounds: [1040, 110, 180, 300]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: step5-badge
+    elementType: shape
+    bounds: [1040, 110, 180, 50]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: step5-badge-text
+    elementType: text
+    bounds: [1040, 110, 180, 50]
+    content:
+      fontSize: 16
+      color: "#FFFFFF"
+      fontFamily: "Liter, MiSans"
+      align: [center, middle]
+      wrap: false
+      text: |
+        <p><strong>STEP 5 校验输出</strong></p>
+  - elementId: step5-content
+    elementType: text
+    bounds: [1055, 175, 150, 220]
+    content:
+      fontSize: 13
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.65
+      text: |
+        <p><strong style="color:$primary;">校验项</strong></p>
+        <p>工程量一致性/规范引用/逻辑冲突/排版格式</p>
+        <p style="margin-top:8px"><strong style="color:$primary;">输出</strong></p>
+        <p>审核通过的标准化施组文档</p>
+  - elementId: bottom-highlight
+    elementType: shape
+    bounds: [60, 435, 1160, 200]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$primary"
+  - elementId: bottom-title
+    elementType: text
+    bounds: [90, 450, 500, 28]
+    content:
+      fontSize: 18
+      color: "#FFFFFF"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>关键技术挑战与对策</strong></p>
+  - elementId: bottom-content
+    elementType: text
+    bounds: [90, 490, 540, 125]
+    content:
+      fontSize: 13
+      color: "#FFFFFFCC"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.65
+      text: |
+        <p><span style="color:$accent;"><strong>图纸解析</strong></span>  CAD/PDF图纸→结构化数据，需专用OCR+几何识别</p>
+        <p><span style="color:$accent;"><strong>工程量一致性</strong></span>  设计图/清单/施组三处数据交叉校验</p>
+        <p><span style="color:$accent;"><strong>工艺匹配</strong></span>  地质条件+结构类型→施工方法智能决策</p>
+        <p><span style="color:$accent;"><strong>规范引用</strong></span>  自动生成规范引用清单，确保版本有效性</p>
+  - elementId: bottom-content2
+    elementType: text
+    bounds: [660, 490, 540, 125]
+    content:
+      fontSize: 13
+      color: "#FFFFFFCC"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.65
+      text: |
+        <p><span style="color:$accent;"><strong>章节衔接</strong></span>  施工部署→技术方案→资源配置的逻辑闭环</p>
+        <p><span style="color:$accent;"><strong>数据安全</strong></span>  工程数据本地化处理，涉密内容隔离</p>
+        <p><span style="color:$accent;"><strong>人工审核</strong></span>  人机协作：AI生成→专家确认→持续优化</p>
+        <p><span style="color:$accent;"><strong>版本管理</strong></span>  设计变更→施组自动修订追踪</p>
+  - elementId: bottom-line
+    elementType: shape
+    bounds: [60, 660, 1160, 2]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: page-num
+    elementType: text
+    bounds: [1190, 680, 50, 24]
+    content:
+      fontSize: 13
+      color: "$secondary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      align: [right, middle]
+      text: |
+        <p>17</p>

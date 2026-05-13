@@ -1,0 +1,50 @@
+pageType: final
+background:
+  type: image
+  src: "/mnt/agents/output/ai-construction-plan/images/interchange.png"
+  fit: {mode: cover}
+  mask:
+    type: gradient
+    gradientType: linear
+    angle: 0
+    stops:
+      - {position: 0, color: "#1E2426E6"}
+      - {position: 0.5, color: "#1E2426CC"}
+      - {position: 1, color: "#1E242680"}
+elements:
+  - elementId: accent-line
+    elementType: shape
+    bounds: [80, 260, 80, 3]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: main-text
+    elementType: text
+    bounds: [80, 280, 900, 140]
+    content:
+      fontSize: 36
+      color: "#FFFFFF"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.4
+      text: |
+        <p><strong>让AI成为造价工程师的</strong></p>
+        <p><strong>智能助手</strong></p>
+  - elementId: sub-text
+    elementType: text
+    bounds: [80, 440, 800, 100]
+    content:
+      fontSize: 18
+      color: "#FFFFFFAA"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.7
+      text: |
+        <p>AI不会取代造价工程师，但善用AI的造价工程师将更具竞争力</p>
+        <p>从"重复编写"走向"智能决策"，从"经验传承"走向"知识沉淀"</p>
+  - elementId: bottom-line
+    elementType: shape
+    bounds: [80, 650, 1120, 1]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "#FFFFFF30"

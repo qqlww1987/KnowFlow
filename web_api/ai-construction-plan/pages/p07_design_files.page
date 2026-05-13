@@ -1,0 +1,183 @@
+pageType: content
+background:
+  type: solid
+  color: "$background"
+elements:
+  - elementId: page-title
+    elementType: text
+    bounds: [60, 40, 900, 40]
+    content:
+      style: "$title"
+      wrap: false
+      text: |
+        <p><strong>设计类原始文件：施组生成的核心数据底座</strong></p>
+  - elementId: title-accent
+    elementType: shape
+    bounds: [60, 85, 40, 3]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: col1-card
+    elementType: shape
+    bounds: [60, 110, 370, 250]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: col1-icon
+    elementType: icon
+    bounds: [80, 125, 32, 32]
+    iconName: "fas:file-shield"
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: col1-title
+    elementType: text
+    bounds: [122, 128, 280, 26]
+    content:
+      fontSize: 18
+      color: "$primary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>施工图设计文件</strong></p>
+  - elementId: col1-content
+    elementType: text
+    bounds: [80, 168, 330, 175]
+    content:
+      fontSize: 14
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.7
+      text: |
+        <p>• 路线设计图（平纵断面）</p>
+        <p>• 路基工程设计图</p>
+        <p>• 路面结构设计图</p>
+        <p>• 桥涵结构施工图</p>
+        <p>• 交叉工程设计图</p>
+        <p>• 沿线设施布置图</p>
+  - elementId: col2-card
+    elementType: shape
+    bounds: [450, 110, 370, 250]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: col2-icon
+    elementType: icon
+    bounds: [470, 125, 32, 32]
+    iconName: "fas:mountain"
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: col2-title
+    elementType: text
+    bounds: [512, 128, 280, 26]
+    content:
+      fontSize: 18
+      color: "$primary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>地质勘察报告</strong></p>
+  - elementId: col2-content
+    elementType: text
+    bounds: [470, 168, 330, 175]
+    content:
+      fontSize: 14
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.7
+      text: |
+        <p>• 工程地质条件评价</p>
+        <p>• 水文地质分析</p>
+        <p>• 不良地质分布（岩溶/采空区）</p>
+        <p>• 特殊性岩土（软土/填土）</p>
+        <p>• 地震烈度与地震动参数</p>
+  - elementId: col3-card
+    elementType: shape
+    bounds: [840, 110, 380, 250]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: col3-icon
+    elementType: icon
+    bounds: [860, 125, 32, 32]
+    iconName: "fas:list-check"
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: col3-title
+    elementType: text
+    bounds: [902, 128, 290, 26]
+    content:
+      fontSize: 18
+      color: "$primary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>工程量清单</strong></p>
+  - elementId: col3-content
+    elementType: text
+    bounds: [860, 168, 340, 175]
+    content:
+      fontSize: 14
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.7
+      text: |
+        <p>• 路基土石方分项工程量</p>
+        <p>• 防护排水工程量</p>
+        <p>• 桥涵结构物工程量</p>
+        <p>• 路面工程工程量</p>
+        <p>• 沿线设施工程量</p>
+  - elementId: bottom-card
+    elementType: shape
+    bounds: [60, 385, 1160, 245]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$primary"
+  - elementId: bottom-title
+    elementType: text
+    bounds: [90, 400, 500, 28]
+    content:
+      fontSize: 18
+      color: "#FFFFFF"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>AI需从中提取的关键数据字段</strong></p>
+  - elementId: bottom-content
+    elementType: text
+    bounds: [90, 440, 1100, 170]
+    content:
+      fontSize: 14
+      color: "#FFFFFFCC"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.8
+      text: |
+        <p><span style="color:$accent;"><strong>结构参数</strong></span> — 桥梁跨径组合 / 墩柱类型与尺寸 / 桩径桩长 / 梁型与片数 / 涵洞孔径</p>
+        <p><span style="color:$accent;"><strong>材料参数</strong></span> — 混凝土标号与方量 / 钢筋规格与用量 / 钢绞线规格 / 水泥/粉煤灰用量</p>
+        <p><span style="color:$accent;"><strong>地质参数</strong></span> — 地层分布 / 岩石强度 / 地下水位 / 不良地质位置与范围</p>
+        <p><span style="color:$accent;"><strong>路线参数</strong></span> — 起讫桩号 / 路线长度 / 平曲线半径 / 纵坡 / 路基宽度</p>
+  - elementId: bottom-line
+    elementType: shape
+    bounds: [60, 660, 1160, 2]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: page-num
+    elementType: text
+    bounds: [1190, 680, 50, 24]
+    content:
+      fontSize: 13
+      color: "$secondary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      align: [right, middle]
+      text: |
+        <p>07</p>

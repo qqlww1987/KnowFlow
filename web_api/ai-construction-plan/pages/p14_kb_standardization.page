@@ -1,0 +1,274 @@
+pageType: content
+background:
+  type: solid
+  color: "$background"
+elements:
+  - elementId: page-title
+    elementType: text
+    bounds: [60, 40, 1000, 40]
+    content:
+      style: "$title"
+      wrap: false
+      text: |
+        <p><strong>知识库标准化：让AI"读懂"工程语言的关键</strong></p>
+  - elementId: title-accent
+    elementType: shape
+    bounds: [60, 85, 40, 3]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: step1-card
+    elementType: shape
+    bounds: [60, 110, 280, 370]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: step1-num
+    elementType: text
+    bounds: [75, 120, 60, 50]
+    content:
+      fontSize: 36
+      color: "$accent"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>01</strong></p>
+  - elementId: step1-title
+    elementType: text
+    bounds: [75, 172, 250, 26]
+    content:
+      fontSize: 18
+      color: "$primary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>结构化处理</strong></p>
+  - elementId: step1-line
+    elementType: shape
+    bounds: [75, 204, 40, 2]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: step1-content
+    elementType: text
+    bounds: [75, 218, 250, 245]
+    content:
+      fontSize: 14
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.65
+      text: |
+        <p>将非结构化历史施组转化为结构化数据</p>
+        <p style="margin-top:8px"><strong>输出格式：</strong></p>
+        <p>JSON / XML</p>
+        <p style="margin-top:8px"><strong>四维关联：</strong></p>
+        <p>工程量 ↔ 工序</p>
+        <p>工序 ↔ 资源</p>
+        <p>资源 ↔ 进度</p>
+  - elementId: step2-card
+    elementType: shape
+    bounds: [360, 110, 280, 370]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: step2-num
+    elementType: text
+    bounds: [375, 120, 70, 50]
+    content:
+      fontSize: 36
+      color: "$accent"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>02</strong></p>
+  - elementId: step2-title
+    elementType: text
+    bounds: [375, 172, 250, 26]
+    content:
+      fontSize: 18
+      color: "$primary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>实体标注</strong></p>
+  - elementId: step2-line
+    elementType: shape
+    bounds: [375, 204, 40, 2]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: step2-content
+    elementType: text
+    bounds: [375, 218, 250, 245]
+    content:
+      fontSize: 14
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.65
+      text: |
+        <p>对工程实体进行标准化编码体系</p>
+        <p style="margin-top:8px"><strong>编码维度：</strong></p>
+        <p>桥梁（QL-001）</p>
+        <p>路基（LJ-K62+300）</p>
+        <p>互通（HT-翁贡）</p>
+        <p style="margin-top:8px"><strong>属性标注：</strong></p>
+        <p>结构类型/桩号/规模</p>
+  - elementId: step3-card
+    elementType: shape
+    bounds: [660, 110, 280, 370]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: step3-num
+    elementType: text
+    bounds: [675, 120, 70, 50]
+    content:
+      fontSize: 36
+      color: "$accent"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>03</strong></p>
+  - elementId: step3-title
+    elementType: text
+    bounds: [675, 172, 250, 26]
+    content:
+      fontSize: 18
+      color: "$primary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>语义关联</strong></p>
+  - elementId: step3-line
+    elementType: shape
+    bounds: [675, 204, 40, 2]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: step3-content
+    elementType: text
+    bounds: [675, 218, 250, 245]
+    content:
+      fontSize: 14
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.65
+      text: |
+        <p>建立工程知识推理链</p>
+        <p style="margin-top:8px"><strong>推理链路：</strong></p>
+        <p>工程量 → 施工方法</p>
+        <p>施工方法 → 设备需求</p>
+        <p>设备需求 → 工期</p>
+        <p>工期 → 成本</p>
+  - elementId: step4-card
+    elementType: shape
+    bounds: [960, 110, 260, 370]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: step4-num
+    elementType: text
+    bounds: [975, 120, 70, 50]
+    content:
+      fontSize: 36
+      color: "$accent"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>04</strong></p>
+  - elementId: step4-title
+    elementType: text
+    bounds: [975, 172, 230, 26]
+    content:
+      fontSize: 18
+      color: "$primary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>向量化存储</strong></p>
+  - elementId: step4-line
+    elementType: shape
+    bounds: [975, 204, 40, 2]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: step4-content
+    elementType: text
+    bounds: [975, 218, 230, 245]
+    content:
+      fontSize: 14
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.65
+      text: |
+        <p>工艺文本转化为向量嵌入</p>
+        <p style="margin-top:8px"><strong>技术方案：</strong></p>
+        <p>RAG检索增强</p>
+        <p>向量数据库</p>
+        <p style="margin-top:8px"><strong>应用场景：</strong></p>
+        <p>相似工程匹配</p>
+        <p>工艺智能推荐</p>
+  - elementId: arrow1
+    elementType: shape
+    bounds: [340, 280, 20, 0]
+    shapeName: straightConnector1
+    arrow: [null, "arrow"]
+    border: {style: solid, width: 2, color: "$accent"}
+  - elementId: arrow2
+    elementType: shape
+    bounds: [640, 280, 20, 0]
+    shapeName: straightConnector1
+    arrow: [null, "arrow"]
+    border: {style: solid, width: 2, color: "$accent"}
+  - elementId: arrow3
+    elementType: shape
+    bounds: [940, 280, 20, 0]
+    shapeName: straightConnector1
+    arrow: [null, "arrow"]
+    border: {style: solid, width: 2, color: "$accent"}
+  - elementId: bottom-note
+    elementType: shape
+    bounds: [60, 505, 1160, 130]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$primary"
+  - elementId: bottom-note-text
+    elementType: text
+    bounds: [90, 520, 1100, 100]
+    content:
+      fontSize: 15
+      color: "#FFFFFFCC"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.7
+      text: |
+        <p><span style="color:$accent;"><strong>核心目标：</strong></span>让AI不仅"读得懂"施工组织设计的文本内容，更能理解工程实体之间的逻辑关系——</p>
+        <p>知道"桩径1.8m的中风化岩层"应该匹配"冲击钻成孔"，知道"1891片T梁"需要"3座梁场"和"6套30m模板"，</p>
+        <p>从而从<span style="color:$accent;"><strong>文本生成</strong></span>迈向<span style="color:$accent;"><strong>工程推理</strong></span>。</p>
+  - elementId: bottom-line
+    elementType: shape
+    bounds: [60, 660, 1160, 2]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: page-num
+    elementType: text
+    bounds: [1190, 680, 50, 24]
+    content:
+      fontSize: 13
+      color: "$secondary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      align: [right, middle]
+      text: |
+        <p>14</p>

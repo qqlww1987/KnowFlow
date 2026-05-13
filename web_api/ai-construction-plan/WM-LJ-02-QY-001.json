@@ -1,0 +1,355 @@
+{
+  "wm_id": "WM-LJ-02-QY-001",
+  "wm_name": "高水位沙性路基压密注浆加固施工工法",
+  "wm_level": "QY",
+  "wm_level_name": "企业级工法",
+  "wm_category": "LJ-02",
+  "wm_category_name": "路基工程-地基处理",
+  "wm_tags": [
+    "压密注浆",
+    "高水位",
+    "沙性地基",
+    "软基处理",
+    "海陆交汇"
+  ],
+  "wm_status": "active",
+  "source_doc": {
+    "original_format": "PDF",
+    "page_count": 23,
+    "file_hash": "sha256:xxx",
+    "storage_path": "/knowledge_base/work_methods/WM-LJ-02-QY-001.pdf"
+  },
+  "authors": [
+    {
+      "name": "林万福",
+      "unit": "福建路港（集团）有限公司",
+      "role": "第一完成人"
+    },
+    {
+      "name": "黄金星",
+      "unit": "福建路港（集团）有限公司",
+      "role": "完成人"
+    },
+    {
+      "name": "王巧艺",
+      "unit": "福建路港（集团）有限公司",
+      "role": "完成人"
+    },
+    {
+      "name": "许连发",
+      "unit": "福建路港（集团）有限公司",
+      "role": "完成人"
+    },
+    {
+      "name": "江良运",
+      "unit": "福建路港（集团）有限公司",
+      "role": "完成人"
+    }
+  ],
+  "completion_unit": "福建路港（集团）有限公司",
+  "record_date": "",
+  "version": "1.0",
+  "knowledge": {
+    "foreword": "针对海陆交汇区域沙性地质，尤其在地下水位高、流沙严重区域的施工总结形成的工法，有效解决注浆过程中水泥浆被地下水、流沙带走无法固结的问题。",
+    "features": [
+      {
+        "feature_id": "F01",
+        "content": "通过土体挤密构成浆脉复合地基，提高软土地基承载力",
+        "dimension": "技术效果"
+      },
+      {
+        "feature_id": "F02",
+        "content": "噪音小、无震动、维护效果好",
+        "dimension": "环保性能"
+      },
+      {
+        "feature_id": "F03",
+        "content": "施工工艺简单，便于操作，施工质量高，适用性强",
+        "dimension": "施工便利性"
+      }
+    ],
+    "applicability": {
+      "suitable_conditions": [
+        "中砂海陆交汇区域沙性地质",
+        "地下水位高、流沙严重区域",
+        "黏土地基（有适宜排水条件时）"
+      ],
+      "unsuitable_conditions": [],
+      "geological_keywords": [
+        "沙性地质",
+        "高水位",
+        "流沙",
+        "中砂",
+        "海陆交汇"
+      ],
+      "structural_keywords": [
+        "路基",
+        "地基加固",
+        "基础处理"
+      ]
+    },
+    "principle": {
+      "core_mechanism": "压密注浆将水泥浆混合速凝剂注入地层设计深度，浆液以填充、渗透、挤密方式赶走土颗粒间水分和空气，经人工控制时间胶结成U型结石体。",
+      "key_innovation": "添加速凝剂解决高水位流沙区浆液被带走问题，形成浆土结合体实现综合加固"
+    },
+    "process_flow": {
+      "description": "施工准备→测量放线→原材料检验→钻机就位→水泥浆拌制→打孔至设计标高→注浆(提升注浆)→注浆结束",
+      "steps": [
+        {
+          "step_id": "S01",
+          "name": "施工准备",
+          "description": "清除表层耕植土、回填沙至设计标高、开挖沟槽与集水坑、准备机械器具仪表管路材料水电"
+        },
+        {
+          "step_id": "S02",
+          "name": "测量放线",
+          "description": "利用全站仪进行桩位定位放样，允许偏差2cm"
+        },
+        {
+          "step_id": "S03",
+          "name": "原材料检验",
+          "description": "水泥按JTGF801-2012检测，外加剂按GB8076-2008检测"
+        },
+        {
+          "step_id": "S04",
+          "name": "钻机就位",
+          "description": "根据放线点位安装调试钻机，通过试验段确定浆比重、注浆流量、提升速度"
+        },
+        {
+          "step_id": "S05",
+          "name": "水泥浆拌制",
+          "description": "每100m设制浆点，投料顺序水→水泥→粉煤灰→水玻璃，搅拌≥3min"
+        },
+        {
+          "step_id": "S06",
+          "name": "打孔",
+          "description": "Φ25mm钻头注浆管压入土中至设计深度，垂直偏差≤1%"
+        },
+        {
+          "step_id": "S07",
+          "name": "注浆",
+          "description": "自下而上，压力0.5-1.0MPa，流速0-1.0L/min，跳孔注浆梅花形布置"
+        },
+        {
+          "step_id": "S08",
+          "name": "注浆结束",
+          "description": "提升至设计标高，提出注浆管，清洗管路"
+        }
+      ]
+    }
+  },
+  "parameters": {
+    "key_parameters": [
+      {
+        "param_name": "注浆压力",
+        "value": "0.5-1.0",
+        "unit": "MPa",
+        "control_type": "双控（注浆量为主，压力为辅）"
+      },
+      {
+        "param_name": "浆液流速",
+        "value": "0-1.0",
+        "unit": "L/min"
+      },
+      {
+        "param_name": "拔管高度",
+        "value": "0.33",
+        "unit": "m"
+      },
+      {
+        "param_name": "钻杆垂直偏差",
+        "value": "≤1",
+        "unit": "%"
+      },
+      {
+        "param_name": "桩位偏差",
+        "value": "≤50",
+        "unit": "mm"
+      },
+      {
+        "param_name": "搅拌时间",
+        "value": "≥3",
+        "unit": "min"
+      },
+      {
+        "param_name": "有效加固半径",
+        "value": "0.4-0.5",
+        "unit": "m",
+        "note": "无试验条件时取值"
+      },
+      {
+        "param_name": "水泥浆填充系数α",
+        "value": "0.6-0.8",
+        "unit": ""
+      },
+      {
+        "param_name": "工作条件系数β",
+        "value": "1.1",
+        "unit": "",
+        "note": "考虑浆液流失"
+      },
+      {
+        "param_name": "重复注浆间隔",
+        "value": "≤4",
+        "unit": "h",
+        "note": "不超过浆液初凝时间"
+      }
+    ],
+    "formula": {
+      "name": "每孔水泥浆灌注量估算",
+      "expression": "N = αβπr²(l+r)n",
+      "variables": {
+        "α": "水泥浆填充系数 0.6-0.8",
+        "β": "工作条件系数 1.1",
+        "r": "有效加固半径(m) 0.4-0.5",
+        "l": "加固深度(m)",
+        "n": "天然孔隙率"
+      },
+      "source": "JGJ79-2012 第8.2.3-3条"
+    },
+    "materials": [
+      {
+        "name": "42.5R普通硅酸盐水泥",
+        "spec": "袋装≤200t/批或散装≤500t/批取样",
+        "test_std": "JTGF801-2012"
+      },
+      {
+        "name": "粉煤灰",
+        "spec": "",
+        "test_std": ""
+      },
+      {
+        "name": "外加剂（水玻璃）",
+        "spec": "检测减水率/含固量/含水率/pH/细度等",
+        "test_std": "GB8076-2008"
+      }
+    ],
+    "equipment": [
+      {
+        "name": "钻机注浆机",
+        "model": "45KW",
+        "quantity_per_unit": "1台",
+        "note": "根据工程量确定台数"
+      },
+      {
+        "name": "砂浆搅拌机",
+        "model": "2.2KW",
+        "quantity_per_unit": "1台"
+      },
+      {
+        "name": "压浆泵",
+        "model": "SYB50挤压式 压力0.5-1.6MPa",
+        "quantity_per_unit": "1台"
+      },
+      {
+        "name": "注浆管",
+        "model": "Φ25mm专用钻头",
+        "quantity_per_unit": "50m"
+      },
+      {
+        "name": "履带式挖掘机",
+        "model": "斗容1m³",
+        "quantity_per_unit": "1台",
+        "note": "清表平整"
+      }
+    ],
+    "labor": [
+      {
+        "role": "技术员/测量员",
+        "count": 1,
+        "note": "可兼顾多台钻机"
+      },
+      {
+        "role": "工班长",
+        "count": 1
+      },
+      {
+        "role": "制浆工",
+        "count": 2
+      },
+      {
+        "role": "钻机技工",
+        "count": 2
+      },
+      {
+        "role": "辅助工",
+        "count": 2
+      },
+      {
+        "role": "电工",
+        "count": 1,
+        "note": "可兼顾多台钻机"
+      }
+    ]
+  },
+  "relations": {
+    "ref_specifications": [
+      {
+        "spec_no": "JTGF801-2012",
+        "spec_name": "公路工程质量检验评定标准",
+        "usage": "原材料检测/质量控制"
+      },
+      {
+        "spec_no": "GB8076-2008",
+        "spec_name": "混凝土外加剂规范",
+        "usage": "外加剂检测"
+      },
+      {
+        "spec_no": "JGJ79-2012",
+        "spec_name": "建筑地基处理技术规范",
+        "usage": "注浆量计算公式来源"
+      }
+    ],
+    "application_cases": [
+      {
+        "project_name": "福清市江阴张厝片区填海造地项目（填海工程一期）",
+        "location": "福建省福清市",
+        "geology": "海陆交汇区域沙性地质，人工填筑层+中砂层，厚1.8-12.1m",
+        "scale": "压密注浆面积5500㎡，加固深度3.5m",
+        "cost": "总造价1557万元",
+        "period": "2013.1-2013.10",
+        "comparison": {
+          "alternative_method": "高压旋喷桩",
+          "alternative_unit_cost": "220元/m",
+          "this_method_unit_cost": "135元/m",
+          "saving_per_m³": "85元",
+          "total_saving": "163.625万元"
+        },
+        "effect": "强度符合设计和规范要求，施工质量优良"
+      },
+      {
+        "project_name": "泉州台商投资区东西主干道拓改工程（一期）第二标段",
+        "location": "福建省泉州市",
+        "geology": "海陆交汇区域，半流态中细沙质土体，松、散、软",
+        "cost": "总造价13500万元",
+        "period": "2012.8-2013.12",
+        "effect": "按期完成，质量可靠、污染小"
+      },
+      {
+        "project_name": "遵义市巷口经鸭溪至三合公路XXTJ-6合同段",
+        "location": "贵州省遵义市",
+        "geology": "半流态中细沙质土体，松、散、软",
+        "cost": "总造价8602万元",
+        "period": "2014.1-2015.8",
+        "effect": "强度符合要求，施工质量合格"
+      }
+    ]
+  },
+  "embedding_text": "压密注浆加固工法 适用于高水位沙性路基 海陆交汇区域 \n    地下水位高 流沙严重 中砂地质 黏土地基排水条件 \n    浆液填充渗透挤密 U型结石体 浆脉复合地基 \n    注浆压力0.5-1.0MPa 浆液流速0-1.0L/min \n    水泥浆配合比 水玻璃速凝剂 粉煤灰 \n    跳孔注浆 梅花形布置 双控原则",
+  "quality_control": [
+    "施工前进行工艺性试验确定参数",
+    "注浆孔垂直偏差≤1%，桩位偏差≤50mm",
+    "以注浆量为主、压力为辅的双控原则",
+    "冒浆情况监控，达到要求方可提升",
+    "管线下方注浆控制灌浆时间和浆量",
+    "停机3h以上必须全面清洗管路"
+  ],
+  "safety_measures": [
+    "执行JGJ46-2005临时用电安全规范",
+    "安全教育培训考试合格上岗",
+    "佩戴安全帽口罩手套穿软底鞋",
+    "钻具立悬摆放时牢固垫稳",
+    "检查地面开裂防止机架倾斜",
+    "手持电动工具配备漏电保护器"
+  ]
+}

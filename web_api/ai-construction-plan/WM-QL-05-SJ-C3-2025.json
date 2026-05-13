@@ -1,0 +1,375 @@
+{
+  "wm_id": "WM-QL-05-SJ-C3-2025",
+  "wm_name": "PC斜拉桥变宽主梁后支点挂篮施工工法",
+  "wm_level": "SJ",
+  "wm_level_name": "省级工法",
+  "wm_level_detail": "GGG(川)C3-2025",
+  "wm_category": "QL-05",
+  "wm_category_name": "桥梁工程-斜拉桥施工",
+  "wm_tags": [
+    "斜拉桥",
+    "变宽主梁",
+    "后支点挂篮",
+    "悬臂浇筑",
+    "智能控制"
+  ],
+  "wm_status": "active",
+  "source_doc": {
+    "original_format": "PDF",
+    "page_count": 51,
+    "file_hash": "sha256:xxx",
+    "storage_path": "/knowledge_base/work_methods/WM-QL-05-SJ-C3-2025.pdf"
+  },
+  "authors": [
+    {
+      "name": "唐中波",
+      "unit": "四川路桥华东建设有限责任公司",
+      "role": "第一完成人"
+    },
+    {
+      "name": "周咏凯",
+      "unit": "四川路桥华东建设有限责任公司",
+      "role": "完成人"
+    },
+    {
+      "name": "周长宪",
+      "unit": "四川路桥华东建设有限责任公司",
+      "role": "完成人"
+    },
+    {
+      "name": "吴锐",
+      "unit": "四川路桥华东建设有限责任公司",
+      "role": "完成人"
+    },
+    {
+      "name": "唐源懋",
+      "unit": "四川路桥华东建设有限责任公司",
+      "role": "完成人"
+    }
+  ],
+  "completion_unit": "四川路桥华东建设有限责任公司",
+  "record_province": "四川省",
+  "record_date": "2025",
+  "version": "1.0",
+  "knowledge": {
+    "foreword": "传统前支点挂篮在变宽主梁施工中行走困难、需多次调索工序复杂。本工法创新采用后支点挂篮，通过中下横梁+垫块简支结构适应主梁反力调整及梁体变宽，设置悬臂吊架解决行走时与斜拉索空间冲突。",
+    "features": [
+      {
+        "feature_id": "F01",
+        "content": "采用后支点挂篮替代前支点挂篮，无需多次调索，工序更简单",
+        "dimension": "工艺创新"
+      },
+      {
+        "feature_id": "F02",
+        "content": "中下横梁+垫块简支结构，适应主梁反力调整及梁体变宽；悬臂吊架上下交替使用解决斜拉索空间冲突",
+        "dimension": "结构创新"
+      },
+      {
+        "feature_id": "F03",
+        "content": "前后下横梁采用桁架结构分节段厂内预制，现场销轴连接拼装，解决库区无大型运输船和吊装设备难题",
+        "dimension": "设备创新"
+      },
+      {
+        "feature_id": "F04",
+        "content": "挂篮行走采用一机两泵四顶智能集中控制系统，一键式操作，精度1mm",
+        "dimension": "智能控制"
+      }
+    ],
+    "applicability": {
+      "suitable_conditions": [
+        "PC斜拉桥变宽主梁施工",
+        "双纵肋主梁结构",
+        "半漂浮体系斜拉桥"
+      ],
+      "unsuitable_conditions": [
+        "等截面主梁（前支点挂篮更经济）",
+        "非预应力混凝土斜拉桥"
+      ],
+      "structural_keywords": [
+        "斜拉桥",
+        "变宽主梁",
+        "后支点挂篮",
+        "悬臂浇筑",
+        "双纵肋"
+      ],
+      "technical_keywords": [
+        "智能集中控制",
+        "一键式操作",
+        "同步顶升"
+      ]
+    },
+    "principle": {
+      "core_mechanism": "在底篮平台上搭设桁架作为模板系统，绑扎钢筋安装预应力管道后浇筑混凝土，养护等强后预应力张拉，完成斜拉索张挂及终张，挂篮行走至下一节段，重复流程完成悬臂施工。",
+      "key_innovation": "后支点受力方式使挂篮结构更安全可控；变宽段中下横梁横移30cm适应梁宽变化"
+    },
+    "process_flow": {
+      "description": "挂篮设计→施工准备→挂篮安装→挂篮预压→钢筋及预应力管道施工→混凝土浇筑→主梁预应力施工→斜拉索张挂及终张→挂篮行走",
+      "steps": [
+        {
+          "step_id": "S01",
+          "name": "挂篮设计",
+          "description": "技术中心初步设计，与监控/设计/专家讨论确定后支点三角挂篮方案（主桁+行走机构+悬吊系统+锚固系统+底篮系统+操作平台+预埋件）"
+        },
+        {
+          "step_id": "S02",
+          "name": "施工准备",
+          "description": "技术方案编审、安全技术交底；厂内构件尺寸检查及焊缝探伤；主桁及行走托架厂内预压（对顶荷载试验）"
+        },
+        {
+          "step_id": "S03",
+          "name": "挂篮安装",
+          "description": "主桁架/下横梁预拼后陆运至现场，塔吊+卷扬机配合拼装：中下横梁定位→前后斜杆→后下横梁→底篮纵梁桁架→前下横梁→底纵梁"
+        },
+        {
+          "step_id": "S04",
+          "name": "挂篮预压",
+          "description": "水袋上挂下压方式，配重钢筋布置于底篮桁架水袋下方。消除非弹性变形，测定弹性变形作为立模标高依据"
+        },
+        {
+          "step_id": "S05",
+          "name": "钢筋及预应力管道施工",
+          "description": "横隔梁钢筋及预应力管道→横隔梁外侧模板→主梁钢筋→预应力管道及索导管端头模板→顶板钢筋及预应力"
+        },
+        {
+          "step_id": "S06",
+          "name": "混凝土浇筑",
+          "description": "2台地泵+两套泵管+两台布料机，浇筑顺序：大纵肋→横隔板→小纵肋及桥面板，对称均匀浇筑"
+        },
+        {
+          "step_id": "S07",
+          "name": "主梁预应力施工",
+          "description": "先纵向后横向张拉，智能张拉机施工，张拉完成后压浆"
+        },
+        {
+          "step_id": "S08",
+          "name": "斜拉索张挂及终张",
+          "description": "单根钢绞线循环牵引法安装，初张80%设计索力，终张在气温适宜恒定时张拉至100%"
+        },
+        {
+          "step_id": "S09",
+          "name": "挂篮行走",
+          "description": "14步标准流程：行走吊杆安装→底篮下放75cm→顶升中支点→安装前后托架→解除后锚→第二次下放至3m→前移→吊架转换→行走到位→提升2.6m→模板安装→精确提升→受力体系转换"
+        }
+      ]
+    }
+  },
+  "parameters": {
+    "key_parameters": [
+      {
+        "param_name": "主桥跨径",
+        "value": "148+320+148",
+        "unit": "m"
+      },
+      {
+        "param_name": "标准梁段肋高",
+        "value": "2.7",
+        "unit": "m"
+      },
+      {
+        "param_name": "路线中心梁高",
+        "value": "3.062",
+        "unit": "m"
+      },
+      {
+        "param_name": "肋宽",
+        "value": "2.2",
+        "unit": "m"
+      },
+      {
+        "param_name": "肋间净距",
+        "value": "31.8",
+        "unit": "m"
+      },
+      {
+        "param_name": "顶板厚度",
+        "value": "0.28",
+        "unit": "m"
+      },
+      {
+        "param_name": "梁顶全宽(标准)",
+        "value": "36.2",
+        "unit": "m"
+      },
+      {
+        "param_name": "最大截面宽度",
+        "value": "37.496",
+        "unit": "m"
+      },
+      {
+        "param_name": "变宽段横梁横移量",
+        "value": "30",
+        "unit": "cm"
+      },
+      {
+        "param_name": "行走控制精度",
+        "value": "1",
+        "unit": "mm"
+      },
+      {
+        "param_name": "单节段循环工期",
+        "value": "12",
+        "unit": "天"
+      },
+      {
+        "param_name": "斜拉索初张比例",
+        "value": "80",
+        "unit": "%设计索力"
+      },
+      {
+        "param_name": "小纵肋高",
+        "value": "0.88",
+        "unit": "m"
+      },
+      {
+        "param_name": "小纵肋宽",
+        "value": "0.5",
+        "unit": "m"
+      }
+    ],
+    "formula": {
+      "name": "变宽段挂篮支点调整",
+      "description": "挂篮行走至X12'节段后，解除中下横梁与下弦杆螺栓，中下横梁向外横移30cm，垫块1向内移动30cm，支点间距增加30cm"
+    },
+    "equipment": [
+      {
+        "name": "塔吊",
+        "model": "6024",
+        "usage": "挂篮安装",
+        "quantity": "2台"
+      },
+      {
+        "name": "施工电梯",
+        "model": "SC200W",
+        "usage": "人员运输",
+        "quantity": "2台"
+      },
+      {
+        "name": "智能张拉机",
+        "model": "",
+        "usage": "预应力张拉",
+        "quantity": ""
+      },
+      {
+        "name": "地泵",
+        "model": "HBT90",
+        "usage": "混凝土浇筑",
+        "quantity": "2台"
+      },
+      {
+        "name": "布料机",
+        "model": "",
+        "usage": "混凝土布料",
+        "quantity": "2台"
+      },
+      {
+        "name": "180型拌合楼",
+        "model": "",
+        "usage": "混凝土生产",
+        "quantity": "2套"
+      },
+      {
+        "name": "智能集中控制系统",
+        "model": "一机两泵四顶",
+        "usage": "挂篮行走控制",
+        "note": "一键式操作"
+      },
+      {
+        "name": "100t穿心千斤顶",
+        "model": "",
+        "usage": "顶升挂篮后锚压梁",
+        "quantity": "4台"
+      },
+      {
+        "name": "10t卷扬机",
+        "model": "",
+        "usage": "挂篮安装",
+        "quantity": "2台"
+      }
+    ]
+  },
+  "relations": {
+    "ref_specifications": [
+      {
+        "spec_no": "JTG/T 3650-2020",
+        "spec_name": "公路桥涵施工技术规范"
+      },
+      {
+        "spec_no": "CJJ/T 281-2018",
+        "spec_name": "桥梁悬臂浇筑施工技术标准"
+      },
+      {
+        "spec_no": "GB50666-2011",
+        "spec_name": "混凝土结构工程施工规范"
+      },
+      {
+        "spec_no": "JTG F90-2015",
+        "spec_name": "公路工程施工安全技术规范"
+      },
+      {
+        "spec_no": "JTG F80/1-2017",
+        "spec_name": "公路工程质量检验评定标准"
+      },
+      {
+        "spec_no": "GB50205-2020",
+        "spec_name": "钢结构工程施工及验收规范"
+      }
+    ],
+    "application_cases": [
+      {
+        "project_name": "宜金高速XJ1标中都河特大桥",
+        "bridge_type": "双塔双索面密索对称扇形布置PC斜拉桥",
+        "main_span": "148m+320m+148m",
+        "total_length": "1009m",
+        "structure_system": "半漂浮体系",
+        "main_pier": "新市岸承台22.7m×16.5m×6m，桩径2.5m",
+        "construction_period_per_segment": "12天",
+        "total_output_value": "1.02亿元",
+        "savings": "181.48万元",
+        "efficiency_improvement": "14%",
+        "result": "无任何安全质量问题，单节段工期节约2天"
+      }
+    ],
+    "comparison": {
+      "this_method": "后支点挂篮",
+      "alternative": "前支点挂篮",
+      "this_advantages": [
+        "受力方式简单结构安全",
+        "工序简单只需一次调索",
+        "变宽段行走无难题"
+      ],
+      "alternative_advantages": [
+        "技术成熟有成套技术",
+        "拉索作用充分发挥"
+      ],
+      "alternative_disadvantages": [
+        "需多次调索工序复杂",
+        "变宽段行走困难"
+      ]
+    }
+  },
+  "embedding_text": "PC斜拉桥 变宽主梁 后支点挂篮 悬臂浇筑 \n    双纵肋主梁 半漂浮体系 密索扇形布置 \n    中下横梁垫块简支 悬臂吊架 斜拉索空间冲突 \n    桁架结构厂内预制 销轴连接拼装 \n    智能集中控制 一机两泵四顶 一键式操作 精度1mm \n    水袋预压 混凝土浇筑顺序 大纵肋横隔板小纵肋 \n    单根钢绞线循环牵引 初张80% 终张100% \n    挂篮行走14步流程 底篮下放 吊架转换 受力体系转换 \n    变宽段横梁横移30cm",
+  "quality_control": {
+    "checklists": [
+      "挂篮模板安装检查表（表面高低差/平整度/垂直度/模内尺寸）",
+      "挂篮安装完成检查表（拼装验收/主桁/模板/吊篮/牵引/安全/电器）",
+      "挂篮浇筑前检查表（主桁/悬吊/后锚/钢筋/预应力/模板/预埋/安全）",
+      "挂篮行走前后验收表",
+      "挂篮月度维保检查表（行走/后锚/主桁/模板/悬吊/清理）"
+    ],
+    "key_standards": {
+      "template_surface_flatness": "2mm",
+      "template_verticality": "H/1000且≤3mm",
+      "adjacent_surface_height_diff": "2mm",
+      "anchor_bolt_safety_factor": "≥2倍"
+    }
+  },
+  "safety_measures": [
+    "精加工件编制技术规格书",
+    "挂篮行走设置前吊杆保险（接长3m钢吊带）和侧吊杆保险（滑车组+钢绳）",
+    "底部安全平台：2道横向+2道纵向通道",
+    "上横梁及侧吊架安全平台三边封闭",
+    "主梁合龙束梁底悬挂安全平台（主纵肋12m×4m，小纵肋3m×3m）",
+    "跨越道路设置防击棚（宽7m×高6.6m，φ325钢管立柱+I25主梁+3mm钢板）",
+    "塔梁通道附着索塔防击通道"
+  ]
+}

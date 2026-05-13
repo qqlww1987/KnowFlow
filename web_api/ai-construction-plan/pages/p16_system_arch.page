@@ -1,0 +1,175 @@
+pageType: content
+background:
+  type: solid
+  color: "$background"
+elements:
+  - elementId: page-title
+    elementType: text
+    bounds: [60, 40, 1000, 40]
+    content:
+      style: "$title"
+      wrap: false
+      text: |
+        <p><strong>系统总体架构：LLM+RAG+多Agent协同的生成引擎</strong></p>
+  - elementId: title-accent
+    elementType: shape
+    bounds: [60, 85, 40, 3]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: layer1-bg
+    elementType: shape
+    bounds: [60, 115, 1160, 105]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$darkBg"
+  - elementId: layer1-label
+    elementType: text
+    bounds: [80, 122, 160, 24]
+    content:
+      fontSize: 14
+      color: "$accent"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>数据接入层</strong></p>
+  - elementId: layer1-content
+    elementType: text
+    bounds: [80, 150, 1120, 55]
+    content:
+      fontSize: 14
+      color: "#FFFFFFCC"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.6
+      text: |
+        <p><strong style="color:#FFFFFF;">PDF/OCR解析</strong> — 图纸/报告文字提取  →  <strong style="color:#FFFFFF;">表格提取引擎</strong> — 工程量清单/材料表自动识别  →  <strong style="color:#FFFFFF;">BIM数据接口</strong> — 三维模型参数导出  →  <strong style="color:#FFFFFF;">矢量化处理</strong> — 图纸线条转几何数据</p>
+  - elementId: layer2-bg
+    elementType: shape
+    bounds: [60, 235, 1160, 105]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "#3D4549"
+  - elementId: layer2-label
+    elementType: text
+    bounds: [80, 242, 160, 24]
+    content:
+      fontSize: 14
+      color: "$accent"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>知识检索层</strong></p>
+  - elementId: layer2-content
+    elementType: text
+    bounds: [80, 270, 1120, 55]
+    content:
+      fontSize: 14
+      color: "#FFFFFFCC"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.6
+      text: |
+        <p><strong style="color:#FFFFFF;">向量数据库</strong> — 工艺工法语义检索  →  <strong style="color:#FFFFFF;">结构化查询</strong> — 工程量/定额精确匹配  →  <strong style="color:#FFFFFF;">混合检索引擎</strong> — 语义+关键词融合排序  →  <strong style="color:#FFFFFF;">知识图谱</strong> — 工程实体关系推理</p>
+  - elementId: layer3-bg
+    elementType: shape
+    bounds: [60, 355, 1160, 105]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$primary"
+  - elementId: layer3-label
+    elementType: text
+    bounds: [80, 362, 160, 24]
+    content:
+      fontSize: 14
+      color: "$accent"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>智能生成层</strong></p>
+  - elementId: layer3-content
+    elementType: text
+    bounds: [80, 390, 1120, 55]
+    content:
+      fontSize: 14
+      color: "#FFFFFFCC"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.6
+      text: |
+        <p><strong style="color:#FFFFFF;">文档规划Agent</strong> — 大纲生成与章节编排  →  <strong style="color:#FFFFFF;">工程计算Agent</strong> — 工程量复核/工期计算  →  <strong style="color:#FFFFFF;">工艺选择Agent</strong> — 施工方法匹配推荐  →  <strong style="color:#FFFFFF;">排版渲染Agent</strong> — Word自动排版输出</p>
+  - elementId: layer4-bg
+    elementType: shape
+    bounds: [60, 475, 1160, 105]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: layer4-label
+    elementType: text
+    bounds: [80, 482, 160, 24]
+    content:
+      fontSize: 14
+      color: "#FFFFFF"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>质量校验层</strong></p>
+  - elementId: layer4-content
+    elementType: text
+    bounds: [80, 510, 1120, 55]
+    content:
+      fontSize: 14
+      color: "#FFFFFFDD"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.6
+      text: |
+        <p><strong style="color:#FFFFFF;">规则引擎</strong> — 规范引用准确性检查  →  <strong style="color:#FFFFFF;">一致性校验</strong> — 工程量前后数据核对  →  <strong style="color:#FFFFFF;">逻辑冲突检测</strong> — 工期/资源/方案矛盾识别  →  <strong style="color:#FFFFFF;">人工审核工作流</strong> — 专家确认与修订</p>
+  - elementId: arrow1
+    elementType: shape
+    bounds: [618, 220, 0, 15]
+    shapeName: straightConnector1
+    arrow: [null, "arrow"]
+    border: {style: solid, width: 2, color: "$accent"}
+  - elementId: arrow2
+    elementType: shape
+    bounds: [618, 340, 0, 15]
+    shapeName: straightConnector1
+    arrow: [null, "arrow"]
+    border: {style: solid, width: 2, color: "$accent"}
+  - elementId: arrow3
+    elementType: shape
+    bounds: [618, 460, 0, 15]
+    shapeName: straightConnector1
+    arrow: [null, "arrow"]
+    border: {style: solid, width: 2, color: "$accent"}
+  - elementId: tech-note
+    elementType: text
+    bounds: [60, 600, 1160, 40]
+    content:
+      fontSize: 14
+      color: "$secondary"
+      fontFamily: "Liter, MiSans"
+      align: [center, middle]
+      lineHeight: 1.5
+      text: |
+        <p><strong style="color:$accent;">核心技术栈：</strong>大语言模型（LLM）+ 知识图谱（KG）+ 向量化检索（RAG）+ 多Agent协作框架</p>
+  - elementId: bottom-line
+    elementType: shape
+    bounds: [60, 660, 1160, 2]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: page-num
+    elementType: text
+    bounds: [1190, 680, 50, 24]
+    content:
+      fontSize: 13
+      color: "$secondary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      align: [right, middle]
+      text: |
+        <p>16</p>

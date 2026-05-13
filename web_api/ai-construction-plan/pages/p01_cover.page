@@ -1,0 +1,67 @@
+pageType: cover
+background:
+  type: image
+  src: "/mnt/agents/output/ai-construction-plan/images/cover_bridge.png"
+  fit: {mode: cover}
+  mask:
+    type: gradient
+    gradientType: linear
+    angle: 0
+    stops:
+      - {position: 0, color: "#1E2426E6"}
+      - {position: 0.5, color: "#1E2426B3"}
+      - {position: 1, color: "#1E242640"}
+elements:
+  - elementId: accent-line
+    elementType: shape
+    bounds: [80, 280, 80, 3]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: title
+    elementType: text
+    bounds: [80, 300, 800, 120]
+    content:
+      style: "$coverTitle"
+      wrap: true
+      text: |
+        <p><strong>AI驱动实施性施工组织设计</strong></p>
+        <p><strong>生成方案</strong></p>
+  - elementId: subtitle
+    elementType: text
+    bounds: [80, 440, 700, 30]
+    content:
+      fontSize: 18
+      color: "#FFFFFFCC"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p>基于高速公路工程模板的智能化文档生成技术方案</p>
+  - elementId: tag
+    elementType: text
+    bounds: [80, 490, 200, 28]
+    content:
+      fontSize: 14
+      color: "$accent"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p>造价专家分析版</p>
+  - elementId: bottom-line
+    elementType: shape
+    bounds: [80, 650, 1120, 1]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "#FFFFFF30"
+  - elementId: date
+    elementType: text
+    bounds: [80, 660, 200, 24]
+    content:
+      fontSize: 13
+      color: "#FFFFFF80"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p>2026.05</p>

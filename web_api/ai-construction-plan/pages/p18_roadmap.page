@@ -1,0 +1,293 @@
+pageType: content
+background:
+  type: solid
+  color: "$background"
+elements:
+  - elementId: page-title
+    elementType: text
+    bounds: [60, 40, 900, 40]
+    content:
+      style: "$title"
+      wrap: false
+      text: |
+        <p><strong>实施路线图与预期效益：降本增效的量化目标</strong></p>
+  - elementId: title-accent
+    elementType: shape
+    bounds: [60, 85, 40, 3]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: phase1-card
+    elementType: shape
+    bounds: [60, 110, 370, 310]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: phase1-badge
+    elementType: shape
+    bounds: [60, 110, 370, 45]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: phase1-badge-text
+    elementType: text
+    bounds: [60, 110, 370, 45]
+    content:
+      fontSize: 16
+      color: "#FFFFFF"
+      fontFamily: "Liter, MiSans"
+      align: [center, middle]
+      wrap: false
+      text: |
+        <p><strong>Phase 1 基础建设期（3个月）</strong></p>
+  - elementId: phase1-content
+    elementType: text
+    bounds: [80, 170, 330, 245]
+    content:
+      fontSize: 14
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.7
+      text: |
+        <p><strong style="color:$accent;">核心任务</strong></p>
+        <p>• 基础文件解析引擎开发</p>
+        <p>• 知识库核心数据入库</p>
+        <p>• 施组模板结构化拆解</p>
+        <p style="margin-top:8px"><strong style="color:$accent;">生成范围</strong></p>
+        <p>工程概况 / 施工部署 / 进度计划</p>
+        <p style="margin-top:8px"><strong style="color:$accent;">预期指标</strong></p>
+        <p>3个核心章节自动生成</p>
+  - elementId: phase2-card
+    elementType: shape
+    bounds: [450, 110, 370, 310]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: phase2-badge
+    elementType: shape
+    bounds: [450, 110, 370, 45]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$primary"
+  - elementId: phase2-badge-text
+    elementType: text
+    bounds: [450, 110, 370, 45]
+    content:
+      fontSize: 16
+      color: "#FFFFFF"
+      fontFamily: "Liter, MiSans"
+      align: [center, middle]
+      wrap: false
+      text: |
+        <p><strong>Phase 2 能力扩展期（6个月）</strong></p>
+  - elementId: phase2-content
+    elementType: text
+    bounds: [470, 170, 330, 245]
+    content:
+      fontSize: 14
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.7
+      text: |
+        <p><strong style="color:$accent;">核心任务</strong></p>
+        <p>• 全章节生成能力覆盖</p>
+        <p>• 多项目类型适配</p>
+        <p>• 质量校验闭环完善</p>
+        <p style="margin-top:8px"><strong style="color:$accent;">生成范围</strong></p>
+        <p>16章全覆盖 / 路基/桥梁/隧道多类型</p>
+        <p style="margin-top:8px"><strong style="color:$accent;">预期指标</strong></p>
+        <p>规范引用准确率 > 90%</p>
+  - elementId: phase3-card
+    elementType: shape
+    bounds: [840, 110, 380, 310]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: phase3-badge
+    elementType: shape
+    bounds: [840, 110, 380, 45]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$darkBg"
+  - elementId: phase3-badge-text
+    elementType: text
+    bounds: [840, 110, 380, 45]
+    content:
+      fontSize: 16
+      color: "#FFFFFF"
+      fontFamily: "Liter, MiSans"
+      align: [center, middle]
+      wrap: false
+      text: |
+        <p><strong>Phase 3 智能优化期（12个月）</strong></p>
+  - elementId: phase3-content
+    elementType: text
+    bounds: [860, 170, 340, 245]
+    content:
+      fontSize: 14
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.7
+      text: |
+        <p><strong style="color:$accent;">核心任务</strong></p>
+        <p>• 智能优化与自动迭代</p>
+        <p>• 企业知识持续沉淀</p>
+        <p>• 一键生成能力成熟</p>
+        <p style="margin-top:8px"><strong style="color:$accent;">生成范围</strong></p>
+        <p>施组+专项方案 / 自动修订追踪</p>
+        <p style="margin-top:8px"><strong style="color:$accent;">预期指标</strong></p>
+        <p>企业知识复用率 > 80%</p>
+  - elementId: kpi-section
+    elementType: shape
+    bounds: [60, 420, 1160, 210]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$primary"
+  - elementId: kpi-title
+    elementType: text
+    bounds: [90, 435, 400, 28]
+    content:
+      fontSize: 18
+      color: "$accent"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>预期效益量化指标</strong></p>
+  - elementId: kpi1-num
+    elementType: text
+    bounds: [90, 475, 250, 70]
+    content:
+      style: "$bigNumber"
+      wrap: false
+      text: |
+        <p><strong>90%</strong></p>
+  - elementId: kpi1-label
+    elementType: text
+    bounds: [90, 550, 250, 22]
+    content:
+      fontSize: 14
+      color: "#FFFFFFCC"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p>编制效率提升</p>
+  - elementId: kpi1-desc
+    elementType: text
+    bounds: [90, 575, 250, 36]
+    content:
+      fontSize: 12
+      color: "#FFFFFF99"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.4
+      text: |
+        <p>从30人天缩短至3人天</p>
+  - elementId: kpi2-num
+    elementType: text
+    bounds: [380, 475, 250, 70]
+    content:
+      style: "$bigNumber"
+      wrap: false
+      text: |
+        <p><strong>95%</strong></p>
+  - elementId: kpi2-label
+    elementType: text
+    bounds: [380, 550, 250, 22]
+    content:
+      fontSize: 14
+      color: "#FFFFFFCC"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p>规范引用准确率</p>
+  - elementId: kpi2-desc
+    elementType: text
+    bounds: [380, 575, 250, 36]
+    content:
+      fontSize: 12
+      color: "#FFFFFF99"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.4
+      text: |
+        <p>自动引用+版本有效性校验</p>
+  - elementId: kpi3-num
+    elementType: text
+    bounds: [670, 475, 250, 70]
+    content:
+      style: "$bigNumber"
+      wrap: false
+      text: |
+        <p><strong>80%</strong></p>
+  - elementId: kpi3-label
+    elementType: text
+    bounds: [670, 550, 250, 22]
+    content:
+      fontSize: 14
+      color: "#FFFFFFCC"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p>知识复用率</p>
+  - elementId: kpi3-desc
+    elementType: text
+    bounds: [670, 575, 250, 36]
+    content:
+      fontSize: 12
+      color: "#FFFFFF99"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.4
+      text: |
+        <p>历史项目经验自动复用</p>
+  - elementId: kpi4-num
+    elementType: text
+    bounds: [960, 475, 230, 70]
+    content:
+      style: "$bigNumber"
+      wrap: false
+      text: |
+        <p><strong>3-5×</strong></p>
+  - elementId: kpi4-label
+    elementType: text
+    bounds: [960, 550, 230, 22]
+    content:
+      fontSize: 14
+      color: "#FFFFFFCC"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p>人效提升倍数</p>
+  - elementId: kpi4-desc
+    elementType: text
+    bounds: [960, 575, 230, 36]
+    content:
+      fontSize: 12
+      color: "#FFFFFF99"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.4
+      text: |
+        <p>单工程师可同时管理更多项目</p>
+  - elementId: bottom-line
+    elementType: shape
+    bounds: [60, 660, 1160, 2]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: page-num
+    elementType: text
+    bounds: [1190, 680, 50, 24]
+    content:
+      fontSize: 13
+      color: "$secondary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      align: [right, middle]
+      text: |
+        <p>18</p>

@@ -1,0 +1,216 @@
+pageType: table_of_contents
+background:
+  type: solid
+  color: "$background"
+elements:
+  - elementId: left-image
+    elementType: image
+    bounds: [0, 0, 420, 720]
+    src: "/mnt/agents/output/ai-construction-plan/images/interchange.png"
+    fit: {mode: cover}
+  - elementId: left-mask
+    elementType: shape
+    bounds: [0, 0, 420, 720]
+    shapeName: rect
+    fill:
+      type: gradient
+      gradientType: linear
+      angle: 0
+      stops:
+        - {position: 0, color: "#1E242600"}
+        - {position: 0.7, color: "#1E242640"}
+        - {position: 1, color: "#1E2426E6"}
+  - elementId: contents-label
+    elementType: text
+    bounds: [480, 60, 300, 40]
+    content:
+      fontSize: 14
+      color: "$accent"
+      fontFamily: "Liter, MiSans"
+      letterSpacing: 4
+      wrap: false
+      text: |
+        <p><strong>CONTENTS</strong></p>
+  - elementId: toc-title
+    elementType: text
+    bounds: [480, 100, 400, 44]
+    content:
+      style: "$title"
+      fontSize: 32
+      wrap: false
+      text: |
+        <p><strong>方案总览</strong></p>
+  - elementId: divider-top
+    elementType: shape
+    bounds: [480, 160, 700, 1]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "#D1CFCA"
+  - elementId: num-01
+    elementType: text
+    bounds: [480, 190, 70, 56]
+    content:
+      fontSize: 40
+      color: "$accent"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      align: [left, top]
+      text: |
+        <p><strong>01</strong></p>
+  - elementId: title-01
+    elementType: text
+    bounds: [560, 190, 500, 32]
+    content:
+      fontSize: 22
+      color: "$primary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      align: [left, top]
+      text: |
+        <p><strong>施工组织设计文档深度解析</strong></p>
+  - elementId: desc-01
+    elementType: text
+    bounds: [560, 228, 600, 24]
+    content:
+      fontSize: 14
+      color: "$secondary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p>拆解16章文档结构与数据依赖关系</p>
+  - elementId: line-01
+    elementType: shape
+    bounds: [480, 270, 700, 1]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "#E8E7E4"
+  - elementId: num-02
+    elementType: text
+    bounds: [480, 300, 70, 56]
+    content:
+      fontSize: 40
+      color: "$accent"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      align: [left, top]
+      text: |
+        <p><strong>02</strong></p>
+  - elementId: title-02
+    elementType: text
+    bounds: [560, 300, 500, 32]
+    content:
+      fontSize: 22
+      color: "$primary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      align: [left, top]
+      text: |
+        <p><strong>AI生成所需原始文件体系</strong></p>
+  - elementId: desc-02
+    elementType: text
+    bounds: [560, 338, 600, 24]
+    content:
+      fontSize: 14
+      color: "$secondary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p>梳理从模板到成稿的全部原始输入文件</p>
+  - elementId: line-02
+    elementType: shape
+    bounds: [480, 380, 700, 1]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "#E8E7E4"
+  - elementId: num-03
+    elementType: text
+    bounds: [480, 410, 70, 56]
+    content:
+      fontSize: 40
+      color: "$accent"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      align: [left, top]
+      text: |
+        <p><strong>03</strong></p>
+  - elementId: title-03
+    elementType: text
+    bounds: [560, 410, 500, 32]
+    content:
+      fontSize: 22
+      color: "$primary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      align: [left, top]
+      text: |
+        <p><strong>专业知识库构建方案</strong></p>
+  - elementId: desc-03
+    elementType: text
+    bounds: [560, 448, 600, 24]
+    content:
+      fontSize: 14
+      color: "$secondary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p>构建面向施组生成的多维知识库体系</p>
+  - elementId: line-03
+    elementType: shape
+    bounds: [480, 490, 700, 1]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "#E8E7E4"
+  - elementId: num-04
+    elementType: text
+    bounds: [480, 520, 70, 56]
+    content:
+      fontSize: 40
+      color: "$accent"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      align: [left, top]
+      text: |
+        <p><strong>04</strong></p>
+  - elementId: title-04
+    elementType: text
+    bounds: [560, 520, 500, 32]
+    content:
+      fontSize: 22
+      color: "$primary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      align: [left, top]
+      text: |
+        <p><strong>AI生成技术实施方案</strong></p>
+  - elementId: desc-04
+    elementType: text
+    bounds: [560, 558, 600, 24]
+    content:
+      fontSize: 14
+      color: "$secondary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p>从系统架构到关键技术的完整技术路线</p>
+  - elementId: bottom-accent
+    elementType: shape
+    bounds: [480, 660, 60, 2]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: page-num
+    elementType: text
+    bounds: [1190, 680, 50, 24]
+    content:
+      fontSize: 13
+      color: "$secondary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      align: [right, middle]
+      text: |
+        <p>02</p>

@@ -1,0 +1,228 @@
+pageType: content
+background:
+  type: solid
+  color: "$background"
+elements:
+  - elementId: page-title
+    elementType: text
+    bounds: [60, 40, 900, 40]
+    content:
+      style: "$title"
+      wrap: false
+      text: |
+        <p><strong>现场条件与环境类文件：施组落地的现实基础</strong></p>
+  - elementId: title-accent
+    elementType: shape
+    bounds: [60, 85, 40, 3]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: card1
+    elementType: shape
+    bounds: [60, 110, 370, 230]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: card1-icon
+    elementType: icon
+    bounds: [80, 125, 32, 32]
+    iconName: "fas:map-location-dot"
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: card1-title
+    elementType: text
+    bounds: [122, 128, 280, 26]
+    content:
+      fontSize: 18
+      color: "$primary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>现场踏勘报告</strong></p>
+  - elementId: card1-content
+    elementType: text
+    bounds: [80, 165, 330, 160]
+    content:
+      fontSize: 14
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.7
+      text: |
+        <p>• 地形地貌与场地条件</p>
+        <p>• 既有道路与进场条件</p>
+        <p>• 水电接入点位置</p>
+        <p>• 施工便道规划依据</p>
+        <p>• 场地平整工程量</p>
+  - elementId: card2
+    elementType: shape
+    bounds: [450, 110, 370, 230]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: card2-icon
+    elementType: icon
+    bounds: [470, 125, 32, 32]
+    iconName: "fas:house-crack"
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: card2-title
+    elementType: text
+    bounds: [512, 128, 280, 26]
+    content:
+      fontSize: 18
+      color: "$primary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>征地拆迁资料</strong></p>
+  - elementId: card2-content
+    elementType: text
+    bounds: [470, 165, 330, 160]
+    content:
+      fontSize: 14
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.7
+      text: |
+        <p>• 征地范围与权属</p>
+        <p>• 房屋拆迁数量</p>
+        <p>• 管线迁改方案（三电迁改）</p>
+        <p>• 坟墓/苗木迁移</p>
+        <p>• 炮损补偿范围</p>
+  - elementId: card3
+    elementType: shape
+    bounds: [840, 110, 380, 230]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: card3-icon
+    elementType: icon
+    bounds: [860, 125, 32, 32]
+    iconName: "fas:cloud-sun-rain"
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: card3-title
+    elementType: text
+    bounds: [902, 128, 290, 26]
+    content:
+      fontSize: 18
+      color: "$primary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>气象水文资料</strong></p>
+  - elementId: card3-content
+    elementType: text
+    bounds: [860, 165, 340, 160]
+    content:
+      fontSize: 14
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.7
+      text: |
+        <p>• 年均气温/极端气温</p>
+        <p>• 降雨量与雨季分布</p>
+        <p>• 风速/风向/冻深</p>
+        <p>• 洪水频率与水位</p>
+        <p>• 地震动峰值加速度</p>
+  - elementId: card4
+    elementType: shape
+    bounds: [60, 360, 560, 260]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: card4-icon
+    elementType: icon
+    bounds: [80, 375, 32, 32]
+    iconName: "fas:truck-ramp-box"
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: card4-title
+    elementType: text
+    bounds: [122, 378, 300, 26]
+    content:
+      fontSize: 18
+      color: "$primary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>材料调查报告</strong></p>
+  - elementId: card4-content
+    elementType: text
+    bounds: [80, 415, 520, 185]
+    content:
+      fontSize: 14
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.7
+      text: |
+        <p>• <strong>石料场</strong>：位置/储量/质量/运距/开采条件/价格</p>
+        <p>• <strong>砂料场</strong>：机制砂/天然砂来源与质量指标</p>
+        <p>• <strong>水泥/钢筋</strong>：供应商/品牌/运输方式</p>
+        <p>• <strong>混凝土外加剂</strong>：类型/掺量/供应商</p>
+        <p>• <strong>其他材料</strong>：粉煤灰/土工材料/防水材料等</p>
+  - elementId: card5
+    elementType: shape
+    bounds: [640, 360, 580, 260]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$cardBg"
+  - elementId: card5-icon
+    elementType: icon
+    bounds: [660, 375, 32, 32]
+    iconName: "fas:tree-city"
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: card5-title
+    elementType: text
+    bounds: [702, 378, 300, 26]
+    content:
+      fontSize: 18
+      color: "$primary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      text: |
+        <p><strong>环境敏感区资料</strong></p>
+  - elementId: card5-content
+    elementType: text
+    bounds: [660, 415, 540, 185]
+    content:
+      fontSize: 14
+      color: "$text"
+      fontFamily: "Liter, MiSans"
+      lineHeight: 1.7
+      text: |
+        <p>• <strong>水源保护区</strong>：位置/范围/保护要求</p>
+        <p>• <strong>文物点</strong>：分布位置/保护等级</p>
+        <p>• <strong>生态红线</strong>：占用情况/避让措施</p>
+        <p>• <strong>基本农田</strong>：征占用审批要求</p>
+        <p>• <strong>环保批复</strong>：环评意见/环保措施要求</p>
+  - elementId: bottom-line
+    elementType: shape
+    bounds: [60, 660, 1160, 2]
+    shapeName: rect
+    fill:
+      type: solid
+      color: "$accent"
+  - elementId: page-num
+    elementType: text
+    bounds: [1190, 680, 50, 24]
+    content:
+      fontSize: 13
+      color: "$secondary"
+      fontFamily: "Liter, MiSans"
+      wrap: false
+      align: [right, middle]
+      text: |
+        <p>09</p>
